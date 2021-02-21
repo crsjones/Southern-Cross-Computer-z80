@@ -1,0 +1,130 @@
+coarse         equ 82h
+fine           equ 3eh
+
+               org 2000h
+
+conv_loop      ld hl,dis_buff    ;convert all 6 digits into
+               call conv_all     ;display code
+main_loop:     call scan_second  ;display digits for 1 second
+up_time:       ld a,(seconds)    ;get seconds count
+               inc a             ;up one second
+               ld (seconds),a    ;save new seconds
+               cp 10             ;check for 10 second count
+               jr nz,conv_loop   ;jump none to update display
+               ld a,0            ;else set to 0
+               ld (seconds),a    ;and save it
+               ld a,(_10_secs)   ;and up _10_secs
+               inc a             ;by one
+               ld (_10_secs),a   ;and save
+               cp 06             ;check it for full minute
+               jr nz,conv_loop   ;jump if not to update display
+               ld a,0            ;else zero _10_secs
+               ld (_10_secs),a   ;and save
+               ld a,(minutes)    ;now
+               inc a             ;up minutes
+               ld (minutes),a    ;and save
+               cp 10             ;test for 10 minutes
+               jr nz,conv_loop   ;jump if not to display new time
+               ld a,0            ;else zero minutes
+               ld (minutes),a    ;and save
+               ld a,(_10_mins)   ;now
+               inc a             ;up _10_mins by one
+               ld (_10_mins),a   ;and save
+               cp 06             ;test it for 60 mins
+               jr nz,conv_loop   ;jump if not
+               ld a,0            ;else zero minutes
+               ld (_10_mins),a   ;and save
+               ld a,(hours)      ;now
+               inc a             ;update hours
+               ld (hours),a      ;and save
+               cp 0ah            ;test it for overflow
+               jr nz,test_24     ;jump if none to test for 24 hours
+               ld a,0            ;else zero hours
+               ld (hours),a      ;and save
+               ld a,(_10_hours)  ;now
+               inc a             ;up _10_hours
+               ld (_10_hours),a  ;and save
+               jp conv_loop      ;all finished display new time
+
+test_24        cp 4              ;testing for 24 hours
+               jp nz,conv_loop   ;jump if not 4 to display time
+               ld a,(_10_hours)  ;else test _10_hours
+               cp 2              ;for 2
+               jp nz,conv_loop   ;display time if not
+               ld b,6            ;else clear all digits
+               ld hl,seconds     ;starting with seconds
+clr_loop:      ld (hl),0         ;set to 0
+               inc hl            ;next digit
+               djnz clr_loop     ;loop 6 times
+               jp conv_loop      ;display 00:00:00 (zero hundred hours)
+
+
+conv_all:      ld de,_10_hours   ;start from highest digit
+               ld b,6            ;6 digits to do
+con_loop:      ld a,(de)         ;display code; use BC as
+               call con_a        ;pointer to display buffer
+               dec de            ;next lowest digit
+               djnz con_loop     ;dec B jump not zero
+               ret               ;return from subroutine
+
+con_a:         push hl           ;save dis_buff pointer on stack
+               ld hl,distab      ;HL is used as an index
+               add a,l           ;pointer into the display code
+               ld l,a            ;table, add number to convert
+               jr nc,page_ok     ;in A to HL jump if no
+               inc h             ;carry else up H into new page
+page_ok:       ld a,(hl)         ;put display code in A
+               pop hl            ;get dis_buff pointer from stack
+               ld (hl),a         ;store in display buffer
+               inc hl            ;point BC to next display location
+               ret               ;all done so return
+
+scan_second:   ld c,0c1h         ;load C with outermost time value
+sec_loop:      push bc           ;save C on stack
+               call scan         ;display three digits
+               pop bc            ;get outer timer from stack put in C
+               ld b,coarse       ;set B for coarse delay
+               djnz $            ;do coarse delay
+               dec c             ;now decrement outer delay
+               jr nz,sec_loop    ;jump until it reaces zero
+               ld b,fine         ;now do very quick coarse delay
+               djnz $            ;coarse delay loop
+               ret               ;one second done, return
+
+scan:
+               ld hl,dis_buff    ;point to 10 hours display code
+               ld b,20h          ;load B with rotating scan bit
+scan_loop:     ld a,(hl)         ;put display code into A
+               out (84h),a       ;output it to segments
+               ld a,b            ;get scan bit in A
+               out (85h),a       ;output it to commons
+               ld b,0edh         ;load B with display on time
+               djnz $            ;loop here until delay finished
+               inc hl            ;point to next diplay code
+               ld b,a            ;return scan bit into B
+               xor a             ;trick to zero A
+               out (85h),a       ;clear commons to prevent ghosts
+               rrc b             ;shift scan bit once to the right
+               jr nc,scan_loop   ;has it fallen into carry flag?
+               ret               ;jump if not else return
+
+
+
+
+distab         db 3fh,06h,5bh,4fh ;0,1,2,3
+               db 66h,6dh,7dh,07h ;4,5,6,7
+               db 7fh,6fh         ;8,9
+
+seconds       equ 2100h
+_10_secs      equ 2101h
+minutes       equ 2102h
+_10_mins      equ 2103h
+hours         equ 2104h
+_10_hours     equ 2105h
+
+dis_buff      equ 2106h
+
+
+               end
+
+

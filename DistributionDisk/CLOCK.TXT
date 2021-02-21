@@ -1,0 +1,63 @@
+The DEMONSTRATION CLOCK is presented here as a programming example and
+is not meant to be a fully functional clock.
+Such a clock could be done on the SC and could have alarm and
+control features but this we'll leave for later as it requires an
+external accurate time source such as a periodical interrupt.
+This clock uses software delay loops for its the timing and these delay
+loops count off a fixed number of clock cycles from the the SC
+oscillator. In order to be accurate and to use the delay values given
+the SC must be set to the crystal (Fast) oscillator and the crystal must
+be 4.000000MHz.
+
+No attempt has been made to count the exact number of cycles used and to
+calibrate the clock by this means. Rather the clock has been calibrated
+simply against another clock over a 24 hour period. Once the clock is
+calibrated over the first 24 hours it will remain highly stable over
+each subsequent 24 hour period as this is the time it takes for one full
+software cycle and this software cycle is exactly the same for each
+24 hour period.
+
+Software trimming for slight variations in crystal speed can by done
+with the FINE adjustment value located at address 20a7h. A COARSE
+adjustment value at 20a0h is provided in case the FINE adjustment dose
+not have sufficient range.
+
+The program has been written in a straight forward way so that as many
+people as possible can easily understand how it works.  The program is
+presented here with each line commented to help you understand its
+operation. In addition to these comments a few other hints are given
+below.
+
+The scan_second subroutine actually is just fractionally lest
+than a second. This is to allow for the software overhead in updating
+the counters and converting the digits to display code etc.
+
+The amount of overhead varies at different times and so the accuracy of
+the clock varies by several hundredths of millionths of seconds.
+This slight variation is impossible to pick with the human eye the
+program is designed to calibrate out this variation over 24 hours.
+
+Ghosts and ghosting are referred several times in the annotation.
+Ghosting is when a digit appears very faintly on either the next display
+to be turned on or the previous display turned on in the multiplexing
+cycle. This happens when a both new common and segment values are to be
+outputted. If a new segment value is outputted while the previous
+common value is still on then the digit momentarily appear on the
+wrong display. because it is only on extremely shortly it appears very
+faintly or as a "ghost".
+
+SETTING THE CLOCK
+To set the clock the time is entered into RAM locations before the clock
+is started. Unit seconds are entered at 2100h. Tens of seconds at 2101h.
+Unit minutes at 2102h. Tens of seconds at 2103h. Unit hours at 2104h and
+tens of hours at 2105h. So to set the clock at 8:15:00 am you would
+enter the following:
+
+2100: 00    ;only the lower nibble is used
+2101: 00    ;the upper nibble must be 0
+2102: 05
+2103: 01
+2104: 08
+2105: 00
+
+

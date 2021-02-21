@@ -1,0 +1,191 @@
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: 3DIGIT.Z8T                                          Page  1
+
+
+                
+ 0011           clear          equ 11h           ;the address key
+ 0012           up             equ 12h           ;the + key
+ 0013           down           equ 13h           ;the - key
+                
+                
+ 2000                          org 2000h
+                
+ 2000 DB86      wait:          in a,(86h)        ;wait here until all keys are
+ 2002 CB6F                     bit 5,a           ;released
+ 2004 20FA                     jr nz,wait        ;jump while any key is down
+ 2006 08        init:          ex af,af'         ;the alternate Accum is used
+ 2007 3E00                     ld a,0            ;as a key stutus flag
+ 2009 08                       ex af,af'         ;0 = no key ff = key down
+ 200A 210020    clr_count:     ld hl,digit1      ;clear the 3 digits to 0
+ 200D 3600                     ld (hl),0         ;each digit is stored in
+ 200F 23                       inc hl            ;one memory location
+ 2010 3600                     ld (hl),0         ;to make the program simpler
+ 2012 23                       inc hl            ;to understand
+ 2013 3600                     ld (hl),0
+ 2015 010320    conv_loop      ld bc,dis_buff    ;now convert digits into
+ 2018 3A0020                   ld a,(digit1)     ;display code use BC as
+ 201B CDA120                   call con_a        ;pointer to dispaly buffer
+ 201E 3A0120                   ld a,(digit2)     ;do second digit
+ 2021 CDA120                   call con_a
+ 2024 3A0220                   ld a,(digit3)     ;and do third digit
+ 2027 CDA120                   call con_a
+ 202A CDAD20    main_loop:     call scan_d_k     ;now scan digits and keys
+ 202D FE12                     cp up             ;back here when new key pushed
+ 202F 280A                     jr z,up_count     ;jump now if + key
+ 2031 FE13                     cp down           ;no? is it - key
+ 2033 2838                     jr z,down_count   ;jump if so
+ 2035 FE11                     cp clear          ;else test for AD key
+ 2037 28D1                     jr z,clr_count    ;jump to clear count if so
+ 2039 18EF                     jr main_loop      ;else ignore all other keys
+                
+ 203B 3A0020    up_count:      ld a,(digit1)     ;get first digit
+ 203E 3C                       inc a             ;up one
+ 203F 320020                   ld (digit1),a     ;save in buffer
+ 2042 FE0A                     cp 0ah            ;check for over flow
+ 2044 20CF                     jr nz,conv_loop   ;jump none to update display
+ 2046 3E00                     ld a,0            ;else set to 0
+ 2048 320020                   ld (digit1),a     ;and save it
+ 204B 3A0120                   ld a,(digit2)     ;and up digit2
+ 204E 3C                       inc a             ;by one
+ 204F 320120                   ld (digit2),a     ;and save
+ 2052 FE0A                     cp 0ah            ;check it for overflow
+ 2054 20BF                     jr nz,conv_loop   ;jump none to update display
+ 2056 3E00                     ld a,0            ;zero digit2
+ 2058 320120                   ld (digit2),a     ;and save
+ 205B 3A0220                   ld a,(digit3)     ;now
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: 3DIGIT.Z8T                                          Page  2
+
+
+ 205E 3C                       inc a             ;up digit3
+ 205F 320220                   ld (digit3),a     ;and save
+ 2062 FE0A                     cp 0ah            ;test it for overflow
+ 2064 20AF                     jr nz,conv_loop   ;jump if none
+ 2066 3E00                     ld a,0            ;else zero digit3
+ 2068 320220                   ld (digit3),a     ;and save
+ 206B 18A8                     jr conv_loop      ;now update displays
+                
+ 206D 3A0020    down_count:    ld a,(digit1)     ;get first digit
+ 2070 3D                       dec a             ;down by one
+ 2071 320020                   ld (digit1),a     ;save in buffer
+ 2074 FEFF                     cp 0ffh           ;check for underflow
+ 2076 209D                     jr nz,conv_loop   ;jump none to update display
+ 2078 3E09                     ld a,9            ;else set to 9
+ 207A 320020                   ld (digit1),a     ;and save it
+ 207D 3A0120                   ld a,(digit2)     ;and down digit2
+ 2080 3D                       dec a             ;by one
+ 2081 320120                   ld (digit2),a     ;and save
+ 2084 FEFF                     cp 0ffh           ;check it for underflow
+ 2086 208D                     jr nz,conv_loop   ;jump none to update display
+ 2088 3E09                     ld a,9            ;set digit2 to 9
+ 208A 320120                   ld (digit2),a     ;and save it
+ 208D 3A0220                   ld a,(digit3)     ;now
+ 2090 3D                       dec a             ;down digit3 by one
+ 2091 320220                   ld (digit3),a     ;and save
+ 2094 FEFF                     cp 0ffh           ;test it for underflow
+ 2096 C21520                   jp nz,conv_loop   ;jump if none
+ 2099 3E09                     ld a,9            ;else set digit3 to 9
+ 209B 320220                   ld (digit3),a     ;and save
+ 209E C31520                   jp conv_loop      ;now update displays
+                
+ 20A1 21FD20    con_a:         ld hl,distab      ;HL is used as an index
+ 20A4 85                       add a,l           ;pointer into the display code
+ 20A5 6F                       ld l,a            ;table, add number to convert
+ 20A6 3001                     jr nc,page_ok     ;in Accum to HL jump if no
+ 20A8 24                       inc h             ;carry else up H into new page
+ 20A9 7E        page_ok:       ld a,(hl)         ;put display code in A
+ 20AA 02                       ld (bc),a         ;store in display buffer
+ 20AB 03                       inc bc            ;point BC to next display locatio
+                n
+ 20AC C9                       ret               ;all done so return
+                
+ 20AD CDC920    scan_d_k:      call scan         ;display three digits
+ 20B0 DB86                     in a,(86h)        ;test for key push
+ 20B2 CB6F                     bit 5,a           ;
+ 20B4 2006                     jr nz,key_down    ;jump if key down
+ 20B6 08                       ex af,af'         ;else clear A' to flag no
+ 20B7 3E00                     ld a,0            ;keys pushed
+ 20B9 08                       ex af,af'         ;get orginal Accum back
+ 20BA 18F1                     jr scan_d_k       ;jump to scan display again
+                
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: 3DIGIT.Z8T                                          Page  3
+
+
+ 20BC 08        key_down:      ex af,af'         ;test for first time key
+ 20BD B7                       or a              ;detected
+ 20BE 2803                     jr z,key_ok       ;jump if is so
+ 20C0 08                       ex af,af'         ;else restore Accum
+ 20C1 18EA                     jr scan_d_k       ;and continue scan loop
+                
+ 20C3 3EFF      key_ok:        ld a,0ffh         ;key is first detection
+ 20C5 08                       ex af,af'         ;flag that a key is down
+ 20C6 E61F                     and 1fh           ;restore Acumm and mask off
+ 20C8 C9                       ret               ;unwanted bits; return
+                
+ 20C9 3A0520    scan:          ld a,(dis_buff+2) ;get digit3 display code
+ 20CC D384                     out (84h),a       ;output it to segments
+ 20CE 3E04                     ld a,4            ;turn on third display
+ 20D0 D385                     out (85h),a       ;common
+ 20D2 0680                     ld b,80h          ;set B for short delay
+ 20D4 10FE      loc1:          djnz loc1         ;delay here until B = 0
+ 20D6 3E00                     ld a,0            ;clear all commons
+ 20D8 D385                     out (85h),a       ;to prevent "ghosts"
+ 20DA 3A0420                   ld a,(dis_buff+1) ;get digit2 display code
+ 20DD D384                     out (84h),a       ;output to segments
+ 20DF 3E02                     ld a,2            ;select second display
+ 20E1 D385                     out (85h),a       ;turn on its common
+ 20E3 0680                     ld b,80h          ;do the
+ 20E5 10FE      loc2:          djnz loc2         ;short delay
+ 20E7 3E00                     ld a,0            ;clear commons
+ 20E9 D385                     out (85h),a       ;for no ghosts
+ 20EB 3A0320                   ld a,(dis_buff)   ;get digit1 display code
+ 20EE D384                     out (84h),a       ;output it to segments
+ 20F0 3E01                     ld a,1            ;turn on first display
+ 20F2 D385                     out (85h),a       ;common
+ 20F4 0680                     ld b,80h          ;do short
+ 20F6 10FE                     djnz $            ;delay
+ 20F8 3E00                     ld a,0            ;clear commons
+ 20FA D385                     out (85h),a       ;again
+ 20FC C9                       ret               ;all done
+                
+ 20FD 3F065B4F  distab         db 3fh,06h,5bh,4fh ;0,1,2,3
+ 2101 666D7D07                 db 66h,6dh,7dh,07h ;4,5,6,7
+ 2105 7F6F                     db 7fh,6fh         ;8,9
+                
+ 2000           digit1         equ 2000h
+ 2001           digit2         equ 2001h
+ 2002           digit3         equ 2002h
+                
+ 2003           dis_buff       equ 2003h
+                
+                
+ 0000                          end
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: 3DIGIT.Z8T                                          Page  4
+---- Symbol Table ----
+
+CLEAR    0011          DIS_BUFF 2003          MAIN_LOO 202A
+CLR_COUN 200A          DOWN     0013          PAGE_OK  20A9
+CONV_LOO 2015          DOWN_COU 206D          SCAN     20C9
+CON_A    20A1          INIT     2006          SCAN_D_K 20AD
+DIGIT1   2000          KEY_DOWN 20BC          UP       0012
+DIGIT2   2001          KEY_OK   20C3          UP_COUNT 203B
+DIGIT3   2002          LOC1     20D4          WAIT     2000
+DISTAB   20FD          LOC2     20E5          
+                
+***** No Errors Detected *****
+F                     db 7fh,6fh         ;8,9
+            
