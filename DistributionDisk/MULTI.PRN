@@ -1,0 +1,218 @@
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MULTI.Z8T                                           Page  1
+
+
+                ;--------------------------
+                ;  DEMONSTRATE MULTIPLEXING
+                ;--------------------------
+                ; THE FOLLOWING PROGRAMS DEMONSTRATE MULTIPLEXING
+                ; THE DISPLAYS AND THE DEVELOPMENT OF A DISPLAY SCAN ROUTINE
+                ; SIMILAR TO THE ONE USED IN THE MONITOR.
+                ; EACH ROUTINE ADDS A SMALL IMPROVEMENT.
+                
+                
+ 0084           DISPLY  EQU     84H     ;DISPLAY SEGMENT LATCH
+ 0085           SCAN    EQU     85H     ;DISPLAY SCAN LATCH
+                
+                ;---------------
+                ; MULTIPLEXING 1
+                ;---------------
+                ; THIS PROGRAM SIMPLY DEMONSTRATES THE IDEA OF
+                ; MULTIPLEXING OR TIME SHARING.
+                ;
+ 2100                   ORG     2100H
+                
+ 2100 3E06      MULTI1  LD      A,06H           ;SEVEN SEG CODE FOR 1
+ 2102 D384              OUT     (DISPLY),A      ;PUT IT IN LATCH IC1
+ 2104 3E20              LD      A,20H           ;TURN ON THE TRANSISTOR
+ 2106 D385              OUT     (SCAN),A        ;FOR DISPLAY LD1
+ 2108 CD4521            CALL    DELAY
+                ;
+ 210B 3E5B              LD      A,5BH           ;SEVEN SEG CODE FOR 2
+ 210D D384              OUT     (DISPLY),A      ;PUT IT IN LATCH IC1
+ 210F 3E10              LD      A,10H           ;TURN ON THE TRANSISTOR
+ 2111 D385              OUT     (SCAN),A        ;FOR DISPLAY LD2
+ 2113 CD4521            CALL    DELAY
+                ;
+ 2116 3E4F              LD      A,4FH           ;SEVEN SEG CODE FOR 3
+ 2118 D384              OUT     (DISPLY),A      ;PUT IT IN LATCH IC1
+ 211A 3E08              LD      A,08H           ;TURN ON THE TRANSISTOR
+ 211C D385              OUT     (SCAN),A        ;FOR DISPLAY LD3
+ 211E CD4521            CALL    DELAY
+                ;
+ 2121 3E66              LD      A,66H           ;SEVEN SEG CODE FOR 4
+ 2123 D384              OUT     (DISPLY),A      ;PUT IT IN LATCH IC1
+ 2125 3E04              LD      A,04H           ;TURN ON THE TRANSISTOR
+ 2127 D385              OUT     (SCAN),A        ;FOR DISPLAY LD4
+ 2129 CD4521            CALL    DELAY
+                ;
+ 212C 3E6D              LD      A,6DH           ;SEVEN SEG CODE FOR 5
+ 212E D384              OUT     (DISPLY),A      ;PUT IT IN LATCH IC1
+ 2130 3E02              LD      A,02H           ;TURN ON THE TRANSISTOR
+ 2132 D385              OUT     (SCAN),A        ;FOR DISPLAY LD5
+ 2134 CD4521            CALL    DELAY
+                ;
+ 2137 3E7D              LD      A,7DH           ;SEVEN SEG CODE FOR 6
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MULTI.Z8T                                           Page  2
+
+
+ 2139 D384              OUT     (DISPLY),A      ;PUT IT IN LATCH IC1
+ 213B 3E01              LD      A,01H           ;TURN ON THE TRANSISTOR
+ 213D D385              OUT     (SCAN),A        ;FOR DISPLAY LD6
+ 213F CD4521            CALL    DELAY
+ 2142 C30021            JP      MULTI1
+                ;
+                ; DELAY SUBROUTINE
+                ;
+ 2145 114002    DELAY   LD      DE,0240H        ;START WITH A CONSTANT
+ 2148 1B        DELAY1  DEC     DE              ;SUBTRACT ONE FROM DE
+ 2149 7B                LD      A,E             ;OR E WITH D TO SEE
+ 214A B2                OR      D               ;IF DE PAIR IS ZERO
+ 214B C24821            JP      NZ,DELAY1       ;DE NOT ZERO KEEP GOING
+ 214E C9                RET
+                ;---------------
+                ; MULTIPLEXING 2
+                ;---------------
+                ; NOW USE ADDRESSES 2000H TO 2005H AS A DISPLAY
+                ; BUFFER TO HOLD THE INFORMATION TO BE DISPLAYED :
+                ; (YOU WILL NEED TO PUT SOMETHING IN THESE ADDRESSES
+                ; OTHERWISE RUBBISH WILL BE DISPLAYED)
+                ;
+                ; AND NOW WE USE A ROTATE INSTRUCTION TO MOVE
+                ; THE BIT ALONG WHICH TURNS ON THE APPROPRIATE
+                ; TRANSISTOR FOR EACH DISPLAY.
+                ;  HL    DISPLAY      C REGISTER
+                ; 2000     LD6        0000 0001
+                ; 2001     LD5        0000 0010
+                ; 2002     LD4        0000 0100
+                ; 2003     LD3        0000 1000
+                ; 2004     LD2        0001 0000
+                ; 2005     LD1        0010 0000
+                ;
+ 2200                   ORG     2200H
+                
+ 2200 210520    MULTI2  LD      HL,2005H        ;HL HAS 2005 IN IT
+ 2203 0E20              LD      C,20H           ;0010 0000
+                
+ 2205 7E                LD      A,(HL)          ;GET LD1 DATA FROM BUFFER
+ 2206 D384              OUT     (DISPLY),A
+ 2208 79                LD      A,C             ;A HAS 0010 0000
+ 2209 D385              OUT     (SCAN),A        ;TURN ON DISPLAY LD1
+ 220B CD4521            CALL    DELAY
+ 220E 2B                DEC     HL              ;HL NOW HAS 2004
+ 220F CB09              RRC     C               ;C NOW HAS 0001 0000
+                ;
+ 2211 7E                LD      A,(HL)          ;GET LD2 DATA FROM BUFFER
+ 2212 D384              OUT     (DISPLY),A
+ 2214 79                LD      A,C             ;A HAS 0001 0000
+ 2215 D385              OUT     (SCAN),A        ;TURN ON DISPLAY LD2
+ 2217 CD4521            CALL    DELAY
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MULTI.Z8T                                           Page  3
+
+
+ 221A 2B                DEC     HL              ;HL NOW HAS 2003
+ 221B CB09              RRC     C               ;C NOW HAS 0000 1000
+                ;
+ 221D 7E                LD      A,(HL)          ;GET LD3 DATA FROM BUFFER
+ 221E D384              OUT     (DISPLY),A
+ 2220 79                LD      A,C             ;A HAS 0000 1000
+ 2221 D385              OUT     (SCAN),A        ;TURN ON DISPLAY LD3
+ 2223 CD4521            CALL    DELAY
+ 2226 2B                DEC     HL              ;HL NOW HAS 2002
+ 2227 CB09              RRC     C               ;C NOW HAS 0000 0100
+                ;
+ 2229 7E                LD      A,(HL)          ;GET LD4 DATA FROM BUFFER
+ 222A D384              OUT     (DISPLY),A
+ 222C 79                LD      A,C             ;A HAS 0000 0100
+ 222D D385              OUT     (SCAN),A        ;TURN ON DISPLAY LD4
+ 222F CD4521            CALL    DELAY
+ 2232 2B                DEC     HL              ;HL NOW HAS 2001
+ 2233 CB09              RRC     C               ;C NOW HAS 0000 0010
+                ;
+ 2235 7E                LD      A,(HL)          ;GET LD5 DATA FROM BUFFER
+ 2236 D384              OUT     (DISPLY),A
+ 2238 79                LD      A,C             ;A HAS 0000 0010
+ 2239 D385              OUT     (SCAN),A        ;TURN ON DISPLAY LD5
+ 223B CD4521            CALL    DELAY
+ 223E 2B                DEC     HL              ;HL NOW HAS 2000
+ 223F CB09              RRC     C               ;C NOW HAS 0000 0001
+                ;
+ 2241 7E                LD      A,(HL)          ;GET LD6 DATA FROM BUFFER
+ 2242 D384              OUT     (DISPLY),A
+ 2244 79                LD      A,C             ;A HAS 0000 0001
+ 2245 D385              OUT     (SCAN),A        ;TURN ON DISPLAY LD6
+ 2247 CD4521            CALL    DELAY
+ 224A C30022            JP      MULTI2
+                ;---------------
+                ; MULTIPLEXING 3
+                ;---------------
+                ; HAVE A CLOSE LOOK AT MULTIPLEXING 2 ABOVE,
+                ; THERE A ESSENTIALLY SIX IDENTICAL ROUTINES
+                ; WHICH EACH TURN ON ONE DISPLAY.
+                ; NOW WE CAN WRITE THE WHOLE ROUTINE IN A SMALL
+                ; NUMBER OF INSTRUCTIONS BY ENCLOSING THE IDENTICAL
+                ; ONES IN A LOOP.
+                ; WE CAN ALSO USE THE C REGISTER TO TELL US WHEN
+                ; ALL DISPLAYS HAVE BEEN DONE AS THE SCAN BIT IS
+                ; SHIFTED OUT OF C INTO THE CARRY.
+                
+ 2300                   ORG     2300H
+                
+ 2300 210520    MULTI3  LD      HL,2005H
+ 2303 0E20              LD      C,20H
+                ;
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MULTI.Z8T                                           Page  4
+
+
+                ; DISPLAY DIGIT LOOP
+                ;
+ 2305 7E        SHOW    LD      A,(HL)          ;GET DIGIT FROM BUFFER
+ 2306 D384              OUT     (DISPLY),A      ;LATCH DIGIT
+ 2308 79                LD      A,C             ;GET SCAN NUMBER
+ 2309 D385              OUT     (SCAN),A        ;TURN ON DISPLAY
+ 230B CD4521            CALL    DELAY           ;LEAVE ON FOR A WHILE
+ 230E 2B                DEC     HL              ;POINT TO NEXT DIGIT DATA
+ 230F CB09              RRC     C               ;POINT TO NEXT DIGIT SCAN
+                ;
+                ; DONE ALL DIGITS?
+                ;
+ 2311 D20523            JP      NC,SHOW         ;DONE IT 6 TIMES?
+ 2314 C30023            JP      MULTI3
+                ;
+                ; NOW HAVE A LOOK AT THE SCAND ROUTINE IN THE MONITOR
+                ; AND SEE HOW IT COMPARES TO THE ABOVE.
+                ; CAN YOU SEE WHAT THE TWO DELAYS AT SCAND2 AND SCAND3 DO?
+                ; TRY CHANGING THE VALUES IN ONTIM (3FD6) AND OFTIM (3FD7)
+                ; AND SEE WHAT HAPPENS.
+                
+ 0000                   END
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MULTI.Z8T                                           Page  5
+---- Symbol Table ----
+
+DELAY    2145          MULTI1   2100          SCAN     0085
+DELAY1   2148          MULTI2   2200          SHOW     2305
+DISPLY   0084          MULTI3   2300          
+                
+***** No Errors Detected *****
+
+   
+

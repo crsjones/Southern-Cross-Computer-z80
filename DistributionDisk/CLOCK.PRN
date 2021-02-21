@@ -1,0 +1,174 @@
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: CLOCK.Z8T                                           Page  1
+
+
+ 0082           coarse         equ 82h
+ 003E           fine           equ 3eh
+                
+ 2000                          org 2000h
+                
+ 2000 210621    conv_loop      ld hl,dis_buff    ;convert all 6 digits into
+ 2003 CD7D20                   call conv_all     ;display code
+ 2006 CD9820    main_loop:     call scan_second  ;display digits for 1 second
+ 2009 3A0021    up_time:       ld a,(seconds)    ;get seconds count
+ 200C 3C                       inc a             ;up one second
+ 200D 320021                   ld (seconds),a    ;save new seconds
+ 2010 FE0A                     cp 10             ;check for 10 second count
+ 2012 20EC                     jr nz,conv_loop   ;jump none to update display
+ 2014 3E00                     ld a,0            ;else set to 0
+ 2016 320021                   ld (seconds),a    ;and save it
+ 2019 3A0121                   ld a,(_10_secs)   ;and up _10_secs
+ 201C 3C                       inc a             ;by one
+ 201D 320121                   ld (_10_secs),a   ;and save
+ 2020 FE06                     cp 06             ;check it for full minute
+ 2022 20DC                     jr nz,conv_loop   ;jump if not to update display
+ 2024 3E00                     ld a,0            ;else zero _10_secs
+ 2026 320121                   ld (_10_secs),a   ;and save
+ 2029 3A0221                   ld a,(minutes)    ;now
+ 202C 3C                       inc a             ;up minutes
+ 202D 320221                   ld (minutes),a    ;and save
+ 2030 FE0A                     cp 10             ;test for 10 minutes
+ 2032 20CC                     jr nz,conv_loop   ;jump if not to display new time
+ 2034 3E00                     ld a,0            ;else zero minutes
+ 2036 320221                   ld (minutes),a    ;and save
+ 2039 3A0321                   ld a,(_10_mins)   ;now
+ 203C 3C                       inc a             ;up _10_mins by one
+ 203D 320321                   ld (_10_mins),a   ;and save
+ 2040 FE06                     cp 06             ;test it for 60 mins
+ 2042 20BC                     jr nz,conv_loop   ;jump if not
+ 2044 3E00                     ld a,0            ;else zero minutes
+ 2046 320321                   ld (_10_mins),a   ;and save
+ 2049 3A0421                   ld a,(hours)      ;now
+ 204C 3C                       inc a             ;update hours
+ 204D 320421                   ld (hours),a      ;and save
+ 2050 FE0A                     cp 0ah            ;test it for overflow
+ 2052 200F                     jr nz,test_24     ;jump if none to test for 24 hour
+                s
+ 2054 3E00                     ld a,0            ;else zero hours
+ 2056 320421                   ld (hours),a      ;and save
+ 2059 3A0521                   ld a,(_10_hours)  ;now
+ 205C 3C                       inc a             ;up _10_hours
+ 205D 320521                   ld (_10_hours),a  ;and save
+ 2060 C30020                   jp conv_loop      ;all finished display new time
+                
+ 2063 FE04      test_24        cp 4              ;testing for 24 hours
+ 2065 C20020                   jp nz,conv_loop   ;jump if not 4 to display time
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: CLOCK.Z8T                                           Page  2
+
+
+ 2068 3A0521                   ld a,(_10_hours)  ;else test _10_hours
+ 206B FE02                     cp 2              ;for 2
+ 206D C20020                   jp nz,conv_loop   ;display time if not
+ 2070 0606                     ld b,6            ;else clear all digits
+ 2072 210021                   ld hl,seconds     ;starting with seconds
+ 2075 3600      clr_loop:      ld (hl),0         ;set to 0
+ 2077 23                       inc hl            ;next digit
+ 2078 10FB                     djnz clr_loop     ;loop 6 times
+ 207A C30020                   jp conv_loop      ;display 00:00:00 (zero hundred h
+                ours)
+                
+                
+ 207D 110521    conv_all:      ld de,_10_hours   ;start from highest digit
+ 2080 0606                     ld b,6            ;6 digits to do
+ 2082 1A        con_loop:      ld a,(de)         ;display code; use BC as
+ 2083 CD8A20                   call con_a        ;pointer to display buffer
+ 2086 1B                       dec de            ;next lowest digit
+ 2087 10F9                     djnz con_loop     ;dec B jump not zero
+ 2089 C9                       ret               ;return from subroutine
+                
+ 208A E5        con_a:         push hl           ;save dis_buff pointer on stack
+ 208B 21C420                   ld hl,distab      ;HL is used as an index
+ 208E 85                       add a,l           ;pointer into the display code
+ 208F 6F                       ld l,a            ;table, add number to convert
+ 2090 3001                     jr nc,page_ok     ;in A to HL jump if no
+ 2092 24                       inc h             ;carry else up H into new page
+ 2093 7E        page_ok:       ld a,(hl)         ;put display code in A
+ 2094 E1                       pop hl            ;get dis_buff pointer from stack
+ 2095 77                       ld (hl),a         ;store in display buffer
+ 2096 23                       inc hl            ;point BC to next display locatio
+                n
+ 2097 C9                       ret               ;all done so return
+                
+ 2098 0EC1      scan_second:   ld c,0c1h         ;load C with outermost time value
+ 209A C5        sec_loop:      push bc           ;save C on stack
+ 209B CDAB20                   call scan         ;display three digits
+ 209E C1                       pop bc            ;get outer timer from stack put i
+                n C
+ 209F 0682                     ld b,coarse       ;set B for coarse delay
+ 20A1 10FE                     djnz $            ;do coarse delay
+ 20A3 0D                       dec c             ;now decrement outer delay
+ 20A4 20F4                     jr nz,sec_loop    ;jump until it reaces zero
+ 20A6 063E                     ld b,fine         ;now do very quick coarse delay
+ 20A8 10FE                     djnz $            ;coarse delay loop
+ 20AA C9                       ret               ;one second done, return
+                
+ 20AB           scan:
+ 20AB 210621                   ld hl,dis_buff    ;point to 10 hours display code
+ 20AE 0620                     ld b,20h          ;load B with rotating scan bit
+ 20B0 7E        scan_loop:     ld a,(hl)         ;put display code into A
+ 20B1 D384                     out (84h),a       ;output it to segments
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: CLOCK.Z8T                                           Page  3
+
+
+ 20B3 78                       ld a,b            ;get scan bit in A
+ 20B4 D385                     out (85h),a       ;output it to commons
+ 20B6 06ED                     ld b,0edh         ;load B with display on time
+ 20B8 10FE                     djnz $            ;loop here until delay finished
+ 20BA 23                       inc hl            ;point to next diplay code
+ 20BB 47                       ld b,a            ;return scan bit into B
+ 20BC AF                       xor a             ;trick to zero A
+ 20BD D385                     out (85h),a       ;clear commons to prevent ghosts
+ 20BF CB08                     rrc b             ;shift scan bit once to the right
+ 20C1 30ED                     jr nc,scan_loop   ;has it fallen into carry flag?
+ 20C3 C9                       ret               ;jump if not else return
+                
+                
+                
+                
+ 20C4 3F065B4F  distab         db 3fh,06h,5bh,4fh ;0,1,2,3
+ 20C8 666D7D07                 db 66h,6dh,7dh,07h ;4,5,6,7
+ 20CC 7F6F                     db 7fh,6fh         ;8,9
+                
+ 2100           seconds       equ 2100h
+ 2101           _10_secs      equ 2101h
+ 2102           minutes       equ 2102h
+ 2103           _10_mins      equ 2103h
+ 2104           hours         equ 2104h
+ 2105           _10_hours     equ 2105h
+                
+ 2106           dis_buff      equ 2106h
+                
+                
+ 0000                          end
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: CLOCK.Z8T                                           Page  4
+---- Symbol Table ----
+
+CLR_LOOP 2075          FINE     003E          SECONDS  2100
+COARSE   0082          HOURS    2104          SEC_LOOP 209A
+CONV_ALL 207D          MAIN_LOO 2006          TEST_24  2063
+CONV_LOO 2000          MINUTES  2102          UP_TIME  2009
+CON_A    208A          PAGE_OK  2093          _10_HOUR 2105
+CON_LOOP 2082          SCAN     20AB          _10_MINS 2103
+DISTAB   20C4          SCAN_LOO 20B0          _10_SECS 2101
+DIS_BUFF 2106          SCAN_SEC 2098          
+                
+***** No Errors Detected *****
+   _10_secs      equ 2101h
+ 2102           minutes       equ 2102h
+ 2103           _10_mins      equ 2103h
+ 2104       

@@ -1,0 +1,152 @@
+
+clear          equ 11h           ;the address key
+up             equ 12h           ;the + key
+down           equ 13h           ;the - key
+
+
+               org 2000h
+
+wait:          in a,(86h)        ;wait here until all keys are
+               bit 5,a           ;released
+               jr nz,wait        ;jump while any key is down
+init:          ex af,af'         ;the alternate Accum is used
+               ld a,0            ;as a key stutus flag
+               ex af,af'         ;0 = no key ff = key down
+clr_count:     ld hl,digit1      ;clear the 3 digits to 0
+               ld (hl),0         ;each digit is stored in
+               inc hl            ;one memory location
+               ld (hl),0         ;to make the program simpler
+               inc hl            ;to understand
+               ld (hl),0
+conv_loop      ld bc,dis_buff    ;now convert digits into
+               ld a,(digit1)     ;display code use BC as
+               call con_a        ;pointer to dispaly buffer
+               ld a,(digit2)     ;do second digit
+               call con_a
+               ld a,(digit3)     ;and do third digit
+               call con_a
+main_loop:     call scan_d_k     ;now scan digits and keys
+               cp up             ;back here when new key pushed
+               jr z,up_count     ;jump now if + key
+               cp down           ;no? is it - key
+               jr z,down_count   ;jump if so
+               cp clear          ;else test for AD key
+               jr z,clr_count    ;jump to clear count if so
+               jr main_loop      ;else ignore all other keys
+
+up_count:      ld a,(digit1)     ;get first digit
+               inc a             ;up one
+               ld (digit1),a     ;save in buffer
+               cp 0ah            ;check for over flow
+               jr nz,conv_loop   ;jump none to update display
+               ld a,0            ;else set to 0
+               ld (digit1),a     ;and save it
+               ld a,(digit2)     ;and up digit2
+               inc a             ;by one
+               ld (digit2),a     ;and save
+               cp 0ah            ;check it for overflow
+               jr nz,conv_loop   ;jump none to update display
+               ld a,0            ;zero digit2
+               ld (digit2),a     ;and save
+               ld a,(digit3)     ;now
+               inc a             ;up digit3
+               ld (digit3),a     ;and save
+               cp 0ah            ;test it for overflow
+               jr nz,conv_loop   ;jump if none
+               ld a,0            ;else zero digit3
+               ld (digit3),a     ;and save
+               jr conv_loop      ;now update displays
+
+down_count:    ld a,(digit1)     ;get first digit
+               dec a             ;down by one
+               ld (digit1),a     ;save in buffer
+               cp 0ffh           ;check for underflow
+               jr nz,conv_loop   ;jump none to update display
+               ld a,9            ;else set to 9
+               ld (digit1),a     ;and save it
+               ld a,(digit2)     ;and down digit2
+               dec a             ;by one
+               ld (digit2),a     ;and save
+               cp 0ffh           ;check it for underflow
+               jr nz,conv_loop   ;jump none to update display
+               ld a,9            ;set digit2 to 9
+               ld (digit2),a     ;and save it
+               ld a,(digit3)     ;now
+               dec a             ;down digit3 by one
+               ld (digit3),a     ;and save
+               cp 0ffh           ;test it for underflow
+               jp nz,conv_loop   ;jump if none
+               ld a,9            ;else set digit3 to 9
+               ld (digit3),a     ;and save
+               jp conv_loop      ;now update displays
+
+con_a:         ld hl,distab      ;HL is used as an index
+               add a,l           ;pointer into the display code
+               ld l,a            ;table, add number to convert
+               jr nc,page_ok     ;in Accum to HL jump if no
+               inc h             ;carry else up H into new page
+page_ok:       ld a,(hl)         ;put display code in A
+               ld (bc),a         ;store in display buffer
+               inc bc            ;point BC to next display location
+               ret               ;all done so return
+
+scan_d_k:      call scan         ;display three digits
+               in a,(86h)        ;test for key push
+               bit 5,a           ;
+               jr nz,key_down    ;jump if key down
+               ex af,af'         ;else clear A' to flag no
+               ld a,0            ;keys pushed
+               ex af,af'         ;get orginal Accum back
+               jr scan_d_k       ;jump to scan display again
+
+key_down:      ex af,af'         ;test for first time key
+               or a              ;detected
+               jr z,key_ok       ;jump if is so
+               ex af,af'         ;else restore Accum
+               jr scan_d_k       ;and continue scan loop
+
+key_ok:        ld a,0ffh         ;key is first detection
+               ex af,af'         ;flag that a key is down
+               and 1fh           ;restore Acumm and mask off
+               ret               ;unwanted bits; return
+
+scan:          ld a,(dis_buff+2) ;get digit3 display code
+               out (84h),a       ;output it to segments
+               ld a,4            ;turn on third display
+               out (85h),a       ;common
+               ld b,80h          ;set B for short delay
+loc1:          djnz loc1         ;delay here until B = 0
+               ld a,0            ;clear all commons
+               out (85h),a       ;to prevent "ghosts"
+               ld a,(dis_buff+1) ;get digit2 display code
+               out (84h),a       ;output to segments
+               ld a,2            ;select second display
+               out (85h),a       ;turn on its common
+               ld b,80h          ;do the
+loc2:          djnz loc2         ;short delay
+               ld a,0            ;clear commons
+               out (85h),a       ;for no ghosts
+               ld a,(dis_buff)   ;get digit1 display code
+               out (84h),a       ;output it to segments
+               ld a,1            ;turn on first display
+               out (85h),a       ;common
+               ld b,80h          ;do short
+               djnz $            ;delay
+               ld a,0            ;clear commons
+               out (85h),a       ;again
+               ret               ;all done
+
+distab         db 3fh,06h,5bh,4fh ;0,1,2,3
+               db 66h,6dh,7dh,07h ;4,5,6,7
+               db 7fh,6fh         ;8,9
+
+digit1         equ 2000h
+digit2         equ 2001h
+digit3         equ 2002h
+
+dis_buff       equ 2003h
+
+
+               end
+
+

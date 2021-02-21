@@ -1,0 +1,81 @@
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MOVE3.Z8T                                           Page  1
+
+
+ 2000                       org 2000h
+                
+ 2000            ;This program outputs a shape to the displays The keyboard
+ 2000            ;can be used to move the shape across the displays. The shape
+ 2000            ;is kept inside the displays at all times. The "C" key moves
+ 2000            ;the shape to the left while the "F" key moves it right The
+ 2000            ;shape continues to move as long as the key is held down as
+ 2000            ;the program code to wait for the key release has been
+ 2000            ;replaced with a delay
+                
+                
+ 2000 3E40                  ld a,40h           ; "your shape" any value 1-FF
+ 2002 D384                  out (84h),a        ;output to segments
+ 2004 3E04                  ld a,04            ;this value turns on
+ 2006 D385                  out (85h),a        ;middle display
+ 2008 320021                ld (buffer),a      ;save rolling bit
+                
+ 200B DB86      mainlp:     in a,(86h)         ;get key status
+ 200D CB6F                  bit 5,a            ;test it
+ 200F 28FA                  jr z,mainlp        ;jump if no key
+ 2011 E61F                  and 1fH            ;clean off unsed bits
+ 2013 FE0C                  cp 0ch             ;is it "C"
+ 2015 2012                  jr nz,notleft      ;jump if not "C"
+ 2017 3A0021                ld a,(buffer)      ;get our rolling bit
+ 201A CB07                  rlc  a             ;shift it left
+ 201C FE40                  cp 40h             ;is it outside left
+ 201E 2004                  jr nz,not40        ;jump if not
+ 2020 CB07                  rlc a              ;else move it to right
+ 2022 CB07                  rlc a              ;display
+ 2024 320021    not40:      ld (buffer),a      ;save rolling bit
+ 2027 1814                  jr out_new         ;jump to output it
+                
+ 2029 FE0F      notleft:    cp 0fh             ;test for "F" key
+ 202B 20DE                  jr nz,mainlp       ;jump to loop if not
+ 202D 3A0021                ld a,(buffer)      ;else get rolling bit
+ 2030 CB0F                  rrc a              ;move it to the right
+ 2032 FE80                  cp a,80h           ;test for right fall out
+ 2034 2004                  jr nz,not80        ;jump if not
+ 2036 CB0F                  rrc a              ;else move bit to
+ 2038 CB0F                  rrc a              ;left display position
+ 203A 320021    not80:      ld (buffer),a      ;save it
+ 203D 3A0021    out_new:    ld a,(buffer)      ;get new rolling bit
+ 2040 D385                  out (85h),a        ;output it to commons
+ 2042 010050                ld bc,5000h        ;now delay here awhile
+ 2045 0B        delaylp:    dec bc             ;count down from 5000h
+ 2046 78                    ld a,b             ;0 is reached when both
+ 2047 B1                    or c               ;B and C are 0
+ 2048 20FB                  jr nz,delaylp      ;jump if B or C not zero
+ 204A 18BF                  jr mainlp          ;else jump to main loop
+                
+ 2100                       org 2100h
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MOVE3.Z8T                                           Page  2
+
+
+ 2100 00        buffer      db 0
+ 0000                       end
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MOVE3.Z8T                                           Page  3
+---- Symbol Table ----
+
+BUFFER   2100          NOT40    2024          OUT_NEW  203D
+DELAYLP  2045          NOT80    203A          
+MAINLP   200B          NOTLEFT  2029          
+                
+***** No Errors Detected *****
+
+

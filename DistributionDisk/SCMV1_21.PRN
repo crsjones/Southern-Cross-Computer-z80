@@ -1,0 +1,2833 @@
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page  1
+
+
+                ;--------------------------------------------
+                ; S O U T H E R N   C R O S S   M O N I T O R
+                ;--------------------------------------------
+                ;
+                ; WRITTEN BY CRAIG R. S. JONES
+                ; MELBOURNE, AUSTRALIA.
+                ; FOR -
+                ; DIY ELECTRONICS
+                ; GPO BOX 904
+                ; HONG KONG
+                ; PHONE : 852-7250610
+                ;
+                ; VERSION : 1.2  01/93. V1.21 7/93
+                ;
+                ;-----------------
+                ; SYSTEM VARIABLES
+                ;-----------------
+ 2000           RAMSRT  EQU     2000H   ;START OF USER RAM
+ 3BFF           RAMEND  EQU     3BFFH   ;END OF USER RAM
+ 3F00           SYSTEM  EQU     3F00H   ;SYSTEM POINTER
+                ;
+                ; BAUD RATE CONSTANTS
+                ;
+ 0220           B300    EQU     0220H   ;300 BAUD
+ 0080           B1200   EQU     0080H   ;1200 BAUD
+ 003F           B2400   EQU     003FH   ;2400 BAUD
+ 001B           B4800   EQU     001BH   ;4800 BAUD
+ 000B           B9600   EQU     000BH   ;9600 BAUD
+                ;
+                ; I/O PORT ADDRESSES
+                ;
+ 0080           IO0     EQU     80H     ;IO PORT 0
+ 0081           IO1     EQU     81H     ;IO PORT 1
+ 0082           IO2     EQU     82H     ;IO PORT 2
+ 0083           IO3     EQU     83H     ;IO PORT 3
+ 0084           DISPLY  EQU     84H     ;DISPLAY LATCH
+ 0085           SCAN    EQU     85H     ;DISPLAY SCAN LATCH
+ 0086           KEYBUF  EQU     86H     ;KEYBOARD BUFFER
+ 0087           IO7     EQU     87H     ;SPARE IO ADDRESS
+                ;-------------------------
+                ; MONITOR GLOBAL VARIABLES
+                ;-------------------------
+ 3FB4           FUNTBL  EQU     3FB4H   ;FN TABLE ADDRESS
+                ;
+                ; DALLAS SMARTWATCH REGISTERS
+                ;
+ 3FB6           CALMDE  EQU     3FB6H   ;CALENDAR MODE
+ 3FB8           SWREG0  EQU     3FB8H   ;10THS, 100THS
+ 3FB9           SWREG1  EQU     3FB9H   ;SECONDS
+ 3FBA           SWREG2  EQU     3FBAH   ;MINUTES
+ 3FBB           SWREG3  EQU     3FBBH   ;HOURS
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page  2
+
+
+ 3FBC           SWREG4  EQU     3FBCH   ;DAY
+ 3FBD           SWREG5  EQU     3FBDH   ;DATE
+ 3FBE           SWREG6  EQU     3FBEH   ;MONTH
+ 3FBF           SWREG7  EQU     3FBFH   ;YEAR
+                ;
+ 3FC0           BAUD    EQU     3FC0H   ;BAUD RATE
+ 3FC2           KEYTIM  EQU     3FC2H   ;BEEP DELAY
+ 3FC4           SPTEMP  EQU     3FC4H   ;TEMP SYSTEM CALL SP
+                ;
+                ; BLOCK FUNCTIONS
+                ;
+ 3FC6           COUNT   EQU     3FC6H   ;NUMBER OF BYTES TO MOVE
+ 3FC8           BLKSRT  EQU     3FC8H   ;BLOCK START ADDRESS
+ 3FCA           BLKEND  EQU     3FCAH   ;BLOCK END ADDRESS
+ 3FCC           BLKDST  EQU     3FCCH   ;DESTINATION ADDRESS
+                ;
+ 3FCE           FUNJMP  EQU     3FCEH   ;FN FN KEY JUMP ADDRESS
+                ;
+                ; DISPLAY SCAN REGISTERS
+                ;
+ 3FD0           DISBUF  EQU     3FD0H   ;DISPLAY BUFFER
+ 3FD6           ONTIM   EQU     3FD6H   ;DISPLAY SCAN ON TIME
+ 3FD7           OFTIM   EQU     3FD7H   ;DISPLAY SCAN OFF TIME
+                ;
+                ; MONITOR VARIABLES
+                ;
+ 3FD8           MODE    EQU     3FD8H   ;DISPLAY MODE
+ 3FDA           ADRESS  EQU     3FDAH   ;USER ADDRESS
+ 3FDC           KEYDEL  EQU     3FDCH   ;AUTO INCREMENT DELAY
+                ;
+                ; TEMPORARY REGISTER STORAGE
+                ;
+ 3FDE           REGPNT  EQU     3FDEH   ;REGISTER POINTER
+ 3FE0           PC_REG  EQU     3FE0H   ;PROGRAM COUNTER
+ 3FE2           AF_REG  EQU     3FE2H   ;ACCUMULATOR,FLAG
+ 3FE4           BC_REG  EQU     3FE4H   ;BC REGISTER PAIR
+ 3FE6           DE_REG  EQU     3FE6H   ;DE REGISTER PAIR
+ 3FE8           HL_REG  EQU     3FE8H   ;HL REGISTER PAIR
+ 3FEA           IX_REG  EQU     3FEAH   ;INDEX REGISTER X
+ 3FEC           IY_REG  EQU     3FECH   ;INDEX REGISTER Y
+ 3FEE           SP_REG  EQU     3FEEH   ;STACK POINTER
+                ;
+                ; RESTART JUMP TABLE AND HARWARE TEST
+                ;
+ 3FF0           RST08   EQU     3FF0H   ;RESTART 08H JUMP
+ 3FF2           RST10   EQU     3FF2H   ;RESTART 10H JUMP
+ 3FF4           RST18   EQU     3FF4H   ;RESTART 18H JUMP
+ 3FF6           RST20   EQU     3FF6H   ;RESTART 20H JUMP
+ 3FF8           RST28   EQU     3FF8H   ;RESTART 28H JUMP
+ 3FFA           RST38   EQU     3FFAH   ;INT INTERRUPT JUMP
+ 3FFC           RST66   EQU     3FFCH   ;NMI INTERRUPT JUMP
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page  3
+
+
+ 3FFE           RAMSUM  EQU     3FFEH   ;USER RAM CHECKSUM
+ 3FFF           DALLAS  EQU     3FFFH   ;RAM TEST LOCATION
+                ;----------------
+                ; RESTART VECTORS
+                ;----------------
+                ;
+                ;  RESTART 00H - RST 0
+                ;WHEN POWER IS APPLIED TO THE SOUTHERN CROSS
+                ;THE Z80 STARTS EXECUTING INSTRUCTIONS FROM HERE
+                ;
+ 0000                   ORG     0000H
+ 0000 C30002    RSTVEC  JP      RESET
+                ;
+                ; RESTART 08H - RST 1
+                ;
+ 0008                   ORG     0008H
+ 0008 E5                PUSH    HL
+ 0009 2AF03F            LD      HL,(RST08)
+ 000C E9                JP      (HL)
+                ;
+                ; RESTART 10H - RST 2
+                ;
+ 0010                   ORG     0010H
+ 0010 E5                PUSH    HL
+ 0011 2AF23F            LD      HL,(RST10)
+ 0014 E9                JP      (HL)
+                ;
+                ; RESTART 18H - RST 3
+                ;
+ 0018                   ORG     0018H
+ 0018 E5                PUSH    HL
+ 0019 2AF43F            LD      HL,(RST18)
+ 001C E9                JP      (HL)
+                ;
+                ; RESTART 20H - RST 4
+                ;
+ 0020                   ORG     0020H
+ 0020 E5                PUSH    HL
+ 0021 2AF63F            LD      HL,(RST20)
+ 0024 E9                JP      (HL)
+                ;
+                ; RESTART 28H - RST 5
+                ;
+ 0028                   ORG     0028H
+ 0028 E5                PUSH    HL
+ 0029 2AF83F            LD      HL,(RST28)
+ 002C E9                JP      (HL)
+                ;
+                ; RESTART 30H - RST 6 - MONITOR ROUTINES ENTRY POINT
+                ;
+ 0030                   ORG     0030H
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page  4
+
+
+ 0030 C36B00    RST30   JP      SYSCALL
+                ;
+                ; RESTART 38H - RST 7     BREAKPOINT HANDLER
+                ;IF INTERRUPTS ARE ENABLED,AND AN
+                ;INT OCCURS- FURTHER INTERRUPTS
+                ;ARE DISABLED, THE PROGRAM COUNTER
+                ;IS PUSHED ONTO THE STACK, AND EXECUTION
+                ;STARTS HERE
+                ;
+ 0038                   ORG     0038H
+ 0038 E5                PUSH    HL
+ 0039 2AFA3F            LD      HL,(RST38)
+ 003C E9                JP      (HL)
+                ;
+                ; RESTART 66H NMI VECTOR
+                ; SAME AS ABOVE BUT NMI CANNOT BE DISABLED.
+                ;
+ 0066                   ORG     0066H
+ 0066 E5                PUSH    HL
+ 0067 2AFC3F            LD      HL,(RST66)
+ 006A E9                JP      (HL)
+                ;--------------------
+                ; SYSTEM CALL HANDLER
+                ;--------------------
+                ;CALLS TO BASIC I/O AND OTHER ROUTINES
+                ;WITHIN THE MONITOR HAVE BEEN ASSIGNED
+                ;SYSTEM CALL NUMBERS TO AVOID RE-WRITING
+                ;USER SOFTWARE IF MONITOR ABSOLUTE ADDRESSES
+                ;CHANGE IN SUBSEQUENT MONITORS
+                ;
+                ;ENTRY : C = CALL NUMBER
+                ;SEE ROUTINES FOR ENTRY AND EXIT
+                ;PARAMETERS
+                ;
+ 006B 3B        SYSCALL DEC     SP
+ 006C 3B                DEC     SP      ;LEAVE SPACE FOR SYSCALL
+ 006D ED73C43F          LD      (SPTEMP),SP     ;POINTS TO SYSCALL LO
+ 0071 F5                PUSH    AF
+ 0072 D5                PUSH    DE
+ 0073 E5                PUSH    HL      ;SAVE REGISTERS
+ 0074 79                LD      A,C     ;GET CALL NUMBER
+ 0075 E67F              AND     127     ;ENSURE IN LIMITS
+ 0077 CB27              SLA     A       ;MULTIPLY BY TWO
+ 0079 2601              LD      H,1     ;LOAD JUMP TABLE HIGH BYTE
+ 007B 6F                LD      L,A     ;LOAD INDEX
+ 007C 7E                LD      A,(HL)
+ 007D 23                INC     HL
+ 007E 56                LD      D,(HL)  ;GET JUMP ADDRESS
+ 007F 2AC43F            LD      HL,(SPTEMP)     ;POINT TO SYSCALL LO
+ 0082 77                LD      (HL),A  ;PUT SYSCALL LO ON STACK
+ 0083 23                INC     HL
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page  5
+
+
+ 0084 7A                LD      A,D
+ 0085 77                LD      (HL),A  ;PUT SYSCALL HI ON STACK
+ 0086 E1                POP     HL
+ 0087 D1                POP     DE
+ 0088 F1                POP     AF      ;RESTORE REGISTERS
+ 0089 C9                RET             ;JUMPS TO SYSTEM CALL
+                ;-----------------------
+                ; SYSTEM CALL JUMP TABLE
+                ;-----------------------
+ 0100                   ORG     0100H
+ 0100 6E027E03  SYSJMP  DEFW    MAIN,VERS
+ 0104 82039703          DEFW    DISADD,DISBYT,CLRBUF,SCAND
+ 010C A003AD03          DEFW    CONBYT,CONVHI,CONVLO
+ 0112 0A041604          DEFW    SKEYIN,SKEYRL,KEYIN,KEYREL
+ 011A 34045704          DEFW    MENU,CHKSUM
+ 011E 8F047704          DEFW    MUL16,RAND
+ 0122 67046E04          DEFW    INDEXB,INDEXW
+ 0126 A6042305          DEFW    MUSIC,TONE,BEEP
+ 012C 5B0C              DEFW    SKATE
+ 012E BF07EA07          DEFW    TXDATA,RXDATA,ASCHEX
+ 0134 730EE90D          DEFW    WWATCH,RWATCH,ONESEC
+ 013A 830BB10B          DEFW    RLSTEP,DELONE
+                ;------------------------------
+                ; POWER UP RESET / MANUAL RESET
+                ;------------------------------
+ 0200                   ORG     0200H
+                ;
+                ; WAIT FOR SMART SOCKET
+                ; TO RECOVER FROM POWER DOWN
+                ;
+ 0200 3E55      RESET   LD      A,55H
+ 0202 32FF3F            LD      (DALLAS),A      ;WRITE TO RAM
+ 0205 AF                XOR     A
+ 0206 D384              OUT     (DISPLY),A      ;WRITE NOTHING TO
+ 0208 D385              OUT     (SCAN),A        ;ON BOARD I/O
+ 020A DB86              IN      A,(KEYBUF)      ;TO HELP DEBUGGING
+ 020C 3AFF3F            LD      A,(DALLAS)      ;READ FROM RAM
+ 020F FE55              CP      55H     ;IS IT READY?
+ 0211 C20002            JP      NZ,RESET        ;KEEP TRYING
+                ;
+                ; LOAD STACK POINTER
+                ;
+ 0214 31003F    RESET1  LD      SP,SYSTEM
+                ;
+                ; SET UP RESTART VECTORS
+                ;
+ 0217 211402            LD      HL,RESET1
+ 021A 22F03F            LD      (RST08),HL
+ 021D 22F23F            LD      (RST10),HL
+ 0220 22F43F            LD      (RST18),HL
+ 0223 22F63F            LD      (RST20),HL
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page  6
+
+
+ 0226 22F83F            LD      (RST28),HL
+ 0229 22FC3F            LD      (RST66),HL      ;NMI INTERRUPT
+ 022C 216D05            LD      HL,SSTEP
+ 022F 22FA3F            LD      (RST38),HL      ;SINGLE STEPPER
+                ;
+                ; SET INTERRUPT MODE 1 - USE THE AUTOMATED INTERRUPT
+                ;
+ 0232 ED56              IM      1
+ 0234 FB                EI              ;ENABLE INTERRUPTS
+                ;
+                ; PERFORM CHECKSUM ON USER RAM
+                ;
+ 0235 210020            LD      HL,RAMSRT       ;START OF USER RAM
+ 0238 11FF3B            LD      DE,RAMEND       ;END OF USER RAM
+ 023B CD5704            CALL    CHKSUM
+ 023E 32FE3F            LD      (RAMSUM),A      ;RAM CHECKSUM
+                ;
+                ; SET UP DEFAULT VARIABLES
+                ;
+ 0241 21C206            LD      HL,FUNLST
+ 0244 22B43F            LD      (FUNTBL),HL     ;FUNCTION KEY TABLE
+ 0247 21B506            LD      HL,CANCEL
+ 024A 22CE3F            LD      (FUNJMP),HL     ;FN FN JUMP
+ 024D 3E00              LD      A,00H
+ 024F 32DE3F            LD      (REGPNT),A      ;INIT SINGLE STEPPER
+ 0252 211B00            LD      HL,B4800
+ 0255 22C03F            LD      (BAUD),HL       ;DEFAULT SERIAL=4800 BAUD
+ 0258 210001            LD      HL,0100H
+ 025B 22DC3F            LD      (KEYDEL),HL     ;INSTEAD OF BEEP DELAY
+ 025E 3E07              LD      A,07H
+ 0260 32D63F            LD      (ONTIM),A       ;DISPLAY ON TIME
+ 0263 3E0A              LD      A,0AH
+ 0265 32D73F            LD      (OFTIM),A       ;DISPLAY OFF TIME
+ 0268 CD4305            CALL    BEEP
+ 026B CD4305            CALL    BEEP
+                ;-----------------
+                ; SET UP MAIN LOOP
+                ;-----------------
+ 026E 31003F    MAIN    LD      SP,SYSTEM       ;SET STACK
+ 0271 210020            LD      HL,RAMSRT
+ 0274 22DA3F            LD      (ADRESS),HL     ;DEFAULT ADDRESS
+ 0277 3AD83F            LD      A,(MODE)
+ 027A F680              OR      80H     ;START OFF IN DATA MODE
+ 027C 32D83F            LD      (MODE),A
+                ;
+                ; SCAN THE DISPLAYS UNTIL A KEY IS PRESSED
+                ;
+ 027F CD5903    MAIN1   CALL    UPDATE
+ 0282 CD0A04    MAIN2   CALL    SKEYIN  ;WAIT FOR A KEY
+ 0285 219402            LD      HL,MENLST       ;USE THE MENU HANDLER
+ 0288 CD3404            CALL    MENU    ;ROUTINE FOR EACH KEY
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page  7
+
+
+ 028B CD5903            CALL    UPDATE  ;UPDATE BUFFER AND
+ 028E CD1604            CALL    SKEYRL  ;WAIT FOR KEY RELEASE
+ 0291 C38202            JP      MAIN2
+                ;
+                ; MAIN MENU KEY TABLE
+                ;
+ 0294 14        MENLST  DEFB    20
+ 0295 00010203          DEFB    00H,01H,02H,03H,04H,05H,06H,07H
+ 029D 08090A0B          DEFB    08H,09H,0AH,0BH,0CH,0DH,0EH,0FH
+ 02A5 10111213          DEFB    10H,11H,12H,13H
+ 02A9 D102D102          DEFW    HEXKEY,HEXKEY,HEXKEY,HEXKEY
+ 02B1 D102D102          DEFW    HEXKEY,HEXKEY,HEXKEY,HEXKEY
+ 02B9 D102D102          DEFW    HEXKEY,HEXKEY,HEXKEY,HEXKEY
+ 02C1 D102D102          DEFW    HEXKEY,HEXKEY,HEXKEY,HEXKEY
+ 02C9 96060303          DEFW    FUNKEY,ADDKEY,INCKEY,DECKEY
+                ;---------------------------------------------------
+                ; ENTER HEX KEY AS LEAST SIGNIFICANT ADDRESS OR DATA
+                ;---------------------------------------------------
+ 02D1 CD4305    HEXKEY  CALL    BEEP
+ 02D4 21D83F            LD      HL,MODE
+ 02D7 CB7E              BIT     7,(HL)  ;ADDR OR DATA MODE?
+ 02D9 CAEA02            JP      Z,HEXKY2        ;IN ADDR MODE
+                ;
+                ; IN DATA MODE
+                ;
+ 02DC 2ADA3F    HEXKY1  LD      HL,(ADRESS)
+ 02DF CB26              SLA     (HL)    ;FROM THE CURRENT
+ 02E1 CB26              SLA     (HL)    ;ADDRESS,MOVE THE
+ 02E3 CB26              SLA     (HL)    ;LSN TO THE MSN.
+ 02E5 CB26              SLA     (HL)    ;PUT THE KEY IN
+ 02E7 B6                OR      (HL)    ;THE NEW DATA BACK AT
+ 02E8 77                LD      (HL),A  ;THE CURRENT ADDRESS.
+ 02E9 C9                RET
+                ;
+                ; IN ADDRESS MODE
+                ;
+ 02EA 2ADA3F    HEXKY2  LD      HL,(ADRESS)
+ 02ED CB25              SLA     L       ;CURRENT ADDRESS
+ 02EF CB14              RL      H       ;AND DO A 16 BIT
+ 02F1 CB25              SLA     L       ;LEFT SHIFT 4 TIMES
+ 02F3 CB14              RL      H       ;TO MAKE  ROOM
+ 02F5 CB25              SLA     L       ;FOR THE NEW KEY
+ 02F7 CB14              RL      H
+ 02F9 CB25              SLA     L
+ 02FB CB14              RL      H
+ 02FD B5                OR      L       ;IT IN THE LEAST
+ 02FE 6F                LD      L,A     ;SIGNIFICANT NYBBLE
+ 02FF 22DA3F            LD      (ADRESS),HL     ;SAVE CURRENT ADDRESS
+ 0302 C9                RET
+                ;-------------
+                ; CHANGE MODES
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page  8
+
+
+                ;-------------
+ 0303 CD4305    ADDKEY  CALL    BEEP
+ 0306 3AD83F            LD      A,(MODE)
+ 0309 EE80              XOR     80H     ;TOGGLE MODE
+ 030B 32D83F            LD      (MODE),A
+ 030E C9                RET
+                ;------------------
+                ; INCREMENT ADDRESS
+                ;------------------
+ 030F CD4305    INCKEY  CALL    BEEP
+ 0312 2ADA3F    INCKY1  LD      HL,(ADRESS)
+ 0315 23                INC     HL      ;INC ADDRESS
+ 0316 22DA3F            LD      (ADRESS),HL
+ 0319 CD5903            CALL    UPDATE
+ 031C 2ADC3F            LD      HL,(KEYDEL)
+ 031F CDD003    INCKY2  CALL    SCAND
+ 0322 DB86              IN      A,(KEYBUF)
+ 0324 CB6F              BIT     5,A     ;RETURN IF +
+ 0326 280B              JR      Z,INCKY3        ;KEY RELEASED
+ 0328 110100            LD      DE,0001H
+ 032B ED52              SBC     HL,DE
+ 032D D21F03            JP      NC,INCKY2
+ 0330 C31203            JP      INCKY1
+ 0333 C9        INCKY3  RET
+                ;------------------
+                ; DECREMENT ADDRESS
+                ;------------------
+ 0334 CD4305    DECKEY  CALL    BEEP
+ 0337 2ADA3F    DECKY1  LD      HL,(ADRESS)
+ 033A 2B                DEC     HL      ;DEC ADDRESS
+ 033B 22DA3F            LD      (ADRESS),HL
+ 033E CD5903            CALL    UPDATE
+ 0341 2ADC3F            LD      HL,(KEYDEL)
+ 0344 CDD003    DECKY2  CALL    SCAND
+ 0347 DB86              IN      A,(KEYBUF)      ;READ KEYBOARD
+ 0349 CB6F              BIT     5,A     ;RETURN IF
+ 034B 280B              JR      Z,DECKY3        ; - KEY RELEASED
+ 034D 110100            LD      DE,0001H
+ 0350 ED52              SBC     HL,DE
+ 0352 D24403            JP      NC,DECKY2
+ 0355 C33703            JP      DECKY1
+ 0358 C9        DECKY3  RET
+                ;-----------------------------------------
+                ; UPDATE DISPLAY BUFFER TO CURRENT ADDRESS
+                ;-----------------------------------------
+ 0359 2ADA3F    UPDATE  LD      HL,(ADRESS)
+ 035C CD8203            CALL    DISADD  ;AND DATA, PUT IN
+ 035F 7E                LD      A,(HL)
+ 0360 CD9703            CALL    DISBYT  ;DISPLAY BUFFER
+                ;
+                ; IN ADDRESS OR DATA MODE?
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page  9
+
+
+                ;
+ 0363 21D83F            LD      HL,MODE
+ 0366 CB7E              BIT     7,(HL)  ;DATA OR ADDR MODE?
+ 0368 CA7303            JP      Z,ADMODE        ;ADDRESS MODE
+                ;
+                ; SHOW DATA MODE
+                ;
+ 036B 21D03F            LD      HL,DISBUF
+ 036E 0602              LD      B,2     ;IN THE DATA
+ 0370 C37803            JP      SETDP   ;DISPLAY
+                ;
+                ; SHOW ADDRESS MODE
+                ;
+ 0373 21D23F    ADMODE  LD      HL,DISBUF+2
+ 0376 0604              LD      B,4     ;SET THE DP'S IN THE
+                ;
+                ; SET DECIMAL POINT
+                ;
+                ;SET BIT 7 IN THE BYTE POINTED TO BY HL
+                ;
+ 0378 CBFE      SETDP   SET     7,(HL)  ;SET BIT 7
+ 037A 23                INC     HL      ;POINT TO NEXT BYTE
+ 037B 10FB              DJNZ    SETDP   ;MORE BITS TO SET
+ 037D C9                RET
+                ;---------------
+                ; VERSION NUMBER
+                ;---------------
+                ;RETURNS THE SOFTWARE VERSION NUMBER
+                ;SHOULD FUTURE MONITORS EXHIBIT DIFFERENCES
+                ;THE VERSION NUMBER CAN BE USED TO COMPENSATE
+                ;
+                ;       ENTRY : NONE
+                ; EXIT : H = ASCII MINOR VERSION NUMBER
+                ;        L = ASCII MAJOR VERSION NUMBER
+                ;
+ 037E 213231    VERS    LD      HL,3132H
+ 0381 C9                RET
+                ;-------------------------
+                ; ADDRESS > DISPLAY BUFFER
+                ;-------------------------
+                ;CONVERT HL TO SEVEN SEGMENT CODE
+                ;AND PUT IN ADDRESS DISPLAY BUFFER.
+                ;
+                ; ENTRY : HL = ADDRESS TO BE DISPLAYED
+                ;
+                ; EXIT  : NO REGISTERS MODIFIED
+                ;
+ 0382 F5        DISADD  PUSH    AF
+ 0383 E5                PUSH    HL
+ 0384 E5                PUSH     HL
+ 0385 7C                LD      A,H
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 10
+
+
+ 0386 CDA003            CALL    CONBYT
+ 0389 22D43F            LD      (DISBUF+4),HL
+ 038C E1                POP     HL
+ 038D 7D                LD      A,L
+ 038E CDA003            CALL    CONBYT
+ 0391 22D23F            LD      (DISBUF+2),HL
+ 0394 E1                POP     HL
+ 0395 F1                POP     AF
+ 0396 C9                RET
+                ;---------------------------
+                ; DATA BYTE > DISPLAY BUFFER
+                ;---------------------------
+                ;CONVERT THE ACC TO SEVEN SEGMENT CODE
+                ;AND PUT IN DATA DISPLAY BUFFER.
+                ;
+                ; ENTRY :  A = DATA DISPLAY BYTE
+                ;
+                ; EXIT  : NO REGISTERS MODIFIED
+                ;
+ 0397 E5        DISBYT  PUSH    HL
+ 0398 CDA003            CALL    CONBYT
+ 039B 22D03F            LD      (DISBUF),HL
+ 039E E1                POP     HL
+ 039F C9                RET
+                ;---------------------------------------
+                ; CONVERT BYTE TO 7 SEGMENT DISPLAY CODE
+                ;---------------------------------------
+                ; CONVERTS BYTE IN ACC TO SEVEN SEGMENT CODE
+                ; FOR DISPLAY
+                ; ENTRY : A = BYTE TO BE CONVERTED
+                ; EXIT  : H = HI NYBBLE SEVEN SEGMENT CODE
+                ;         L = LO NYBBLE SEVEN SEGMENT CODE
+                ;         A = NOT MODIFIED
+ 03A0 F5        CONBYT  PUSH    AF
+ 03A1 F5                PUSH    AF
+ 03A2 CDAD03            CALL    CONVHI  ;CONVERT HI NYBBLE
+ 03A5 67                LD      H,A
+ 03A6 F1                POP     AF
+ 03A7 CDB103            CALL    CONVLO  ;CONVERT LO NYBBLE
+ 03AA 6F                LD      L,A
+ 03AB F1                POP     AF
+ 03AC C9                RET
+                ;---------------------------------------------
+                ; HEXADECIMAL TO SEVEN SEGMENT CODE CONVERSION
+                ;---------------------------------------------
+                ; CONVERTS NYBBLE IN ACC TO SEVEN SEGMENT CODE
+                ; FOR SEVEN SEGMENT DISPLAYS
+                ; CONVHI = CONVERTS HIGH NYBBLE
+                ; CONVLO = CONVERTS LO NYBBLE
+                ;
+                ; ENTRY : A = NYBBLE TO BE CONVERTED
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 11
+
+
+                ; EXIT  : A = SEVEN SEGMENT CODE
+                ;
+ 03AD 07        CONVHI  RLCA
+ 03AE 07                RLCA
+ 03AF 07                RLCA    ;MOVE TO LO NYBBLE
+ 03B0 07                RLCA    ;FOR CONVERSION
+ 03B1 C5        CONVLO  PUSH    BC
+ 03B2 E5                PUSH    HL
+ 03B3 21C003            LD      HL,SEGMNT       ;USE THE HEX VALUE
+ 03B6 E60F              AND     0FH     ;TO INDEX TO THE
+ 03B8 4F                LD      C,A     ;THE SEVEN SEGMENT
+ 03B9 0600              LD      B,00H   ;CODE FOR THAT VALUE
+ 03BB 09                ADD     HL,BC   ;AND RETURN WITH
+ 03BC 7E                LD      A,(HL)  ;CODE IN A
+ 03BD E1                POP     HL
+ 03BE C1                POP     BC
+ 03BF C9                RET
+                ;
+                ; HEXADECIMAL TO 7 SEGMENT DISPLAY CODE TABLE
+                ;
+ 03C0 3F065B4F  SEGMNT  DEFB    3FH,06H,5BH,4FH ;0,1,2,3
+ 03C4 666D7D07          DEFB    66H,6DH,7DH,07H ;4,5,6,7
+ 03C8 7F6F777C          DEFB    7FH,6FH,77H,7CH ;8,9,A,B
+ 03CC 395E7971          DEFB    39H,5EH,79H,71H ;C,D,E,F
+                ;-------------
+                ; SCAN DISPLAY
+                ;-------------
+                ;AS THE DISPLAYS ARE MULTIPLEXED, THE DATA FOR EACH
+                ;DISPLAY MUST BE LATCHED INTO THE DISPLAY SEGMENT
+                ;LATCH IN TURN AND THE CORRESPONDING BIT IN THE DISPLAY
+                ;SCAN LATCH TURNED ON TO DISPLAY THE DATA.
+                ;TWO SHORT DELAYS ARE USED TO ADJUST THE DUTY
+                ;CYCLE AND HENCE DISPLAY BRIGHTNESS.
+                ;
+                ; ENTRY : NONE
+                ; EXIT  : NO REGISTERS MODIFIED
+                ;
+ 03D0 F5        SCAND   PUSH    AF
+ 03D1 C5                PUSH    BC
+ 03D2 E5                PUSH    HL      ;SAVE REGISTERS
+ 03D3 21D53F            LD      HL,DISBUF+5
+ 03D6 0E20              LD      C,20H
+ 03D8 7E        SCAND1  LD      A,(HL)
+ 03D9 D384              OUT     (DISPLY),A      ;OUTPUT CHARACTER
+ 03DB 79                LD      A,C
+ 03DC D385              OUT     (SCAN),A        ;TURN ON DISPLAY
+ 03DE 3AD63F            LD      A,(ONTIM)       ;DO A SHORT DELAY
+ 03E1 47                LD      B,A     ;TO ADJUST ON TIME
+ 03E2 10FE      SCAND2  DJNZ    SCAND2  ;OF DISPLAY
+ 03E4 78                LD      A,B     ;B IS NOW CLEAR, USE
+ 03E5 D385              OUT     (SCAN),A        ;IT TO TURN OFF SCAN
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 12
+
+
+ 03E7 3AD73F            LD      A,(OFTIM)       ;DO A SHORT DELAY
+ 03EA 47                LD      B,A     ;TO ADJUST OFF TIME
+ 03EB 10FE      SCAND3  DJNZ    SCAND3  ;OF DISPLAY
+ 03ED 2B                DEC     HL      ;POINT TO NEXT
+ 03EE CB09              RRC     C       ;ELEMENT IN BUFFER
+ 03F0 30E6              JR      NC,SCAND1       ;DISPLAY NEXT ELEMENT
+ 03F2 78                LD      A,B     ;B IS NOW CLEAR, USE
+ 03F3 D385              OUT     (SCAN),A        ;IT TO TURN OFF SCAN
+ 03F5 D384              OUT     (DISPLY),A      ;AND CLEAR DISPLAY LATCH
+ 03F7 E1                POP     HL
+ 03F8 C1                POP     BC
+ 03F9 F1                POP     AF      ;RESTORE REGISTERS
+ 03FA C9                RET
+                ;---------------------
+                ; CLEAR DISPLAY BUFFER
+                ;---------------------
+ 03FB E5        CLRBUF  PUSH    HL
+ 03FC C5                PUSH    BC
+ 03FD 21D03F            LD      HL,DISBUF
+ 0400 0606              LD      B,6
+ 0402 3600      CLRBF1  LD      (HL),00H        ;PUT ZERO IN 6
+ 0404 23                INC     HL      ;LOCATIONS POINTED
+ 0405 10FB              DJNZ    CLRBF1  ;TO BY HL
+ 0407 C1                POP     BC
+ 0408 E1                POP     HL
+ 0409 C9                RET
+                ;------------------
+                ; KEYBOARD ROUTINES
+                ;------------------
+                ;-----------------------------
+                ; SCAN DISPLAY UNTIL KEY PRESS
+                ;-----------------------------
+                ; ENTRY : NONE
+                ; EXIT  : A = KEY VALUE 00H TO 1FH
+                ;         FLAG REGISTER MODIFIED
+                ;
+ 040A CDD003    SKEYIN  CALL    SCAND   ;SCAN DISPLAY
+ 040D DB86              IN      A,(KEYBUF)      ;READ KEYBOARD
+ 040F CB6F              BIT     5,A     ;DA  HIGH?
+ 0411 28F7              JR      Z,SKEYIN        ;NO KEY PRESS
+ 0413 E61F              AND     1FH     ;STRIP UNUSED BITS
+ 0415 C9                RET
+                ;-------------------------------
+                ; SCAN DISPLAY UNTIL KEY RELEASE
+                ;-------------------------------
+                ; ENTRY : NONE
+                ; EXIT  : NONE
+                ;
+ 0416 F5        SKEYRL  PUSH    AF
+ 0417 CDD003    SKEYL1  CALL    SCAND   ;SCAN DISPLAY
+ 041A DB86              IN      A,(KEYBUF)      ;READ KEYBOARD
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 13
+
+
+ 041C CB6F              BIT     5,A     ;DA LOW?
+ 041E 20F7              JR      NZ,SKEYL1       ;KEY NOT RELEASED
+ 0420 F1                POP     AF
+ 0421 C9                RET
+                ;-------------------
+                ; WAIT FOR KEY PRESS
+                ;-------------------
+                ; ENTRY : NONE
+                ; EXIT  : A = KEY VALUE 00H TO 1FH
+                ;         FLAG REGISTER MODIFIED
+                ;
+ 0422 DB86      KEYIN   IN      A,(KEYBUF)      ;READ KEYBOARD
+ 0424 CB6F              BIT     5,A
+ 0426 28FA              JR      Z,KEYIN ;NO KEY PRESS
+ 0428 E61F              AND     1FH     ;STRIP UNUSED BITS
+ 042A C9                RET
+                ;---------------------
+                ; WAIT FOR KEY RELEASE
+                ;---------------------
+                ; ENTRY : NONE
+                ; EXIT  : NONE
+                ;
+ 042B F5        KEYREL  PUSH    AF
+ 042C DB86      KEYRL1  IN      A,(KEYBUF)
+ 042E CB6F              BIT     5,A
+ 0430 20FA              JR      NZ,KEYRL1
+ 0432 F1                POP     AF
+ 0433 C9                RET
+                ;-----------------
+                ; KEY MENU HANDLER
+                ;-----------------
+                ; COMPARES ACC AGAINST TABLE OF ELEMENTS,
+                ; IF FOUND JUMP TO ADDRESS CORRESPONDING TO
+                ; THAT ELEMENT, RETURNS IF ELEMENT NOT FOUND.
+                ; ENTRY :  A = ELEMENT TO LOOK FOR
+                ;         HL = POINTS TO TABLE
+                ; EXIT  :  ELEMENT NOT FOUND
+                ;           HL HOLDS ADDRESS OF LAST ELEMENT
+                ;          ELEMENT FOUND
+                ;           CONTROL PASSES TO JUMP ADDRESS WITH
+                ;          RETURN ADDRESS OF MENU CALL ON STACK
+                ;
+ 0434 F5        MENU    PUSH    AF
+ 0435 C5                PUSH    BC
+ 0436 D5                PUSH    DE      ;SAVE REGISTERS
+ 0437 E5                PUSH    HL      ;CALCULATE ADDRESS
+ 0438 1600              LD      D,00H   ;OF THE JUMP TABLE BY
+ 043A 5E                LD      E,(HL)  ;ADDING THE INDEX TO
+ 043B 23                INC     HL      ;THE ELEMENTS
+ 043C 19                ADD     HL,DE   ;TO THE ADDR OF THE
+ 043D 54                LD      D,H     ;TABLE
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 14
+
+
+ 043E 5D                LD      E,L
+ 043F E1                POP     HL
+ 0440 46                LD      B,(HL)  ;GET NUMBER OF ENTRIES
+ 0441 23                INC     HL      ;POINT TO LIST OF ENTRIES
+ 0442 BE        MENU1   CP      (HL)    ;COMPARE WITH ENTRY
+ 0443 2809              JR      Z,MENU2 ;FOUND VALUE IN TABLE
+ 0445 23                INC     HL      ;NEXT ENTRY IN LIST
+ 0446 13                INC     DE      ;NEXT ENTRY IN
+ 0447 13                INC     DE      ;JUMP TABLE
+ 0448 10F8              DJNZ    MENU1   ;CHECK MORE ENTRIES
+ 044A D1                POP     DE
+ 044B C1                POP     BC
+ 044C F1                POP     AF
+ 044D C9                RET     ;NOT IN TABLE
+                ;
+                ; FOUND ELEMENT IN THE TABLE
+                ; PASS CONTROL TO THE JUMP HANDLER
+                ;
+ 044E 1A        MENU2   LD      A,(DE)  ;GET THE JUMP ADDR
+ 044F 6F                LD      L,A     ;FROM THE TABLE
+ 0450 13                INC     DE      ;AND JUMP TO
+ 0451 1A                LD      A,(DE)  ;THE JUMP ADDRESS
+ 0452 67                LD      H,A     ;FOR THAT ENTRY
+ 0453 D1                POP     DE
+ 0454 C1                POP     BC
+ 0455 F1                POP     AF      ;RESTORE REGISTERS
+ 0456 E9                JP      (HL)
+                ;-------------------
+                ; CALCULATE CHECKSUM
+                ;-------------------
+                ;CALCULATES CHECKSUM BETWEEN START AND END (INCLUSIVE)
+                ;
+                ; ENTRY : HL = START OF BLOCK TO SUM
+                ;         DE = END OF BLOCK TO SUM
+                ; EXIT  : A =  CHECKSUM
+                ;         FLAG REGISTER MODIFIED
+                ;
+ 0457 E5        CHKSUM  PUSH    HL
+ 0458 D5                PUSH    DE
+ 0459 13                INC     DE      ;END OF BLOCK+1
+ 045A AF                XOR     A       ;CLEAR CHECKSUM
+ 045B 86        CHKSM1  ADD     A,(HL)  ;COMPUTE CHEKSUM
+ 045C 23                INC     HL      ;POINT TO NEXT ELEMENT
+ 045D A7                AND     A       ;SET CARRY
+ 045E E5                PUSH    HL
+ 045F ED52              SBC     HL,DE   ;SUBTRACT
+ 0461 E1                POP     HL
+ 0462 38F7              JR      C,CHKSM1        ;MORE ELEMENTS
+ 0464 D1                POP     DE
+ 0465 E1                POP     HL
+ 0466 C9                RET
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 15
+
+
+                ;--------------------------
+                ; ACCESS BYTE LOOK UP TABLE
+                ;--------------------------
+                ; USE 8 BIT INDEX TO ACCESS BYTE LOOK
+                ; UP TABLE
+                ; ENTRY :  A = NUMBER OF ELEMENT IN TABLE
+                ;         HL = ADDRESS OF LOOK UP TABLE
+                ; EXIT : HL = ADDRESS OF ELEMENT A
+                ;
+ 0467 D5        INDEXB  PUSH    DE
+ 0468 5F                LD      E,A     ;USE DE AS INDEX
+ 0469 1600              LD      D,0     ;TO ELEMENT IN TABLE
+ 046B 19                ADD     HL,DE   ;BY ADDING TO HL
+ 046C D1                POP     DE
+ 046D C9                RET
+                ;--------------------------
+                ; ACCESS WORD LOOK UP TABLE
+                ;--------------------------
+                ; USE 8 BIT INDEX TO ACCESS WORD LOOK
+                ; UP TABLE
+                ; ENTRY :  A = NUMBER OF ELEMENT IN TABLE
+                ;         HL = ADDRESS OF LOOK UP TABLE
+                ; EXIT : HL = ADDRESS OF 2 BYTE ELEMENT A
+                ;
+ 046E D5        INDEXW  PUSH    DE
+ 046F 5F                LD      E,A
+ 0470 CB23              SLA     E       ;MULTIPLY BY TWO
+ 0472 1600              LD      D,0
+ 0474 19                ADD     HL,DE
+ 0475 D1                POP     DE
+ 0476 C9                RET
+                ;-------------------------------
+                ; GENERATE A QUASI-RANDOM NUMBER
+                ;-------------------------------
+                ; GENERATE AN 16 BIT RANDOM NUMBER
+                ; USING LINEAR CONGRUENTIAL METHOD.
+                ;     Rn+1 = (aRn+c) MOD m
+                ; REFRESH REGISTER USED FOR Rn AND c
+                ;       ENTRY : NONE
+                ;       EXIT  : HL = RANDOM WORD
+                ;       NO REGISTERS MODIFIED
+                ;
+ 0477 F5        RAND    PUSH    AF
+ 0478 C5                PUSH    BC
+ 0479 D5                PUSH    DE      ;SAVE REGISTERS
+                ;
+                ; CALCULATE aRn
+                ;
+ 047A ED5F              LD      A,R     ;MULTIPLY RANDOM NUMBER
+ 047C 5F                LD      E,A     ;(Rn) BY
+ 047D 1600              LD      D,0
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 16
+
+
+ 047F 214805            LD      HL,0548H        ;CONSTANT (a)
+ 0482 CD8F04            CALL    MUL16
+                ;
+                ; CALCULATE aRn+c
+                ;
+ 0485 ED5F              LD      A,R     ;ADD IT TO ANOTHER
+ 0487 0600              LD      B,0     ;READ OF THE
+ 0489 4F                LD      C,A     ;THE REFRESH
+ 048A 09                ADD     HL,BC   ;REGISTER (c)
+ 048B D1                POP     DE
+ 048C C1                POP     BC
+ 048D F1                POP     AF      ;RESTORE REGISTERS
+ 048E C9                RET
+                ;----------------------
+                ; 16 BIT MULTIPLICATION
+                ;----------------------
+                ;16 BIT MULTIPLY
+                ; ENTRY : HL = MULTIPLICAND (MPD)
+                ;         DE = MULTIPLIER (MPR)
+                ; EXIT : HL = RESULT
+                ;SEE ZAKS 'PROGRAMMING THE Z80'
+                ;
+ 048F F5        MUL16   PUSH    AF
+ 0490 C5                PUSH    BC
+ 0491 4C                LD      C,H     ;MPR(H)
+ 0492 7D                LD      A,L     ;MPR(L)
+ 0493 0610              LD      B,16    ;BIT COUNTER
+ 0495 210000            LD      HL,0    ;CLEAR RESULT
+ 0498 CB39      MULT    SRL     C       ;MPR (H)
+ 049A 1F                RRA     ;MPR (L)
+ 049B 3001              JR      NC,MULT1        ;TEST CARRY
+ 049D 19                ADD     HL,DE   ;ADD MPD TO RESULT
+ 049E EB        MULT1   EX      DE,HL
+ 049F 29                ADD     HL,HL   ;DOUBLE -SHIFT MPD LEFT
+ 04A0 EB                EX      DE,HL
+ 04A1 10F5              DJNZ    MULT    ;DONE?
+ 04A3 C1                POP     BC
+ 04A4 F1                POP     AF
+ 04A5 C9                RET
+                ;----------------
+                ; MUSIC SEQUENCER
+                ;----------------
+                ; SEQUENCES THROUGH A TABLE OF NOTES
+                ; 1EH = REPEAT TUNE UNTIL RESET
+                ; 1FH = PLAY ONCE AND RETURN
+                ; ENTRY : HL = ADDRESS OF NOTE TABLE
+                ; EXIT : NO REGISTERS MODIFIED
+ 04A6 F5        MUSIC   PUSH    AF
+ 04A7 C5                PUSH    BC
+ 04A8 D5                PUSH    DE
+ 04A9 E5                PUSH    HL      ;SAVE REGISTERS
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 17
+
+
+ 04AA E5                PUSH    HL
+ 04AB EB                EX      DE,HL   ;GET ADDRESS OF MUSIC
+                ;
+                ; PLAY EACH NOTE IN TURN
+                ;
+ 04AC 1A        STEP    LD      A,(DE)  ;GET ELEMENT FROM TABLE
+ 04AD E61F              AND     1FH     ;STRIP UNUSED BITS
+                ;
+                ; IF ELEMENT IS 00H PAUSE FOR A WHILE
+                ;
+ 04AF FE00              CP      00H
+ 04B1 C2C104            JP      NZ,STEP1
+ 04B4 010010            LD      BC,1000H
+ 04B7 0B        PAUSE   DEC     BC
+ 04B8 78                LD      A,B
+ 04B9 B1                OR      C
+ 04BA C2B704            JP      NZ,PAUSE        ;LOOP UNTIL DE = 0
+ 04BD 13                INC     DE      ;POINT TO NEXT ELEMENT
+ 04BE C3AC04            JP      STEP
+                ;
+                ; IF ELEMENT IS 1EH REPEAT TUNE
+                ;
+ 04C1 FE1E      STEP1   CP      1EH
+ 04C3 C2CB04            JP      NZ,STEP2
+ 04C6 D1                POP     DE      ;GET TABLE ADDRESS BACK
+ 04C7 D5                PUSH    DE      ;SAVE IT FOR LATER
+ 04C8 C3AC04            JP      STEP
+                ;
+                ; IF ELEMENT IS 1FH RETURN
+                ;
+ 04CB FE1F      STEP2   CP      1FH     ;END OF TUNE TABLE?
+ 04CD C2D604            JP      NZ,STEP3
+ 04D0 E1                POP     HL
+ 04D1 E1                POP     HL
+ 04D2 D1                POP     DE
+ 04D3 C1                POP     BC
+ 04D4 F1                POP     AF
+ 04D5 C9                RET
+                ;
+                ;NOW PLAY THE NOTE
+                ;
+ 04D6 47        STEP3   LD      B,A     ;SAVE ELEMENT IN B
+ 04D7 21F204            LD      HL,PERIOD       ;POINT TO PERIOD/2 TABLE
+ 04DA CD6704            CALL    INDEXB  ;GET PERIOD/2
+ 04DD 7E                LD      A,(HL)  ;GET ELEMENT
+ 04DE F5                PUSH    AF      ;SAVE FOR LATER
+ 04DF 78                LD      A,B     ;GET ELEMENT BACK IN A
+ 04E0 210A05            LD      HL,LENGTH       ;POINT TO DURATION/2 TABLE
+ 04E3 CD6704            CALL    INDEXB  ;GET DURATION/2
+ 04E6 7E                LD      A,(HL)  ;GET ELEMENT
+ 04E7 6F                LD      L,A
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 18
+
+
+ 04E8 2600              LD      H,0     ;HL = DURATION/2
+ 04EA F1                POP     AF
+ 04EB CD2305            CALL    TONE    ;DO NOTE ROUTINE
+ 04EE 13                INC     DE
+ 04EF C3AC04            JP      STEP    ;STEP TO NEXT ELEMENT
+                ;
+                ; PERIOD/2 OF NOTE
+                ;
+ 04F2 8C837C75  PERIOD  DEFB    8CH,83H,7CH,75H,70H,67H,62H,5CH
+ 04FA 57524E48          DEFB    57H,52H,4EH,48H,45H,41H,3CH,39H
+ 0502 36322F2C          DEFB    36H,32H,2FH,2CH,2AH,27H,25H,23H
+                ;
+                ; NOTE DURATION/2
+                ;
+ 050A 191A1C1D  LENGTH  DEFB    19H,1AH,1CH,1DH,1EH,20H,23H,25H
+ 0512 27292C2E          DEFB    27H,29H,2CH,2EH,31H,33H,37H,3AH
+ 051A 3D414549          DEFB    3DH,41H,45H,49H,4DH,52H,57H,5CH
+ 0522 10                DEFB    10H
+                ;--------------
+                ; OUTPUT A TONE
+                ;--------------
+                ;
+                ; ENTRY : A = PERIOD/2 OF NOTE
+                ;         HL = DURATION/2 OF NOTE
+                ; EXIT NO REGISTERS MODIFIED
+ 0523 F5        TONE    PUSH    AF
+ 0524 C5                PUSH    BC
+ 0525 D5                PUSH    DE
+ 0526 E5                PUSH    HL
+ 0527 110100            LD      DE,0001H
+ 052A 4F                LD      C,A
+ 052B 29                ADD     HL,HL   ;DOUBLE DURATION
+ 052C AF                XOR     A
+ 052D EE80      TONE1   XOR     80H     ;TOGGLE SPEAKER BIT
+ 052F D385              OUT     (SCAN),A        ;OUTPUT SPEAKER BIT
+ 0531 41                LD      B,C
+ 0532 C5        TONE2   PUSH    BC
+ 0533 0602              LD      B,02H
+ 0535 10FE      TONE3   DJNZ    TONE3   ;DELAY FOR PERIOD/2
+ 0537 C1                POP     BC
+ 0538 10F8              DJNZ    TONE2   ; DELAY FOR PERIOD/2
+ 053A ED52              SBC     HL,DE   ;END OF NOTE?
+ 053C 20EF              JR      NZ,TONE1        ;DO AGAIN
+ 053E E1                POP     HL
+ 053F D1                POP     DE
+ 0540 C1                POP     BC
+ 0541 F1                POP     AF
+ 0542 C9                RET
+                ;---------------
+                ; KEY ENTRY BEEP
+                ;---------------
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 19
+
+
+ 0543 E5        BEEP    PUSH    HL
+ 0544 F5                PUSH    AF
+ 0545 21D83F            LD      HL,MODE
+ 0548 CB76              BIT     6,(HL)  ;BEEP ENABLED?
+ 054A 280E              JR      Z,BEEP2 ;BEEP IS ENABLED
+                ;
+                ; DO KEYPRESS DELAY
+                ;
+ 054C D5                PUSH    DE      ;DO A SHORT
+ 054D 110100            LD      DE,0001H        ;DELAY TO PREVENT
+ 0550 2AC23F            LD      HL,(KEYTIM)     ;RECOGNITION
+ 0553 ED52      BEEP1   SBC     HL,DE   ;OF DOUBLE
+ 0555 30FC              JR      NC,BEEP1        ;KEY STROKES
+ 0557 D1                POP     DE
+ 0558 1810              JR      BEEP3
+                ;
+                ; OUTPUT KEYPRESS TONES
+                ;
+ 055A 3E24      BEEP2   LD      A,24H
+ 055C 213000            LD      HL,0030H
+ 055F CD2305            CALL    TONE    ;DO FIRST TONE
+ 0562 3E0E              LD      A,0EH
+ 0564 215000            LD      HL,0050H
+ 0567 CD2305            CALL    TONE    ;DO SECOND TONE
+ 056A F1        BEEP3   POP     AF
+ 056B E1                POP     HL
+ 056C C9                RET
+                ;----------------------------------------
+                ; BREAKPOINT AND SINGLE STEPPING ROUTINES
+                ;----------------------------------------
+                ;DISPLAYS AND MODIFIES REGISTERS AFTER BREAKPOINT
+                ; (RST 38H) OR SINGLE STEP INTERRUPT (IF HARDWARE
+                ; ATTACHED).
+                ;INSERT RST 38H (FFH) IN PROGRAM TO EXAMINE
+                ; AND MODIFY REGISTERS.
+                ;
+ 056D E1        SSTEP   POP     HL      ;GET HL BACK
+ 056E F5                PUSH    AF      ;SAVE AF FOR LATER
+ 056F 22E83F            LD      (HL_REG),HL
+ 0572 ED53E63F          LD      (DE_REG),DE
+ 0576 ED43E43F          LD      (BC_REG),BC
+ 057A DD22EA3F          LD      (IX_REG),IX
+ 057E FD22EC3F          LD      (IY_REG),IY     ;SAVE REGISTERS
+ 0582 E1                POP     HL      ;GET AF BACK
+ 0583 22E23F            LD      (AF_REG),HL     ;SAVE AF
+ 0586 E1                POP     HL      ;GET PC RETURN ADDRESS
+ 0587 22E03F            LD      (PC_REG),HL     ;SAVE PC
+ 058A ED73EE3F          LD      (SP_REG),SP     ;SAVE STACK POINTER
+                ;
+                ; STEP THROUGH,DISPLAY AND EDIT REGISTERS
+                ;
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 20
+
+
+ 058E CD4305            CALL    BEEP
+ 0591 3ADE3F            LD      A,(REGPNT)      ;GET CURRENT REG
+ 0594 E607              AND     7       ;MAKE SURE IN LIMITS
+ 0596 32DE3F            LD      (REGPNT),A      ;SAVE IT
+ 0599 CD7606    DISREG  CALL    SETREG  ;SET UP DISPLAY BUFFER
+ 059C CD1604            CALL    SKEYRL  ;WAIT FOR A KEY
+ 059F CD0A04            CALL    SKEYIN  ;WAIT FOR KEY RELEASE
+ 05A2 21AB05            LD      HL,REGTBL       ;HANDLE THE KEY
+ 05A5 CD3404            CALL    MENU    ;AND UPDATE DISPLAY
+ 05A8 C39905            JP      DISREG  ;BEFORE RETURNING TO LOOP
+                ;
+                ; REGISTER DISPLAY KEY TABLE
+                ;
+ 05AB 14        REGTBL  DEFB    14H
+ 05AC 00010203          DEFB    00H,01H,02H,03H,04H,05H,06H,07H
+ 05B4 08090A0B          DEFB    08H,09H,0AH,0BH,0CH,0DH,0EH,0FH
+ 05BC 10111213          DEFB    10H,11H,12H,13H
+ 05C0 F805F805          DEFW    REGKEY,REGKEY,REGKEY,REGKEY
+ 05C8 F805F805          DEFW    REGKEY,REGKEY,REGKEY,REGKEY
+ 05D0 F805F805          DEFW    REGKEY,REGKEY,REGKEY,REGKEY
+ 05D8 F805F805          DEFW    REGKEY,REGKEY,REGKEY,REGKEY
+ 05E0 1F062906          DEFW    RETMON,RETPGM,INCSTP,DECSTP
+                ;
+                ; REGISTER NAME CHARACTERS
+                ;
+ 05E8 3973      REGNAM  DEFW    7339H
+ 05EA 7177397C          DEFW    7771H,7C39H,5E79H
+ 05F0 38747606          DEFW    7438H,0676H,066EH
+ 05F6 736D              DEFW    6D73H
+                ;--------------
+                ; EDIT REGISTER
+                ;--------------
+ 05F8 CD4305    REGKEY  CALL    BEEP
+ 05FB F5                PUSH    AF      ;SAVE KEY FOR LATER
+ 05FC 3ADE3F            LD      A,(REGPNT)
+                ;
+                ; EDIT REGISTER
+                ;
+ 05FF 21E03F            LD      HL,PC_REG
+ 0602 CD6E04            CALL    INDEXW
+ 0605 4E                LD      C,(HL)
+ 0606 23                INC     HL
+ 0607 46                LD      B,(HL)  ;GET REG CONTENTS
+ 0608 CB21              SLA     C
+ 060A CB10              RL      B
+ 060C CB21              SLA     C
+ 060E CB10              RL      B
+ 0610 CB21              SLA     C
+ 0612 CB10              RL      B       ;SHIFT REGISTER
+ 0614 CB21              SLA     C       ;FOUR BITS
+ 0616 CB10              RL      B       ;LEFT AND
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 21
+
+
+ 0618 F1                POP     AF      ;PUT THE KEY
+ 0619 B1                OR      C       ;INTO THE LSN
+ 061A 4F                LD      C,A     ;AND PUT THE
+ 061B 70                LD      (HL),B  ;REGISTER BACK
+ 061C 2B                DEC     HL      ;WHERE IT BELONGS
+ 061D 71                LD      (HL),C
+ 061E C9                RET
+                ;------------------
+                ; RETURN TO MONITOR
+                ;------------------
+ 061F CD4305    RETMON  CALL    BEEP
+ 0622 CD1604            CALL    SKEYRL
+ 0625 FB                EI      ;ENABLE INTERRUPTS AGAIN
+ 0626 C36E02            JP      MAIN
+                ;------------------
+                ; RETURN TO PROGRAM
+                ;------------------
+ 0629 ED7BEE3F  RETPGM  LD      SP,(SP_REG)     ;PUT STACK POINTER BACK
+ 062D 2AE03F            LD      HL,(PC_REG)     ;PUT RETURN
+ 0630 E5                PUSH    HL      ;ADDRESS BACK ON STACK
+ 0631 2AE23F            LD      HL,(AF_REG)
+ 0634 E5                PUSH    HL      ;SAVE AF REG FOR LATER
+ 0635 FD2AEC3F          LD      IY,(IY_REG)
+ 0639 DD2AEA3F          LD      IX,(IX_REG)
+ 063D ED4BE43F          LD      BC,(BC_REG)
+ 0641 ED5BE63F          LD      DE,(DE_REG)     ;RESTORE REGISTERS
+ 0645 F1                POP     AF      ;RESTORE AF
+ 0646 2AE83F            LD      HL,(HL_REG)     ;RETORE HL
+ 0649 FB                EI      ;ENABLE INTERRUPTS
+ 064A C9                RET     ;AND RETURN TO PROGRAM
+                ;----------------------
+                ; DISPLAY NEXT REGISTER
+                ;----------------------
+ 064B CD4305    INCSTP  CALL    BEEP
+ 064E 3ADE3F            LD      A,(REGPNT)
+ 0651 FE07              CP      A,7     ;END OF REG TABLE?
+ 0653 CA5B06            JP      Z,INCSP1
+ 0656 3C                INC     A
+ 0657 32DE3F            LD      (REGPNT),A
+ 065A C9                RET
+ 065B AF        INCSP1  XOR     A
+ 065C 32DE3F            LD      (REGPNT),A
+ 065F C9                RET
+                ;--------------------------
+                ; DISPLAY PREVIOUS REGISTER
+                ;--------------------------
+ 0660 CD4305    DECSTP  CALL    BEEP
+ 0663 3ADE3F            LD      A,(REGPNT)
+ 0666 FE00              CP      A,0     ;START OF REG TABLE?
+ 0668 CA7006            JP      Z,DECSP1
+ 066B 3D                DEC     A
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 22
+
+
+ 066C 32DE3F            LD      (REGPNT),A
+ 066F C9                RET
+ 0670 3E07      DECSP1  LD      A,7
+ 0672 32DE3F            LD      (REGPNT),A
+ 0675 C9                RET
+                ;-----------------
+                ; DISPLAY REGISTER
+                ;-----------------
+ 0676 3ADE3F    SETREG  LD      A,(REGPNT)
+ 0679 21E03F            LD      HL,PC_REG       ;START OF TABLE
+ 067C CD6E04            CALL    INDEXW  ;GET ELEMENT ADDRESS
+ 067F 5E                LD      E,(HL)
+ 0680 23                INC     HL
+ 0681 56                LD      D,(HL)
+ 0682 EB                EX      DE,HL   ;LOAD REGISTER CONTENTS
+ 0683 CD8203            CALL    DISADD
+                ;
+                ; DISPLAY REGISTER NAME
+                ;
+ 0686 21E805            LD      HL,REGNAM
+ 0689 CD6E04            CALL    INDEXW
+ 068C 7E                LD      A,(HL)
+ 068D 32D03F            LD      (DISBUF+0),A
+ 0690 23                INC     HL
+ 0691 7E                LD      A,(HL)
+ 0692 32D13F            LD      (DISBUF+1),A
+ 0695 C9                RET
+                ;------------------
+                ; FUNCTION KEY MENU
+                ;------------------
+                ; WHEN THE FN KEY IS PRESSED, Fn IS DISPLAYED IN THE
+                ; DATA DISPLAYS, THE CURRENT ADDRESS REMAINS IN THE
+                ; ADDRESS DISPLAYS THE PROGRAM THEN WAITS FOR A
+                ; KEYPRESS WHICH WILL SELECT 1 OF 16 ROUTINES.
+                ;
+ 0696 E1        FUNKEY  POP     HL      ;REMOVE RETURN ADDRESS
+ 0697 CD4305            CALL    BEEP
+ 069A 2ADA3F    FUNKY1  LD      HL,(ADRESS)
+ 069D CD8203            CALL    DISADD  ;DISP ADDR TO REMOVE DP'S
+ 06A0 215471            LD      HL,7154H
+ 06A3 22D03F            LD      (DISBUF),HL     ;DISPLAY FN
+ 06A6 CD1604            CALL    SKEYRL  ;WAIT FOR KEY RELEASE
+ 06A9 CD0A04    FUNKY2  CALL    SKEYIN
+ 06AC 2AB43F            LD      HL,(FUNTBL)     ;USE THE MENU HANDLER
+ 06AF CD3404            CALL    MENU    ;ROUTINE FOR EACH KEY
+ 06B2 C3A906            JP      FUNKY2  ;TRY AGAIN
+                ;
+                ; RETURN TO MAIN
+                ;
+ 06B5 CD4305    CANCEL  CALL    BEEP
+ 06B8 CD5903    CANCL1  CALL    UPDATE  ;UPDATE DISPLAY BUFFER
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 23
+
+
+ 06BB CD1604            CALL    SKEYRL  ;WAIT FOR KEY RELEASE
+ 06BE E1                POP     HL      ;REMOVE MENU RETURN
+ 06BF C38202            JP      MAIN2
+                ;
+                ; FUNCTION MENU KEY TABLE
+                ;
+ 06C2 11        FUNLST  DEFB    11H
+ 06C3 00010203          DEFB    00H,01H,02H,03H,04H,05H,06H,07H
+ 06CB 08090A0B          DEFB    08H,09H,0AH,0BH,0CH,0DH,0EH,0FH
+ 06D3 10                DEFB    10H
+ 06D4 FA060507          DEFW    GOEXEC,INTELH,ADDRA,ADDRB
+ 06DC 4D08A308          DEFW    BLKMVE,BLKSUM,BRANCH,TRACE
+ 06E4 26093509          DEFW    PLAY1,PLAY2,PLAY3,SWBEEP
+ 06EC ED096E0B          DEFW    SECRET,RELSQR,SCOPE,TIME
+ 06F4 F606              DEFW    FUNFUN
+                ;--------------------------
+                ; JUMP TO FUNCTION FUNCTION
+                ;--------------------------
+ 06F6 2ACE3F    FUNFUN  LD      HL,(FUNJMP)
+ 06F9 E9                JP      (HL)
+                ;------------------------------------------
+                ; FUNCTION 0 - EXECUTE FROM CURRENT ADDRESS
+                ;------------------------------------------
+ 06FA CD4305    GOEXEC  CALL    BEEP
+ 06FD CD2B04            CALL    KEYREL
+ 0700 E1                POP     HL      ;REMOVE EXEC RETURN
+ 0701 2ADA3F            LD      HL,(ADRESS)
+ 0704 E9                JP      (HL)    ;START EXECUCTION
+                ;------------------------------------
+                ; FUNCTION 1 RECEIVE INTEL HEX FORMAT
+                ;------------------------------------
+ 0705 CD4305    INTELH  CALL    BEEP
+ 0708 CD2B04            CALL    KEYREL
+ 070B DD21003F          LD      IX,SYSTEM       ;POINT TO SYSTEM VARIABLES
+                ;
+                ; WAIT FOR RECORD MARK
+                ;
+ 070F AF        INTEL1  XOR     A
+ 0710 DD7703            LD      (IX+3),A        ;CLEAR CHECKSUM
+ 0713 CDEA07            CALL    RXDATA  ;WAIT FOR THE
+ 0716 3868              JR      C,INTEL5        ;RECORD MARK
+ 0718 FE3A              CP      ':'     ;TO BE TRANSMITTED
+ 071A 20F3              JR      NZ,INTEL1       ;NOT RECORD MARK
+                ;
+                ; GET RECORD LENGTH
+                ;
+ 071C CD8607            CALL    GETBYT
+ 071F 385F              JR      C,INTEL5
+ 0721 DD7700            LD      (IX+0),A        ;NUMBER OF DATA BYTES
+                ;
+                ; GET ADDRESS FIELD
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 24
+
+
+                ;
+ 0724 CD8607            CALL    GETBYT
+ 0727 3857              JR      C,INTEL5
+ 0729 DD7702            LD      (IX+2),A        ;LOAD ADDRESS HIGH BYTE
+ 072C CD8607            CALL    GETBYT
+ 072F 384F              JR      C,INTEL5
+ 0731 DD7701            LD      (IX+1),A        ;LOAD ADDRESS LOW BYTE
+                ;
+                ; GET RECORD TYPE
+                ;
+ 0734 CD8607            CALL    GETBYT
+ 0737 3847              JR      C,INTEL5
+ 0739 202A              JR      NZ,INTEL4       ;END OF FILE RECORD
+                ;
+                ; READ IN THE DATA
+                ;
+ 073B DD4600            LD      B,(IX+0)        ;NUMBER OF DATA BYTES
+ 073E DD6602            LD      H,(IX+2)        ;LOAD ADDRESS HIGH BYTE
+ 0741 DD6E01            LD      L,(IX+1)        ;LOAD ADDRESS LOW BYTE
+                
+ 0744 CD8607    INTEL2  CALL    GETBYT  ;GET DATA BYTE
+ 0747 3837              JR      C,INTEL5
+ 0749 77                LD      (HL),A  ;STORE DATA BYTE
+ 074A 23                INC     HL
+ 074B 10F7              DJNZ    INTEL2  ;LOAD MORE BYTES
+                ;
+                ; GET CHECKSUM AND COMPARE
+                ;
+ 074D DD7E03            LD      A,(IX+3)        ;CONVERT CHECKSUM TO
+ 0750 ED44              NEG             ;TWO'S COMPLEMENT
+ 0752 DD7704            LD      (IX+4),A        ;SAVE COMPUTED CHECKSUM
+ 0755 CD8607            CALL    GETBYT
+ 0758 3826              JR      C,INTEL5
+ 075A DD7703            LD      (IX+3),A        ;SAVE RECORD CHECKSUM
+ 075D DDBE04            CP      (IX+4)  ;COMPARE CHECKSUM
+ 0760 28AD              JR      Z,INTEL1        ;CHECKSUM OK,NEXT RECORD
+                ;
+                ; CHECKSUM ERROR
+                ;
+ 0762 C36C08    INTEL3  JP      BLKMV1
+                ;
+                ; END OF FILE RECORD
+                ;
+ 0765 DD7E03    INTEL4  LD      A,(IX+3)        ;CONVERT CHECKSUM TO
+ 0768 ED44              NEG             ;TWO'S COMPLEMENT
+ 076A DD7704            LD      (IX+4),A        ;SAVE COMPUTED CHECKSUM
+ 076D CD8607            CALL    GETBYT
+ 0770 380E              JR      C,INTEL5
+ 0772 DD7703            LD      (IX+3),A        ;SAVE EOF CHECKSUM
+ 0775 DDBE04            CP      (IX+4)  ;COMPARE CHECKSUM
+ 0778 20E8              JR      NZ,INTEL3       ;CHECKSUM ERROR
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 25
+
+
+                ;
+                ; LOAD COMPLETE
+                ;
+ 077A 213900            LD      HL,0039H        ;SHOW C FOR COMPLETE
+ 077D C36F08            JP      BLKMV2
+                ;
+                ; INTERRUPTED BY KEYBOARD
+                ;
+ 0780 217700    INTEL5  LD      HL,0077H        ;SHOW A FOR ABORT
+ 0783 C36F08            JP      BLKMV2
+                ;--------------------------
+                ; GET BYTE FROM SERIAL PORT
+                ;--------------------------
+ 0786 C5        GETBYT  PUSH    BC
+ 0787 CDEA07            CALL    RXDATA
+ 078A 3828              JR      C,GETBT3
+ 078C CB77              BIT     6,A
+ 078E 2802              JR      Z,GETBT1
+ 0790 C609              ADD     A,09H
+ 0792 E60F      GETBT1  AND     0FH
+ 0794 CB27              SLA     A
+ 0796 CB27              SLA     A
+ 0798 CB27              SLA     A
+ 079A CB27              SLA     A
+ 079C 4F                LD      C,A
+                ;
+                ; GET LOW NYBBLE
+                ;
+ 079D CDEA07            CALL    RXDATA
+ 07A0 3812              JR      C,GETBT3
+ 07A2 CB77              BIT     6,A
+ 07A4 2802              JR      Z,GETBT2
+ 07A6 C609              ADD     A,09H
+ 07A8 E60F      GETBT2  AND     0FH
+ 07AA B1                OR      C
+ 07AB 47                LD      B,A
+ 07AC DD8603            ADD     A,(IX+3)
+ 07AF DD7703            LD      (IX+3),A        ;ADD TO CHECKSUM
+ 07B2 78                LD      A,B
+ 07B3 A7                AND     A       ;CLEAR CARRY
+ 07B4 C1        GETBT3  POP     BC
+ 07B5 C9                RET
+                ;-------------------------------
+                ; CONVERT ASCII CHARACTER TO HEX
+                ;-------------------------------
+                ;CONVERTS ASCII 0-9,A-F INTO HEX LSN
+                ;ENTRY : A= ASCII 0-9,A-F
+                ;EXIT  : A= HEX 0-F IN LSN
+                ; A AND F REGISTERS MODIFIED
+                ;
+ 07B6 CB77      ASCHEX  BIT     6,A
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 26
+
+
+ 07B8 2802              JR      Z,ASCHX1
+ 07BA C609              ADD     A,09H
+ 07BC E60F      ASCHX1  AND     0FH
+ 07BE C9                RET
+                ;------------------------
+                ; SERIAL TRANSMIT ROUTINE
+                ;------------------------
+                ;TRANSMIT BYTE SERIALLY ON DOUT
+                ;
+                ; ENTRY : A = BYTE TO TRANSMIT
+                ;  EXIT : NO REGISTERS MODIFIED
+                ;
+ 07BF F5        TXDATA  PUSH    AF
+ 07C0 C5                PUSH    BC
+ 07C1 E5                PUSH    HL
+ 07C2 2AC03F            LD      HL,(BAUD)
+ 07C5 4F                LD      C,A
+                ;
+                ; TRANSMIT START BIT
+                ;
+ 07C6 AF                XOR     A
+ 07C7 D385              OUT     (SCAN),A
+ 07C9 CD1C08            CALL    BITIME
+                ;
+                ; TRANSMIT DATA
+                ;
+ 07CC 0608              LD      B,08H
+ 07CE CB09              RRC     C
+ 07D0 CB09      NXTBIT  RRC     C       ;SHIFT BITS TO D6,
+ 07D2 79                LD      A,C     ;LSB FIRST AND OUTPUT
+ 07D3 E640              AND     40H     ;THEM FOR ONE BIT TIME.
+ 07D5 D385              OUT     (SCAN),A
+ 07D7 CD1C08            CALL    BITIME
+ 07DA 10F4              DJNZ    NXTBIT
+                ;
+                ; SEND STOP BITS
+                ;
+ 07DC 3E40              LD      A,40H
+ 07DE D385              OUT     (SCAN),A
+ 07E0 CD1C08            CALL    BITIME
+ 07E3 CD1C08            CALL    BITIME
+ 07E6 E1                POP     HL
+ 07E7 C1                POP     BC
+ 07E8 F1                POP     AF
+ 07E9 C9                RET
+                ;-----------------------
+                ; SERIAL RECEIVE ROUTINE
+                ;-----------------------
+                ;RECEIVE SERIAL BYTE FROM DIN
+                ;
+                ; ENTRY : NONE
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 27
+
+
+                ;  EXIT : A= RECEIVED BYTE IF CARRY CLEAR
+                ;         A= KEYBUF, CARRY SET IF KEY PRESSED
+                ; REGISTERS MODIFIED A AND F
+                ;
+ 07EA C5        RXDATA  PUSH    BC
+ 07EB E5                PUSH    HL
+                ;
+                ; WAIT FOR START BIT OR EXIT IF KEY PRESS.
+                ;
+ 07EC DB86      RXDAT1  IN      A,(KEYBUF)
+ 07EE CB6F              BIT     5,A
+ 07F0 37                SCF
+ 07F1 2026              JR      NZ,RXDAT3       ;KEY PRESS SO EXIT
+ 07F3 CB7F              BIT     7,A
+ 07F5 20F5              JR      NZ,RXDAT1       ;NO START BIT
+                ;
+                ; DETECTED START BIT
+                ;
+ 07F7 2AC03F            LD      HL,(BAUD)
+ 07FA CB3C              SRL     H
+ 07FC CB1D              RR      L       ;DELAY FOR HALF BIT TIME
+ 07FE CD1C08            CALL    BITIME
+ 0801 DB86              IN      A,(KEYBUF)
+ 0803 CB7F              BIT     7,A
+ 0805 20E5              JR      NZ,RXDAT1       ;START BIT NOT VALID
+                ;
+                ; DETECTED VALID START BIT,READ IN DATA
+                ;
+ 0807 0608              LD      B,08H
+ 0809 2AC03F    RXDAT2  LD      HL,(BAUD)
+ 080C CD1C08            CALL    BITIME  ;DELAY ONE BIT TIME
+ 080F DB86              IN      A,(KEYBUF)
+ 0811 CB17              RL      A
+ 0813 CB19              RR      C       ;SHIFT BIT INTO DATA REG
+ 0815 10F2              DJNZ    RXDAT2
+ 0817 79                LD      A,C
+ 0818 B7                OR      A       ;CLEAR CARRY FLAG
+ 0819 E1        RXDAT3  POP     HL
+ 081A C1                POP     BC
+ 081B C9                RET
+                ;---------------
+                ; BIT TIME DELAY
+                ;---------------
+                ;DELAY FOR ONE SERIAL BIT TIME
+                ;ENTRY : HL = DELAY TIME
+                ; NO REGISTERS MODIFIED
+                ;
+ 081C E5        BITIME  PUSH    HL
+ 081D D5                PUSH    DE
+ 081E 110100            LD      DE,0001H
+ 0821 ED52      BITIM1  SBC     HL,DE
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 28
+
+
+ 0823 D22108            JP      NC,BITIM1
+ 0826 D1                POP     DE
+ 0827 E1                POP     HL
+ 0828 C9                RET
+                ;-----------------------------
+                ; FUNCTION 2 - ENTER ADDRESS 1
+                ;-----------------------------
+ 0829 CD4305    ADDRA   CALL    BEEP
+ 082C 2ADA3F            LD      HL,(ADRESS)     ;COPY CURRENT
+ 082F 22C83F            LD      (BLKSRT),HL     ;ADDRESS AS START
+ 0832 210039            LD      HL,3900H        ;ADDRESS
+ 0835 CD9508            CALL    SDELAY
+ 0838 C3B806            JP      CANCL1
+                ;-----------------------------
+                ; FUNCTION 3 - ENTER ADDRESS 2
+                ;-----------------------------
+ 083B CD4305    ADDRB   CALL    BEEP
+ 083E 2ADA3F            LD      HL,(ADRESS)     ;COPY CURRENT
+ 0841 22CA3F            LD      (BLKEND),HL     ;ADDRESS AS END
+ 0844 210F00            LD      HL,000FH        ;ADDRESS
+ 0847 CD9508            CALL    SDELAY
+ 084A C3B806            JP      CANCL1
+                ;------------------------
+                ; FUNCTION 4 - BLOCK MOVE
+                ;------------------------
+ 084D CD4305    BLKMVE  CALL    BEEP
+ 0850 2ADA3F            LD      HL,(ADRESS)     ;COPY CURRENT
+ 0853 22CC3F            LD      (BLKDST),HL     ;ADDRESS AS
+ 0856 210F39            LD      HL,390FH        ;DESTINATION
+ 0859 CD9508            CALL    SDELAY
+                ;
+                ; CALCULATE NUMBER OF BYTES TO MOVE
+                ;
+ 085C 2ACA3F            LD      HL,(BLKEND)
+ 085F ED5BC83F          LD      DE,(BLKSRT)
+ 0863 A7                AND     A
+ 0864 ED52              SBC     HL,DE
+ 0866 23                INC     HL      ;MAKE MOVE INCLUSIVE
+ 0867 22C63F            LD      (COUNT),HL
+ 086A 3015              JR      NC,BLKMV3       ;IF OK MOVE BLOCK
+                ;
+                ; SHOW ERROR
+                ;
+ 086C 217900    BLKMV1  LD      HL,0079H        ;SHOW ERROR
+ 086F CD4305    BLKMV2  CALL    BEEP
+ 0872 22D03F            LD      (DISBUF),HL     ;AND WAIT
+ 0875 CD0A04            CALL    SKEYIN  ;FOR KEYPRESS
+ 0878 CD4305            CALL    BEEP
+ 087B CD1604            CALL    SKEYRL
+ 087E C3B806            JP      CANCL1
+                ;
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 29
+
+
+                ; MOVE BLOCK
+                ;
+ 0881 CD8708    BLKMV3  CALL    MOVE
+ 0884 C3B806            JP      CANCL1
+                ;-----------
+                ; BLOCK MOVE
+                ;-----------
+ 0887 ED4BC63F  MOVE    LD      BC,(COUNT)
+ 088B 2AC83F            LD      HL,(BLKSRT)     ;START ADDR
+ 088E ED5BCC3F          LD      DE,(BLKDST)     ;DESTINATION ADDR
+ 0892 EDB0              LDIR
+ 0894 C9                RET
+                ;-------------------------------
+                ; SCAN DISPLAY UNTIL KEY RELEASE
+                ;-------------------------------
+ 0895 22D03F    SDELAY  LD      (DISBUF),HL     ;SHOW HL
+ 0898 06FF              LD      B,255   ;IN DATA DISPLAYS
+ 089A CDD003    SDELY1  CALL    SCAND   ;UNTIL KEY
+ 089D 10FB              DJNZ SDELY1     ;IS RELEASED
+ 089F CD1604            CALL    SKEYRL
+ 08A2 C9                RET
+                ;---------------------------
+                ;FUNCTION 5 - BLOCK CHECKSUM
+                ;---------------------------
+ 08A3 CD4305    BLKSUM  CALL    BEEP
+ 08A6 216D39            LD      HL,396DH
+ 08A9 CD9508            CALL    SDELAY  ;SHOW PROMPT
+ 08AC ED5BC83F          LD      DE,(BLKSRT)
+ 08B0 2ACA3F            LD      HL,(BLKEND)
+ 08B3 A7                AND     A
+ 08B4 ED52              SBC     HL,DE
+ 08B6 23                INC     HL      ;MAKE CHECKSUM INCLUSIVE
+ 08B7 22C63F            LD      (COUNT),HL
+ 08BA 3003              JR      NC,BLKSM1       ;IF OK SUM BLOCK
+                ;
+                ; SHOW ERROR
+                ;
+ 08BC C36C08            JP      BLKMV1
+                ;
+                ; CALCULATE CHECKSUM
+                ;
+ 08BF 2AC83F    BLKSM1  LD      HL,(BLKSRT)
+ 08C2 ED5BCA3F          LD      DE,(BLKEND)
+ 08C6 CD5704            CALL    CHKSUM  ;DO THE CHECKSUM,
+ 08C9 CD9703            CALL    DISBYT  ;DISPLAY
+ 08CC 2AC63F            LD      HL,(COUNT)      ;NUMBER OF BYTES
+ 08CF CD8203            CALL    DISADD  ;SUMMED AND
+ 08D2 CD4305            CALL    BEEP
+ 08D5 CD0A04            CALL    SKEYIN  ;CHECKSUM UNTIL
+ 08D8 CD4305            CALL    BEEP    ;A KEY IS PRESSED
+ 08DB CD1604            CALL    SKEYRL
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 30
+
+
+ 08DE C3B806            JP      CANCL1
+                ;----------------------------------------
+                ; FUNCTION 6 - RELATIVE BRANCH CALCULATOR
+                ;----------------------------------------
+ 08E1 CD4305    BRANCH  CALL    BEEP
+ 08E4 217C50            LD      HL,507CH
+ 08E7 CD9508            CALL    SDELAY
+ 08EA 2ADA3F            LD      HL,(ADRESS)     ;GET CURRENT ADDRESS
+ 08ED ED5BC83F          LD      DE,(BLKSRT)
+ 08F1 13                INC     DE      ;POINT TO PC+2
+ 08F2 A7                AND     A
+ 08F3 ED52              SBC     HL,DE   ;SUBTRACT
+                ;
+                ;TEST HIGH BYTE OF RESULT TO
+                ;DETERMINE IF BACKWARD BRANCH
+                ;
+ 08F5 7C                LD      A,H
+ 08F6 FEFF              CP      255     ;BACKWARD BRANCH?
+ 08F8 C20309            JP      NZ,BRNCH1       ;CHECK IF FORWARD
+                ;
+                ;CHECK IF WE HAVE BRANCHED BEYOND -128
+                ;
+ 08FB 7D                LD      A,L
+ 08FC CB7F              BIT     7,A
+ 08FE 200E              JR      NZ,BRNCH2       ;BRANCH IS WITHIN LIMITS
+ 0900 C36C08            JP      BLKMV1  ;TOO FAR BACK
+                ;
+                ;TEST HIGH BYTE OF RESULT TO
+                ;DETERMINE IF FORWARD BRANCH
+                ;
+ 0903 FE00      BRNCH1  CP      0       ;FORWARD BRANCH?
+ 0905 C26C08            JP      NZ,BLKMV1       ;TOO FAR IN ANY DIRECTION
+                ;
+                ; CHECK IF WE HAVE BRANCHED BEYOND +128
+                ;
+ 0908 7D                LD      A,L
+ 0909 CB7F              BIT     7,A
+ 090B C26C08            JP      NZ,BLKMV1       ;TOO FAR FORWARD
+                ;
+                ; WITHIN LIMITS PUT IN RAM
+                ; AND SHOW AS CURRENT ADDRESS
+                ;
+ 090E 2AC83F    BRNCH2  LD      HL,(BLKSRT)
+ 0911 22DA3F            LD      (ADRESS),HL
+ 0914 77                LD      (HL),A
+ 0915 C3B806            JP      CANCL1
+                ;-----------------------------------------
+                ; FUNCTION 7 - TOGGLE HARDWARE SINGLE STEP
+                ;-----------------------------------------
+ 0918 CD4305    TRACE   CALL    BEEP
+ 091B D387              OUT     (IO7),A ;TOGGLE HARDWARE LATCH
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 31
+
+
+ 091D 217000            LD      HL,0070H        ;SHOW T
+ 0920 CD9508            CALL    SDELAY
+ 0923 C3B806            JP      CANCL1
+                ;-------------------------
+                ; FUNCTION 8 - PLAY TUNE 1
+                ;-------------------------
+ 0926 CD4305    PLAY1   CALL    BEEP
+ 0929 CD2B04            CALL    KEYREL
+ 092C 216109            LD      HL,TUNE1
+ 092F CDA604            CALL    MUSIC
+ 0932 C3B806            JP      CANCL1
+                ;-------------------------
+                ; FUNCTION 9 - PLAY TUNE 2
+                ;-------------------------
+ 0935 CD4305    PLAY2   CALL    BEEP
+ 0938 CD2B04            CALL    KEYREL
+ 093B 21A109            LD      HL,TUNE2
+ 093E CDA604            CALL    MUSIC
+ 0941 C3B806            JP      CANCL1
+                ;------------------------------
+                ; FUNCTION A - PLAY TUNE IN RAM
+                ;------------------------------
+ 0944 CD4305    PLAY3   CALL    BEEP
+ 0947 CD2B04            CALL    KEYREL
+ 094A 2ADA3F            LD      HL,(ADRESS)
+ 094D CDA604            CALL    MUSIC
+ 0950 C3B806            JP      CANCL1
+                ;-----------------------------
+                ; FUNCTION B - TOGGLE KEY BEEP
+                ;-----------------------------
+ 0953 CD4305    SWBEEP  CALL    BEEP
+ 0956 3AD83F            LD      A,(MODE)
+ 0959 EE40              XOR     40H
+ 095B 32D83F            LD      (MODE),A
+ 095E C3B806            JP      CANCL1
+                ;
+                ; TUNE 1
+                ;
+ 0961 06060A0D  TUNE1   DEFB    06H,06H,0AH,0DH,06H,0DH,0AH,0DH
+ 0969 12161412          DEFB    12H,16H,14H,12H,0FH,11H,12H,0FH
+ 0971 0D0D0D0A          DEFB    0DH,0DH,0DH,0AH,12H,0FH,0DH,0AH
+ 0979 0806080A          DEFB    08H,06H,08H,0AH,0FH,0AH,0DH,0FH
+ 0981 06060A0D          DEFB    06H,06H,0AH,0DH,06H,0DH,0AH,0DH
+ 0989 12161412          DEFB    12H,16H,14H,12H,0FH,11H,12H,0FH
+ 0991 0D0D0D0A          DEFB    0DH,0DH,0DH,0AH,12H,0FH,0DH,0AH
+ 0999 0806080A          DEFB    08H,06H,08H,0AH,06H,12H,00H,1EH
+                ;
+                ; TUNE 2
+                ;
+ 09A1 0B0A080A  TUNE2   DEFB    0BH,0AH,08H,0AH,0AH,0AH,06H,06H
+ 09A9 060B0A08          DEFB    06H,0BH,0AH,08H,0AH,0AH,0AH,0AH
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 32
+
+
+ 09B1 0A0A0B0A          DEFB    0AH,0AH,0BH,0AH,08H,0AH,0AH,0AH
+ 09B9 0606060A          DEFB    06H,06H,06H,0AH,08H,0AH,0DH,0DH
+ 09C1 0D0D0D00          DEFB    0DH,0DH,0DH,00H,0DH,05H,08H,0BH
+ 09C9 0B0B0606          DEFB    0BH,0BH,06H,06H,06H,0BH,0AH,08H
+ 09D1 0A0A0A06          DEFB    0AH,0AH,0AH,06H,06H,06H,0BH,0AH
+ 09D9 06080808          DEFB    06H,08H,08H,08H,08H,08H,0AH,0BH
+ 09E1 0A080606          DEFB    0AH,08H,06H,06H,06H,06H,06H,06H
+ 09E9 0000001E          DEFB    00H,00H,00H,1EH
+                ;---------------------------
+                ; FUNCTION C - SECRET NUMBER
+                ;---------------------------
+ 09ED CD4305    SECRET  CALL    BEEP    ;WAIT FOR KEY RELEASE
+ 09F0 CD2B04            CALL    KEYREL  ;AND CLEAR DISPLAY
+ 09F3 CDFB03            CALL    CLRBUF  ;BUFFER
+ 09F6 DD21003F          LD      IX,SYSTEM       ;USE IX FOR LOCAL VARIABLES
+                ;
+                ; SEPARATE NYBBLES IN RANDOM NUMBER
+                ;
+ 09FA CD7704            CALL    RAND
+ 09FD DD750B            LD      (IX+11),L
+ 0A00 DD740C            LD      (IX+12),H       ;RANDOM NUMBER
+ 0A03 DD7E0B            LD      A,(IX+11)       ;SEPARATE THE RANDOM
+ 0A06 CD5B0B            CALL    SPLIT   ;NUMBER INTO
+ 0A09 DD7504            LD      (IX+4),L        ;FOUR NYBBLES
+ 0A0C DD7405            LD      (IX+5),H        ;TO MAKE CHECKING
+ 0A0F DD7E0C            LD      A,(IX+12)       ;AGAINST THE
+ 0A12 CD5B0B            CALL    SPLIT   ;GUESS EASIER
+ 0A15 DD7506            LD      (IX+6),L
+ 0A18 DD7407            LD      (IX+7),H
+ 0A1B AF                XOR     A
+ 0A1C ED47              LD      I,A     ;CLEAR NUMBER OF TRIES
+ 0A1E 210000            LD      HL,0
+ 0A21 DD7508            LD      (IX+8),L
+ 0A24 DD7409            LD      (IX+9),H
+ 0A27 CD8203            CALL    DISADD  ;AND DISPLAY GUESS
+                ;
+                ; SCAN THE KEYBOARD
+                ;
+ 0A2A CD0A04    SECRT1  CALL    SKEYIN  ;WAIT FOR KEY
+ 0A2D 21390A            LD      HL,SECNUM
+ 0A30 CD3404            CALL    MENU    ;EXECUTE KEY HANDLER
+ 0A33 CD1604            CALL    SKEYRL  ;WAIT FOR KEY RELEASE
+ 0A36 C32A0A            JP      SECRT1
+                ;
+                ; SECRET NUMBER KEY TABLE
+                ;
+ 0A39 12        SECNUM  DEFB    12H
+ 0A3A 00010203          DEFB    00H,01H,02H,03H,04H,05H,06H,07H
+ 0A42 08090A0B          DEFB    08H,09H,0AH,0BH,0CH,0DH,0EH,0FH
+ 0A4A 1011              DEFB    10H,11H
+ 0A4C 700A700A          DEFW    EDTKEY,EDTKEY,EDTKEY,EDTKEY
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 33
+
+
+ 0A54 700A700A          DEFW    EDTKEY,EDTKEY,EDTKEY,EDTKEY
+ 0A5C 700A700A          DEFW    EDTKEY,EDTKEY,EDTKEY,EDTKEY
+ 0A64 700A700A          DEFW    EDTKEY,EDTKEY,EDTKEY,EDTKEY
+ 0A6C 970AA00A          DEFW    ENDKEY,CHKKEY
+                ;---------------
+                ; EDIT GUESS KEY
+                ;---------------
+ 0A70 F5        EDTKEY  PUSH    AF
+ 0A71 DD6E08            LD      L,(IX+8)
+ 0A74 DD6609            LD      H,(IX+9)        ;GET CURRENT GUESS
+ 0A77 CB25              SLA     L
+ 0A79 CB14              RL      H       ;AND DO A 16 BIT
+ 0A7B CB25              SLA     L       ;LEFT SHIFT 4 TIMES
+ 0A7D CB14              RL      H       ;TO MAKE  ROOM
+ 0A7F CB25              SLA     L       ;FOR THE NEW KEY
+ 0A81 CB14              RL      H
+ 0A83 CB25              SLA     L
+ 0A85 CB14              RL      H
+ 0A87 F1                POP     AF
+ 0A88 B5                OR      L       ;IT IN THE LEAST
+ 0A89 6F                LD      L,A     ;SIGNIFICANT NYBBLE
+ 0A8A DD7508            LD      (IX+8),L
+ 0A8D DD7409            LD      (IX+9),H        ;SAVE GUESS
+ 0A90 CD8203            CALL    DISADD
+ 0A93 CD4305            CALL    BEEP
+ 0A96 C9                RET
+                ;----------
+                ; QUIT GAME
+                ;----------
+ 0A97 CD4305    ENDKEY  CALL    BEEP    ;WAIT FOR KEY RELEASE
+ 0A9A CD2B04            CALL    KEYREL  ;AND RETURN TO
+ 0A9D C36E02            JP      MAIN    ;MONITOR
+                ;---------------------------
+                ; SEE IF ITS THE RIGHT GUESS
+                ;---------------------------
+ 0AA0 CD4305    CHKKEY  CALL    BEEP
+ 0AA3 ED57              LD      A,I
+ 0AA5 3C                INC     A
+ 0AA6 27                DAA     ;INC BCD NO. OF TRIES
+                ;
+                ; BRIEFLY SHOW GUESS NO.
+                ;
+ 0AA7 ED47              LD      I,A
+ 0AA9 CD9703            CALL    DISBYT
+ 0AAC 06FF              LD      B,255
+ 0AAE CDD003    CHKKY1  CALL    SCAND
+ 0AB1 10FB              DJNZ    CHKKY1
+                ;
+                ; SEPARATE GUESS INTO NYBBLES
+                ;
+ 0AB3 DD7E08            LD      A,(IX+8)        ;GET CURRENT GUESS
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 34
+
+
+ 0AB6 CD5B0B            CALL    SPLIT   ;NUMBER INTO
+ 0AB9 DD7500            LD      (IX+0),L        ;FOUR NYBBLES
+ 0ABC DD7401            LD      (IX+1),H        ;TO MAKE CHECKING
+ 0ABF DD7E09            LD      A,(IX+9)        ;AGAINST THE
+ 0AC2 CD5B0B            CALL    SPLIT   ;GUESS EASIER
+ 0AC5 DD7502            LD      (IX+2),L
+ 0AC8 DD7403            LD      (IX+3),H
+                ;
+                ; CHECK FOR CORRECT NUMBER,CORRECT SPOT
+                ;
+ 0ACB AF                XOR     A
+ 0ACC DD770A            LD      (IX+10),A       ;CLEAR RESULT
+ 0ACF 21043F            LD      HL,SYSTEM+4     ;POINT TO RANDOM
+ 0AD2 11003F            LD      DE,SYSTEM       ;POINT TO GUESS
+ 0AD5 0604              LD      B,4     ;NUMBER OF DIGITS
+ 0AD7 7E        CHKKY2  LD      A,(HL)  ;GET RANDOM
+ 0AD8 EB                EX      DE,HL
+ 0AD9 BE                CP      (HL)    ;SAME AS GUESS?
+ 0ADA 2010              JR      NZ,CHKKY4       ;NOT SAME
+ 0ADC DD7E0A            LD      A,(IX+10)
+ 0ADF C610              ADD     A,10H   ;RIGHT POSITION
+ 0AE1 DD770A            LD      (IX+10),A
+ 0AE4 23        CHKKY3  INC     HL      ;POINT TO NEXT
+ 0AE5 EB                EX      DE,HL   ;DIGIT POSITION
+ 0AE6 23                INC     HL      ;AND GO
+ 0AE7 10EE              DJNZ    CHKKY2  ;CHECK OTHER POSITIONS
+ 0AE9 C3080B            JP      CHKKY8
+                ;
+                ; CHECK IF NUMBER IS THERE
+                ;
+ 0AEC C5        CHKKY4  PUSH    BC
+ 0AED E5                PUSH    HL
+ 0AEE 0604              LD      B,4     ;CHECK EACH DIGIT
+ 0AF0 21003F            LD      HL,SYSTEM       ;TO SEE IF THIS
+ 0AF3 BE        CHKKY5  CP      (HL)    ;NUMBER IS IN
+ 0AF4 23                INC     HL      ;THE WRONG
+ 0AF5 200A              JR      NZ,CHKKY6       ;POSITION
+ 0AF7 DD7E0A            LD      A,(IX+10)       ;AND UPDATE
+ 0AFA 3C                INC     A       ;THE RESULT
+ 0AFB DD770A            LD      (IX+10),A
+ 0AFE C3030B            JP      CHKKY7
+ 0B01 10F0      CHKKY6  DJNZ    CHKKY5
+ 0B03 E1        CHKKY7  POP     HL
+ 0B04 C1                POP     BC
+ 0B05 C3E40A            JP      CHKKY3  ;CHECK NEXT DIGIT
+                ;
+                ; CHECK IF CORRECT
+                ;
+ 0B08 DD7E0A    CHKKY8  LD      A,(IX+10)
+ 0B0B FE40              CP      40H     ;IS IT CORRECT?
+ 0B0D CA2D0B            JP      Z,CHKKY9        ;YES!
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 35
+
+
+ 0B10 DD7E0A            LD      A,(IX+10)       ;NOT CORRECT
+ 0B13 CD9703            CALL    DISBYT  ;IN DATA DISPLAYS
+ 0B16 ED57              LD      A,I     ;WAS THAT THE
+ 0B18 FE20              CP      20H     ;LAST GUESS?
+ 0B1A C0                RET     NZ      ;NO TRY AGAIN
+                ;
+                ; RAN OUT OF TRYS
+                ;
+ 0B1B CDFB03            CALL    CLRBUF  ;DISPLAY
+ 0B1E DD6E0B            LD      L,(IX+11)
+ 0B21 DD660C            LD      H,(IX+12)       ;THE RANDOM NUMBER
+ 0B24 CD8203            CALL    DISADD  ;AND PLAY
+ 0B27 21540B            LD      HL,LOSE ;THE LOSE
+ 0B2A C33B0B            JP      CHKKYA  ;MUSIC
+                ;
+                ; GOT THE RIGHT ANSWER
+                ;
+ 0B2D ED57      CHKKY9  LD      A,I     ;DISPLAY HOW MANY
+ 0B2F CD9703            CALL    DISBYT  ;AND PLAY THE WIN
+ 0B32 DD6E0B            LD      L,(IX+11)
+ 0B35 DD660C            LD      H,(IX+12)
+ 0B38 214B0B            LD      HL,WIN  ;MUSIC
+                ;
+                ; PLAY MUSIC AND WAIT FOR ANY KEY TO RESTART
+                ;
+ 0B3B CDA604    CHKKYA  CALL    MUSIC   ;PLAY THE MUSIC
+ 0B3E CD0A04            CALL    SKEYIN  ;WAIT FOR A KEY
+ 0B41 CD4305            CALL    BEEP
+ 0B44 CD1604            CALL    SKEYRL  ;WAIT FOR KEY RELEASE
+ 0B47 E1                POP     HL      ;AND RESTART THE GAME
+ 0B48 C3ED09            JP      SECRET
+                ;
+                ; WIN AND LOSE MUSIC
+                ;
+ 0B4B 14121417  WIN     DEFB    14H,12H,14H,17H,17H,12H,14H,10H,1FH
+ 0B54 01110111  LOSE    DEFB    01H,11H,01H,11H,01H,11H,1FH
+                ;-------------------------------
+                ; SEPARATE BYTE INTO TWO NYBBLES
+                ;-------------------------------
+                ;SEPARATES A BYTE INTO TWO
+                ;RIGHT JUSTIFIED NYBBLES
+                ; ENTRY : A = BYTE TO BE SEPARATED
+                ; EXIT  : H = MSN
+                ;         L = LSN
+                ;
+ 0B5B F5        SPLIT   PUSH    AF
+ 0B5C C5                PUSH    BC
+ 0B5D 47                LD      B,A     ;SAVE BYTE
+ 0B5E E60F              AND     0FH     ;STRIP BITS LSN
+ 0B60 6F                LD      L,A     ;RETURN LSN IN L
+ 0B61 78                LD      A,B
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 36
+
+
+ 0B62 CB3F              SRL     A
+ 0B64 CB3F              SRL     A
+ 0B66 CB3F              SRL     A       ;MOVE MSN
+ 0B68 CB3F              SRL     A       ;INTO LSN
+ 0B6A 67                LD      H,A     ;RETURN MSN IN H
+ 0B6B C1                POP     BC
+ 0B6C F1                POP     AF
+ 0B6D C9                RET
+                ;-----------------------------------
+                ; FUNCTION D - RELAY BOARD SEQUENCER
+                ;-----------------------------------
+ 0B6E CD4305    RELSQR  CALL    BEEP
+ 0B71 CD2B04            CALL    KEYREL
+ 0B74 217D0B            LD      HL,RLTEST       ;POINT TO TEST SEQUENCE
+ 0B77 CD830B            CALL    RLSTEP
+ 0B7A C3B806            JP      CANCL1
+                ;--------------
+                ; TEST SEQUENCE
+                ;--------------
+ 0B7D 5501AA01  RLTEST  DEFB    55H,01H,0AAH,01H,00H,0FFH
+                ;----------------
+                ; RELAY SEQUENCER
+                ;----------------
+                ; SEQUENCES RELAYS ON RELAY BOARD
+                ; USES TWO BYTES TO SPECIFY OUTPUT DATA AND DELAY TIME
+                ; DELAY TIME BYTE ALSO DETERMINES IF SEQUENCE IS TO STOP
+                ; OR REPEAT.
+                ;  TABLE:
+                ;  <BYTE1>,<BYTE2>
+                ;  BYTE1 = DATA TO GO TO OUTPUT LATCH (USES PORT IO1)
+                ;  BYTE2 = FF - REPEAT
+                ;          00 - FINISHED
+                ;  ENTRY : HL POINTS TO TABLE OF OUTPUT DATA
+                ;  EXIT : NONE MODIFIED
+                ;
+ 0B83 F5        RLSTEP  PUSH    AF
+ 0B84 C5                PUSH    BC
+ 0B85 D5                PUSH    DE
+ 0B86 E5                PUSH    HL      ;SAVE REGISTERS
+ 0B87 E5                PUSH    HL
+ 0B88 EB                EX      DE,HL   ;GET ADDRESS OF DATA
+ 0B89 1A        RELSR1  LD      A,(DE)
+ 0B8A 4F                LD      C,A     ;GET OUTPUT DATA
+ 0B8B 13                INC     DE
+ 0B8C 1A                LD      A,(DE)  ;GET TIME DELAY
+ 0B8D FE00              CP      0
+ 0B8F 2816              JR      Z,RELSR4        ;END OF SEQUENCE
+ 0B91 FEFF              CP      255
+ 0B93 280D              JR      Z,RELSR3        ;REPEAT SEQUENCE
+ 0B95 47                LD      B,A
+ 0B96 79                LD      A,C
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 37
+
+
+ 0B97 D381              OUT     (IO1),A
+ 0B99 13                INC     DE
+ 0B9A CDB10B    RELSR2  CALL    DELONE  ;1 SEC DELAY
+ 0B9D 10FB              DJNZ    RELSR2  ;MORE SECONDS TO GO
+ 0B9F C3890B            JP      RELSR1
+                ;
+                ; REPEAT
+                ;
+ 0BA2 D1        RELSR3  POP     DE      ;GET START ADDRESS
+ 0BA3 D5                PUSH    DE      ;SAVE FOR LATER
+ 0BA4 C3890B            JP      RELSR1
+                ;
+                ; FINISHED
+                ;
+ 0BA7 3E00      RELSR4  LD      A,00H
+ 0BA9 D381              OUT     (IO1),A ;CLEAR OUTPUT REG
+ 0BAB E1                POP     HL
+ 0BAC E1                POP     HL
+ 0BAD D1                POP     DE
+ 0BAE C1                POP     BC
+ 0BAF F1                POP     AF
+ 0BB0 C9                RET
+                ;-----------------
+                ; ONE SECOND DELAY
+                ;-----------------
+                ;
+                ; ENTRY : NONE
+                ; EXIT : FLAG REGISTER MODIFIED
+                ;
+ 0BB1 C5        DELONE  PUSH    BC
+ 0BB2 D5                PUSH    DE
+ 0BB3 E5                PUSH    HL
+ 0BB4 110100            LD      DE,0001H
+ 0BB7 217008            LD      HL,0870H
+ 0BBA 0692      DELON1  LD      B,92H
+ 0BBC 10FE      DELON2  DJNZ    DELON2  ;INNER LOOP
+ 0BBE ED52              SBC     HL,DE
+ 0BC0 D2BA0B            JP      NC,DELON1       ;OUTER LOOP
+ 0BC3 E1                POP     HL
+ 0BC4 D1                POP     DE
+ 0BC5 C1                POP     BC
+ 0BC6 C9                RET
+                ;--------------------------
+                ; FUNCTION E - KALEIDOSCOPE
+                ;--------------------------
+ 0BC7 CD4305    SCOPE   CALL    BEEP
+ 0BCA CD2B04            CALL    KEYREL
+ 0BCD CD7704            CALL    RAND    ;GENERATE RANDOM
+ 0BD0 EB                EX      DE,HL
+ 0BD1 21003F            LD      HL,SYSTEM       ;NUMBER AND SET UP
+ 0BD4 7B                LD      A,E     ;THE FIRST QUADRANT
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 38
+
+
+ 0BD5 CD4C0C            CALL    SEED    ;WITH A RANDOM BIT
+ 0BD8 7A                LD      A,D     ;PATTERN
+ 0BD9 CD4C0C            CALL    SEED
+                ;
+                ; GENERATE MIRROR IMAGES
+                ;
+ 0BDC 0604      SCOPE2  LD      B,04H
+ 0BDE 21003F            LD      HL,SYSTEM
+ 0BE1 11073F            LD      DE,SYSTEM+7
+ 0BE4 7E        SCOPE3  LD      A,(HL)  ;MIRROR THE FIRST
+ 0BE5 12                LD      (DE),A  ;QUADRANT INTO
+ 0BE6 23                INC     HL      ;THE FOURTH
+ 0BE7 1B                DEC     DE      ;QUADRANT
+ 0BE8 10FA              DJNZ    SCOPE3
+                ;
+                ; MIRROR ACROSS CENTRE OF DISPLAY
+                ;
+ 0BEA 0608              LD      B,8     ;MIRROR THE FIRST
+ 0BEC 21003F            LD      HL,SYSTEM       ;AND FOURTH QUADRANT
+ 0BEF 7E                LD      A,(HL)  ;ACROSS THE CENTRE
+ 0BF0 E60F              AND     0FH     ;OF THE DISPLAY
+ 0BF2 77                LD      (HL),A  ;INTO THE SECOND
+ 0BF3 CB46      SCOPE4  BIT     0,(HL)  ;AND THIRD QUADRANTS.
+ 0BF5 CAFA0B            JP      Z,SCOPE5        ;CHECKING IF THE
+ 0BF8 CBFE              SET     7,(HL)  ;BITS IN THE LSN ARE
+ 0BFA CB4E      SCOPE5  BIT     1,(HL)  ;SET, AND SETTING THE
+ 0BFC CA010C            JP      Z,SCOPE6        ;CORRESPONDING
+ 0BFF CBF6              SET     6,(HL)  ;MIRROR IMAGE
+ 0C01 CB56      SCOPE6  BIT     2,(HL)  ;BIT IN THE MSN
+ 0C03 CA080C            JP      Z,SCOPE7        ;IF THEY ARE.
+ 0C06 CBEE              SET     5,(HL)  ;DO THIS FOR
+ 0C08 CB5E      SCOPE7  BIT     3,(HL)  ;THE EIGHT ROWS
+ 0C0A CA0F0C            JP      Z,SCOPE8        ;OF DATA BYTES
+ 0C0D CBE6              SET     4,(HL)  ;IN THE DISPLAY
+ 0C0F 23        SCOPE8  INC     HL
+ 0C10 10E1              DJNZ    SCOPE4  ;MORE ROWS TO DO
+                ;
+                ; DISPLAY RANDOM BIT PATTERN
+                ;
+ 0C12 110100            LD      DE,0001H        ;SCAN THE DISPLAY
+ 0C15 CD7704            CALL    RAND    ;A RANDOM
+ 0C18 7C                LD      A,H     ;TIME
+ 0C19 E607              AND     7       ;NOT GREATER THAN
+ 0C1B F601              OR      1       ;NOT LESS THAN
+ 0C1D 67                LD      H,A
+ 0C1E E5        SCOPE9  PUSH    HL
+ 0C1F 21003F            LD      HL,SYSTEM
+ 0C22 CD5B0C            CALL    SKATE   ;SCAN 8X8
+ 0C25 E1                POP     HL
+ 0C26 ED52              SBC     HL,DE
+ 0C28 C21E0C            JP      NZ,SCOPE9
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 39
+
+
+                ;
+                ; MANIPULATE BITS FOR NEXT IMAGE
+                ;
+ 0C2B 21003F    SCOPEA  LD      HL,SYSTEM
+ 0C2E 3E05              LD      A,5
+ 0C30 86                ADD     A,(HL)
+ 0C31 E60F              AND     0FH
+ 0C33 77                LD      (HL),A  ;ADD 5 TO FIRST LSN
+ 0C34 23                INC     HL
+ 0C35 3E03              LD      A,03H
+ 0C37 86                ADD     A,(HL)
+ 0C38 E60F              AND     0FH
+ 0C3A 77                LD      (HL),A  ;ADD 3 TO SECOND LSN
+ 0C3B 23                INC     HL
+ 0C3C 3E01              LD      A,01H
+ 0C3E 86                ADD     A,(HL)
+ 0C3F E60F              AND     0FH
+ 0C41 77                LD      (HL),A  ;ADD 1 TO THIRD LSN
+ 0C42 23                INC     HL
+ 0C43 3E07              LD      A,07H
+ 0C45 86                ADD     A,(HL)
+ 0C46 E60F              AND     0FH
+ 0C48 77                LD      (HL),A  ;ADD 15 TO FOURTH LSN
+ 0C49 C3DC0B            JP      SCOPE2  ;MIRROR BIT PATTERN
+                ;
+                ; SEED THE FIRST QUADRANT WITH RANDOM BITS
+                ;
+ 0C4C 47        SEED    LD      B,A     ;PUT THE
+ 0C4D E60F              AND     0FH     ;RANDOM NUMBER
+ 0C4F 77                LD      (HL),A  ;INTO THE
+ 0C50 23                INC     HL      ;FIRST QUADRANT
+ 0C51 78                LD      A,B     ;OF THE
+ 0C52 E6F0              AND     240     ;DISPLAY
+ 0C54 1F                RRA
+ 0C55 1F                RRA
+ 0C56 1F                RRA
+ 0C57 1F                RRA
+ 0C58 77                LD      (HL),A
+ 0C59 23                INC     HL
+ 0C5A C9                RET
+                ;-----------------
+                ; SCAN 8X8 DISPLAY
+                ;-----------------
+                ;PUT THE 8 RAM LOCATIONS POINTED TO
+                ;BY HL ON THE 8X8 DISPLAY,LOW BYTE
+                ;ON TOP ROW.
+                ;  ROUTINE PERIOD IS 500uS
+                ;  PULSE WIDTH 15uS  GIVES 3% DUTY
+                ;
+                ; ENTRY : HL = ADDRESS OF 8X8 BUFFER
+                ;       EXIT : NO REGISTERS MODIFIED
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 40
+
+
+                ;
+ 0C5B F5        SKATE   PUSH    AF
+ 0C5C C5                PUSH    BC
+ 0C5D E5                PUSH    HL      ;SAVE REGISTERS
+ 0C5E 0E80              LD      C,80H
+ 0C60 7E        SKATE1  LD      A,(HL)
+ 0C61 D380              OUT     (IO0),A ;OUTPUT X
+ 0C63 79                LD      A,C
+ 0C64 D382              OUT     (IO2),A ;OUTPUT Y
+ 0C66 0602              LD      B,02H
+ 0C68 10FE      SKATE2  DJNZ    SKATE2  ;ON TIME DELAY
+ 0C6A AF                XOR     A
+ 0C6B D380              OUT     (IO0),A
+ 0C6D D382              OUT     (IO2),A ;CLEAR DISPLAY LATCHES
+ 0C6F 0608              LD      B,08H
+ 0C71 10FE      SKATE3  DJNZ    SKATE3  ;OFF TIME DELAY
+ 0C73 23                INC     HL
+ 0C74 CB09              RRC     C
+ 0C76 30E8              JR      NC,SKATE1       ;MORE TO OUTPUT
+ 0C78 E1                POP     HL
+ 0C79 C1                POP     BC
+ 0C7A F1                POP     AF
+ 0C7B C9                RET
+                ;----------------------------
+                ; FUNCTION F - CLOCK CALENDAR
+                ;----------------------------
+ 0C7C CD4305    TIME    CALL    BEEP
+ 0C7F CD2B04            CALL    KEYREL  ;WAIT FOR KEY RELEASE
+ 0C82 DD21003F          LD      IX,SYSTEM       ;USE IX FOR TEMP VARIABLES
+ 0C86 3AD63F            LD      A,(ONTIM)
+ 0C89 DD7700            LD      (IX+0),A        ;SAVE DISPLAY SCAN DELAY
+ 0C8C 3E60              LD      A,60H
+ 0C8E 32D63F            LD      (ONTIM),A       ;USE NEW DELAY
+ 0C91 DD7701            LD      (IX+1),A        ;START IN TIME MODE
+                ;
+                ; DISPLAY TIME,CHECK FOR KEY
+                ;
+ 0C94 CDE90D    TIME1   CALL    RWATCH  ;READ THE CLOCK/CALENDAR
+ 0C97 CDD30C            CALL    UPDBUF  ;UPDATE THE DISPLAY BUFFER
+ 0C9A CDD003            CALL    SCAND
+ 0C9D DB86              IN      A,(KEYBUF)
+ 0C9F CB6F              BIT     5,A
+ 0CA1 28F1              JR      Z,TIME1 ;NO KEY KEEP LOOKING
+ 0CA3 E61F              AND     1FH
+ 0CA5 21AD0C            LD      HL,TIMKEY
+ 0CA8 CD3404            CALL    MENU
+ 0CAB 18E7              JR      TIME1
+                
+ 0CAD 04        TIMKEY  DEFB    4
+ 0CAE 10111213          DEFB    10H,11H,12H,13H
+ 0CB2 BA0C4B0D          DEFW    CLKEXT,SETCLK,CALKEY,CALKEY
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 41
+
+
+                ;--------------------
+                ; EXIT CLOCK CALENDAR
+                ;--------------------
+ 0CBA E1        CLKEXT  POP     HL      ;REMOVE RETURN
+ 0CBB DD7E00            LD      A,(IX+0)
+ 0CBE 32D63F            LD      (ONTIM),A       ;RESTORE DELAY TIME
+ 0CC1 C3B506            JP      CANCEL
+                ;--------------------
+                ; TOGGLE DISPLAY MODE
+                ;--------------------
+ 0CC4 CD4305    CALKEY  CALL    BEEP
+ 0CC7 CD2B04            CALL    KEYREL
+ 0CCA DD7E01            LD      A,(IX+1)
+ 0CCD EE80              XOR     80H     ;TOGGLE DISPLAY
+ 0CCF DD7701            LD      (IX+1),A
+ 0CD2 C9                RET
+                ;----------------------
+                ; UPDATE DISPLAY BUFFER
+                ;----------------------
+ 0CD3 DDCB017E  UPDBUF  BIT     7,(IX+1)        ;WHICH DISPLAY MODE?
+ 0CD7 2022              JR      NZ,UPDBF2       ;CALENDAR DISPLAY
+                ;
+                ; TIME DISPLAY
+                ;
+ 0CD9 3AB93F    UPDBF1  LD      A,(SWREG1)
+ 0CDC CDA003            CALL    CONBYT
+ 0CDF CBFD              SET     7,L     ;SET DECIMAL POINT
+ 0CE1 22D03F            LD      (DISBUF),HL     ;SHOW SECONDS (0-59)
+ 0CE4 3ABA3F            LD      A,(SWREG2)
+ 0CE7 CDA003            CALL    CONBYT
+ 0CEA CBFD              SET     7,L     ;SET DECIMAL POINT
+ 0CEC 22D23F            LD      (DISBUF+2),HL   ;SHOW MINUTES (0-59)
+ 0CEF 3ABB3F            LD      A,(SWREG3)
+ 0CF2 CDA003            CALL    CONBYT
+ 0CF5 CBFD              SET     7,L     ;SET DECIMAL POINT
+ 0CF7 22D43F            LD      (DISBUF+4),HL   ;SHOW HOURS (0-23)
+ 0CFA C9                RET
+                ;
+                ; CALENDAR DISPLAY
+                ;
+ 0CFB 3ABF3F    UPDBF2  LD      A,(SWREG7)
+ 0CFE CDA003            CALL    CONBYT
+ 0D01 22D03F            LD      (DISBUF),HL     ;SHOW YEAR (0-99)
+                ;
+                ; CHECK MODE FOR DD/MM/YY OR MM/DD/YY
+                ;
+ 0D04 21B63F            LD      HL,CALMDE
+ 0D07 CB7E              BIT     7,(HL)
+ 0D09 2014              JR      NZ,UPDBF3       ;MM/DD/YY MODE
+                ;
+                ; DD/MM/YY MODE
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 42
+
+
+                ;
+ 0D0B 3ABE3F            LD      A,(SWREG6)
+ 0D0E CDA003            CALL    CONBYT
+ 0D11 22D23F            LD      (DISBUF+2),HL   ;SHOW MONTH (1-12)
+ 0D14 3ABD3F            LD      A,(SWREG5)
+ 0D17 CDA003            CALL    CONBYT
+ 0D1A 22D43F            LD      (DISBUF+4),HL   ;SHOW DATE (1-31)
+ 0D1D 1812              JR      UPDBF4
+                ;
+                ; MM/DD/YY MODE
+                ;
+ 0D1F 3ABE3F    UPDBF3  LD      A,(SWREG6)
+ 0D22 CDA003            CALL    CONBYT
+ 0D25 22D43F            LD      (DISBUF+4),HL   ;SHOW MONTH (1-12)
+ 0D28 3ABD3F            LD      A,(SWREG5)
+ 0D2B CDA003            CALL    CONBYT
+ 0D2E 22D23F            LD      (DISBUF+2),HL   ;SHOW DATE (1-31)
+                ;
+                ; SHOW DAY
+                ;
+ 0D31 3ABC3F    UPDBF4  LD      A,(SWREG4)      ;GET DAY REG
+ 0D34 E607              AND     07H
+ 0D36 2812              JR      Z,UPDBF5        ;ZERO IS ILLEGAL
+ 0D38 FE07              CP      07H
+ 0D3A 280E              JR      Z,UPDBF5        ;DON'T SHOW SATURDAY
+ 0D3C 2F                CPL     ;WORK OUT
+ 0D3D D601              SUB     01H     ;WHICH DECIMAL POINT
+ 0D3F E607              AND     07H     ;TO LIGHT
+ 0D41 21D03F            LD      HL,DISBUF       ;ADDING THE DAY
+ 0D44 0600              LD      B,00H   ;TO A DISPLAY
+ 0D46 4F                LD      C,A     ;BUFFER INDEX
+ 0D47 09                ADD     HL,BC   ;AND SETTING THE
+ 0D48 CBFE              SET     7,(HL)  ;DECIMAL POINT
+ 0D4A C9        UPDBF5  RET     ;IN THAT DISPLAY
+                ;--------------
+                ; SET TIME/DATE
+                ;--------------
+ 0D4B CD4305    SETCLK  CALL    BEEP
+ 0D4E CD2B04            CALL    KEYREL
+                ;
+                ; EDIT THE DISPLAY BUFFER
+                ;
+ 0D51 CDD30C    SETCK1  CALL    UPDBUF  ;UPDATE DISPLAY BUFFER
+ 0D54 CD0A04            CALL    SKEYIN
+ 0D57 CD2B04            CALL    KEYREL
+ 0D5A FE10              CP      10H     ;FN KEY EXITS (NO CHANGE)
+ 0D5C C8                RET     Z
+ 0D5D FE11              CP      11H     ;AD KEY SETS CLOCK/CALENDAR
+ 0D5F 286E              JR      Z,SETCK8
+ 0D61 FE12              CP      12H
+ 0D63 283D              JR      Z,SETCK4        ;PLUS KEY
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 43
+
+
+ 0D65 FE13              CP      13H
+ 0D67 284F              JR      Z,SETCK6        ;MINUS KEY
+ 0D69 FE0A              CP      0AH     ;NO A-F KEYS
+ 0D6B 30E4              JR      NC,SETCK1
+                ;
+                ; IS IT SET CLOCK OR SET CALENDAR?
+                ;
+ 0D6D DDCB017E          BIT     7,(IX+1)
+ 0D71 200D              JR      NZ,SETCK2
+                ;
+                ; SET CLOCK DISPLAY
+                ;
+ 0D73 21B93F            LD      HL,SWREG1
+ 0D76 ED6F              RLD     ;MOVE THE NEW KEY
+ 0D78 23                INC     HL      ;INTO THE CLOCK BUFFER
+ 0D79 ED6F              RLD
+ 0D7B 23                INC     HL
+ 0D7C ED6F              RLD
+ 0D7E 18D1              JR      SETCK1
+                ;
+                ; SET CALENDAR DISPLAY
+                ;
+ 0D80 21B63F    SETCK2  LD      HL,CALMDE
+ 0D83 CB7E              BIT     7,(HL)
+ 0D85 200D              JR      NZ,SETCK3       ;MM/DD/YY MODE
+                ;
+                ; SET CALENDAR AS DD/MM/YY
+                ;
+ 0D87 21BF3F            LD      HL,SWREG7
+ 0D8A ED6F              RLD     ;MOVE THE NEW KEY
+ 0D8C 2B                DEC     HL      ;INTO THE CAL BUFFER
+ 0D8D ED6F              RLD
+ 0D8F 2B                DEC     HL
+ 0D90 ED6F              RLD
+ 0D92 18BD              JR      SETCK1
+                ;
+                ; SET CALENDAR AS MM/DD/YY
+                ;
+ 0D94 21BF3F    SETCK3  LD      HL,SWREG7
+ 0D97 ED6F              RLD     ;MOVE THE NEW KEY
+ 0D99 2B                DEC     HL      ;INTO THE CAL BUFFER
+ 0D9A 2B                DEC     HL
+ 0D9B ED6F              RLD
+ 0D9D 23                INC     HL
+ 0D9E ED6F              RLD
+ 0DA0 18AF              JR      SETCK1
+                ;
+                ; INC DAY
+                ;
+ 0DA2 DDCB017E  SETCK4  BIT     7,(IX+1)
+ 0DA6 28A9              JR      Z,SETCK1
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 44
+
+
+ 0DA8 3ABC3F            LD      A,(SWREG4)
+ 0DAB FE07              CP      07H     ;IS THE DAY SUNDAY?
+ 0DAD 2002              JR      NZ,SETCK5
+ 0DAF 3E00              LD      A,00H   ;SET MONDAY
+ 0DB1 3C        SETCK5  INC     A       ;DAY=DAY+1
+ 0DB2 32BC3F            LD      (SWREG4),A
+ 0DB5 C3510D            JP      SETCK1
+                ;
+                ; DEC DAY
+                ;
+ 0DB8 DDCB017E  SETCK6  BIT     7,(IX+1)
+ 0DBC CA510D            JP      Z,SETCK1
+ 0DBF 3ABC3F            LD      A,(SWREG4)
+ 0DC2 FE01              CP      01H     ;IS THE DAY MONDAY?
+ 0DC4 2002              JR      NZ,SETCK7
+ 0DC6 3E08              LD      A,08H   ;SET SUNDAY
+ 0DC8 3D        SETCK7  DEC     A       ;DAY=DAY-1
+ 0DC9 32BC3F            LD      (SWREG4),A
+ 0DCC C3510D            JP      SETCK1
+                ;
+                ; SET THE CLOCK/CALENDAR WITH NEW DATA
+                ;
+ 0DCF CD4305    SETCK8  CALL    BEEP
+ 0DD2 CD2B04            CALL    KEYREL
+ 0DD5 3ABB3F            LD      A,(SWREG3)
+ 0DD8 E63F              AND     3FH     ;24 HOUR MODE
+ 0DDA 32BB3F            LD      (SWREG3),A
+ 0DDD 3ABC3F            LD      A,(SWREG4)
+ 0DE0 E607              AND     07H     ;OSC ON,RST ENABLED
+ 0DE2 32BC3F            LD      (SWREG4),A
+ 0DE5 CD730E            CALL    WWATCH  ;WRITE CHANGES
+ 0DE8 C9                RET
+                ;---------------------
+                ; READ FROM SMARTWATCH
+                ;---------------------
+                ; READS DATA FROM SMARTWATCH, USES LOOKUP TABLE TO
+                ; WRITE 64 BIT ACCESS CODE TO ENABLE THE SMARTWATCH.
+                ; READS ALL DATA INTO REGISTERS AS RAM CANNOT BE READ
+                ; OR WRITTEN TO WHILE WATCH IS ENABLED.
+                ;
+                ;  ENTRY : NONE
+                ;  EXIT  : NO WORKING REGISTERS MODIFIED
+                ;          (ALTERNATE SET MODIFIED)
+                ;  CONTENTS OF SMARTWATCH WRITTEN TO SWREG0 - SWREG7
+                ;
+                ;
+                ; ENABLE SMARTWATCH
+                ;
+ 0DE9 F5        RWATCH  PUSH    AF
+ 0DEA C5                PUSH    BC
+ 0DEB D5                PUSH    DE
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 45
+
+
+ 0DEC E5                PUSH    HL
+ 0DED 3AFF3F            LD      A,(DALLAS)      ;INITIATE PATTERN
+ 0DF0 21330E            LD      HL,PATERN       ;WRITE D0 OF ALL THE BYTES
+ 0DF3 0640              LD      B,64    ;IN THE TABLE TO THE RAM TO
+ 0DF5 7E        RWACH1  LD      A,(HL)  ;ENABLE THE SMARTWATCH
+ 0DF6 32FF3F            LD      (DALLAS),A
+ 0DF9 23                INC     HL
+ 0DFA 10F9              DJNZ    RWACH1
+                ;
+                ; READ DATA FROM WATCH
+                ;
+ 0DFC 0620              LD      B,32
+ 0DFE 3AFF3F    RWACH2  LD      A,(DALLAS)      ;SHIFT THE FIRST 32 BITS
+ 0E01 CB3F              SRL     A       ;INTO THE 16 BIT REGISTERS
+ 0E03 CB1A              RR      D       ;DE AND HL
+ 0E05 CB1B              RR      E       ;THEN EXCHANGE THEM WITH
+ 0E07 CB1C              RR      H       ;THE ALTERNATE PAIR
+ 0E09 CB1D              RR      L
+ 0E0B 10F1              DJNZ    RWACH2
+ 0E0D D9                EXX
+ 0E0E 0620              LD      B,32
+ 0E10 3AFF3F    RWACH3  LD      A,(DALLAS)      ;NOW SHIFT THE LAST 32 BITS
+ 0E13 CB3F              SRL     A       ;INTO THE SAME 16 BIT REGISTERS
+ 0E15 CB1A              RR      D
+ 0E17 CB1B              RR      E
+ 0E19 CB1C              RR      H
+ 0E1B CB1D              RR      L
+ 0E1D 10F1              DJNZ    RWACH3
+                ;
+                ; SAVE IN WATCH REGISTERS
+                ;
+ 0E1F 22BC3F            LD      (SWREG4),HL     ;SMARTWATCH READ IS COMPLETE
+ 0E22 ED53BE3F          LD      (SWREG6),DE     ;GET THE DATA
+ 0E26 D9                EXX
+ 0E27 22B83F            LD      (SWREG0),HL
+ 0E2A ED53BA3F          LD      (SWREG2),DE
+ 0E2E E1                POP     HL
+ 0E2F D1                POP     DE
+ 0E30 C1                POP     BC
+ 0E31 F1                POP     AF
+ 0E32 C9                RET
+                ;
+                ; SMARTWATCH ACCESS PATTERN
+                ;
+ 0E33 C5E271B8  PATERN  DEFB    0C5H,0E2H,71H,0B8H,5CH,2EH,17H,8BH
+ 0E3B 3A1D8E47          DEFB    3AH,1DH,8EH,47H,0A3H,0D1H,0E8H,74H
+ 0E43 A3D1E874          DEFB    0A3H,0D1H,0E8H,74H,3AH,1DH,8EH,47H
+ 0E4B 5C2E178B          DEFB    5CH,2EH,17H,8BH,0C5H,0E2H,71H,0B8H
+ 0E53 C5E271B8          DEFB    0C5H,0E2H,71H,0B8H,5CH,2EH,17H,8BH
+ 0E5B 3A1D8E47          DEFB    3AH,1DH,8EH,47H,0A3H,0D1H,0E8H,74H
+ 0E63 A3D1E874          DEFB    0A3H,0D1H,0E8H,74H,3AH,1DH,8EH,47H
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 46
+
+
+ 0E6B 5C2E178B          DEFB    5CH,2EH,17H,8BH,0C5H,0E2H,71H,0B8H
+                ;--------------------
+                ; WRITE TO SMARTWATCH
+                ;--------------------
+                ;
+                ; WRITE DATA TO SMARTWATCH BY FIRST ACCESSING
+                ; IT USING BIT MANIPULATION.
+                ; DATA IS WRITTEN BY FIRSTLY PUTTING ALL 64 BITS
+                ; INTO REGISTERS AS RAM CANNOT BE ACCESSED ONCE THE
+                ; SMARTWATCH IS ENABLED.
+                ;
+                ; ENTRY : NONE
+                ; THE DATA TO WRITE TO THE SMARTWATCH
+                ; MUST BE IN SWREG0 - SWREG7
+                ;  EXIT : NO WORKING REGISTERS MODIFIED
+                ;  (ALTERNATE SET MODIFIED)
+                ; GET DATA TO WRITE TO WATCH
+                ;
+ 0E73 F5        WWATCH  PUSH    AF
+ 0E74 C5                PUSH    BC
+ 0E75 D5                PUSH    DE
+ 0E76 E5                PUSH    HL
+ 0E77 2ABC3F            LD      HL,(SWREG4)     ;SET UP THE
+ 0E7A ED5BBE3F          LD      DE,(SWREG6)     ;16 BIT REGISTERS
+ 0E7E D9                EXX
+ 0E7F 2AB83F            LD      HL,(SWREG0)     ;WITH THE DATA TO BE
+ 0E82 ED5BBA3F          LD      DE,(SWREG2)     ;WRITTEN TO THE SMARTWATCH
+                ;
+                ; WRITE 64 BIT ACCESS CODE TO ENABLE SMARTWATCH
+                ;
+ 0E86 3AFF3F            LD      A,(DALLAS)      ;INITIATE PATTERN
+ 0E89 3EC5              LD      A,0C5H
+ 0E8B 0E80              LD      C,80H   ;NUMBER OF BYTES
+ 0E8D 0680      WWACH1  LD      B,80H   ;NUMBER OF BITS
+ 0E8F 32FF3F    WWACH2  LD      (DALLAS),A      ;WRITE TO RAM
+ 0E92 CB0F              RRC     A
+ 0E94 CB38              SRL     B
+ 0E96 30F7              JR      NC,WWACH2       ;MORE BITS
+ 0E98 CB39              SRL     C
+ 0E9A 3811              JR      C,WWACH4        ;NO MORE BYTES
+ 0E9C CB47              BIT     0,A
+ 0E9E 200A              JR      NZ,WWACH3
+ 0EA0 CB0F              RRC     A
+ 0EA2 CB0F              RRC     A
+ 0EA4 CB0F              RRC     A
+ 0EA6 CB0F              RRC     A
+ 0EA8 18E3              JR      WWACH1
+ 0EAA 2F        WWACH3  CPL
+ 0EAB 18E0              JR      WWACH1
+                ;
+                ; WRITE DATA TO WATCH
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 47
+
+
+                ;
+ 0EAD 0620      WWACH4  LD      B,32    ;SHIFT THE FIRST 32 BITS
+ 0EAF CB3A      WWACH5  SRL     D       ;OUT OF THE 16 BIT REGISTERS
+ 0EB1 CB1B              RR      E       ;ONTO D0 AND INTO
+ 0EB3 CB1C              RR      H       ;THE SMARTWATCH
+ 0EB5 CB1D              RR      L
+ 0EB7 17                RLA
+ 0EB8 32FF3F            LD      (DALLAS),A
+ 0EBB 10F2              DJNZ    WWACH5
+ 0EBD D9                EXX     ;RESTORE REGISTERS
+ 0EBE 0620              LD      B,32    ;GET THE OTHER 32 BITS FROM
+ 0EC0 CB3A      WWACH6  SRL     D       ;THE ALTERNATE REGISTER SET
+ 0EC2 CB1B              RR      E       ;AND SHIFT THEM ONTO D0
+ 0EC4 CB1C              RR      H       ;AND INTO THE SMARTWATCH
+ 0EC6 CB1D              RR      L
+ 0EC8 17                RLA
+ 0EC9 32FF3F            LD      (DALLAS),A
+ 0ECC 10F2              DJNZ    WWACH6
+ 0ECE E1                POP     HL
+ 0ECF D1                POP     DE
+ 0ED0 C1                POP     BC
+ 0ED1 F1                POP     AF
+ 0ED2 C9                RET
+                ;-----------------
+                ; ONE SECOND DELAY
+                ;-----------------
+                ; USES SMARTWATCH TO DELAY FOR 1 SECOND
+                ; BY WAITING FOR SECONDS REGISTER TO ROLLOVER
+                ;
+                ; FIRST READ GETS A REFERENCE, SUBSEQUENT READS
+                ; WAIT UNTIL THE SECONDS COUNTER NO LONGER
+                ; READS THE SAME AS THE REFERENCE VALUE,
+                ; THEN THE ROUTINE RETURNS
+                ;
+                ; ENTRY : NONE
+                ; EXIT : NONE MODIFIED
+                ;
+ 0ED3 F5        ONESEC  PUSH    AF
+ 0ED4 C5                PUSH    BC
+ 0ED5 CDE90D            CALL    RWATCH  ;READ WATCH
+ 0ED8 3AB93F            LD      A,(SWREG1)
+ 0EDB 47                LD      B,A     ;SAVE REF COUNT
+ 0EDC CDE90D    ONESC1  CALL    RWATCH
+ 0EDF 3AB93F            LD      A,(SWREG1)
+ 0EE2 B8                CP      B       ;SAME AS REF?
+ 0EE3 CADC0E            JP      Z,ONESC1        ;YES SO WAIT AGAIN
+ 0EE6 C1                POP     BC
+ 0EE7 F1                POP     AF
+ 0EE8 C9                RET
+ 0000                   END
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 48
+---- Symbol Table ----
+
+ADDKEY   0303          CLRBF1   0402          INTEL4   0765
+ADDRA    0829          CLRBUF   03FB          INTEL5   0780
+ADDRB    083B          CONBYT   03A0          INTELH   0705
+ADMODE   0373          CONVHI   03AD          IO0      0080
+ADRESS   3FDA          CONVLO   03B1          IO1      0081
+AF_REG   3FE2          COUNT    3FC6          IO2      0082
+ASCHEX   07B6          DALLAS   3FFF          IO3      0083
+ASCHX1   07BC          DECKEY   0334          IO7      0087
+B1200    0080          DECKY1   0337          IX_REG   3FEA
+B2400    003F          DECKY2   0344          IY_REG   3FEC
+B300     0220          DECKY3   0358          KEYBUF   0086
+B4800    001B          DECSP1   0670          KEYDEL   3FDC
+B9600    000B          DECSTP   0660          KEYIN    0422
+BAUD     3FC0          DELON1   0BBA          KEYREL   042B
+BC_REG   3FE4          DELON2   0BBC          KEYRL1   042C
+BEEP     0543          DELONE   0BB1          KEYTIM   3FC2
+BEEP1    0553          DE_REG   3FE6          LENGTH   050A
+BEEP2    055A          DISADD   0382          LOSE     0B54
+BEEP3    056A          DISBUF   3FD0          MAIN     026E
+BITIM1   0821          DISBYT   0397          MAIN1    027F
+BITIME   081C          DISPLY   0084          MAIN2    0282
+BLKDST   3FCC          DISREG   0599          MENLST   0294
+BLKEND   3FCA          EDTKEY   0A70          MENU     0434
+BLKMV1   086C          ENDKEY   0A97          MENU1    0442
+BLKMV2   086F          FUNFUN   06F6          MENU2    044E
+BLKMV3   0881          FUNJMP   3FCE          MODE     3FD8
+BLKMVE   084D          FUNKEY   0696          MOVE     0887
+BLKSM1   08BF          FUNKY1   069A          MUL16    048F
+BLKSRT   3FC8          FUNKY2   06A9          MULT     0498
+BLKSUM   08A3          FUNLST   06C2          MULT1    049E
+BRANCH   08E1          FUNTBL   3FB4          MUSIC    04A6
+BRNCH1   0903          GETBT1   0792          NXTBIT   07D0
+BRNCH2   090E          GETBT2   07A8          OFTIM    3FD7
+CALKEY   0CC4          GETBT3   07B4          ONESC1   0EDC
+CALMDE   3FB6          GETBYT   0786          ONESEC   0ED3
+CANCEL   06B5          GOEXEC   06FA          ONTIM    3FD6
+CANCL1   06B8          HEXKEY   02D1          PATERN   0E33
+CHKKEY   0AA0          HEXKY1   02DC          PAUSE    04B7
+CHKKY1   0AAE          HEXKY2   02EA          PC_REG   3FE0
+CHKKY2   0AD7          HL_REG   3FE8          PERIOD   04F2
+CHKKY3   0AE4          INCKEY   030F          PLAY1    0926
+CHKKY4   0AEC          INCKY1   0312          PLAY2    0935
+CHKKY5   0AF3          INCKY2   031F          PLAY3    0944
+CHKKY6   0B01          INCKY3   0333          RAMEND   3BFF
+CHKKY7   0B03          INCSP1   065B          RAMSRT   2000
+CHKKY8   0B08          INCSTP   064B          RAMSUM   3FFE
+CHKKY9   0B2D          INDEXB   0467          RAND     0477
+CHKKYA   0B3B          INDEXW   046E          REGKEY   05F8
+CHKSM1   045B          INTEL1   070F          REGNAM   05E8
+CHKSUM   0457          INTEL2   0744          REGPNT   3FDE
+CLKEXT   0CBA          INTEL3   0762          REGTBL   05AB
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: SCMV1_21.Z8T                                        Page 49
+---- Symbol Table ----
+
+RELSQR   0B6E          SCOPE7   0C08          SWREG1   3FB9
+RELSR1   0B89          SCOPE8   0C0F          SWREG2   3FBA
+RELSR2   0B9A          SCOPE9   0C1E          SWREG3   3FBB
+RELSR3   0BA2          SCOPEA   0C2B          SWREG4   3FBC
+RELSR4   0BA7          SDELAY   0895          SWREG5   3FBD
+RESET    0200          SDELY1   089A          SWREG6   3FBE
+RESET1   0214          SECNUM   0A39          SWREG7   3FBF
+RETMON   061F          SECRET   09ED          SYSCALL  006B
+RETPGM   0629          SECRT1   0A2A          SYSJMP   0100
+RLSTEP   0B83          SEED     0C4C          SYSTEM   3F00
+RLTEST   0B7D          SEGMNT   03C0          TIME     0C7C
+RST08    3FF0          SETCK1   0D51          TIME1    0C94
+RST10    3FF2          SETCK2   0D80          TIMKEY   0CAD
+RST18    3FF4          SETCK3   0D94          TONE     0523
+RST20    3FF6          SETCK4   0DA2          TONE1    052D
+RST28    3FF8          SETCK5   0DB1          TONE2    0532
+RST30    0030          SETCK6   0DB8          TONE3    0535
+RST38    3FFA          SETCK7   0DC8          TRACE    0918
+RST66    3FFC          SETCK8   0DCF          TUNE1    0961
+RSTVEC   0000          SETCLK   0D4B          TUNE2    09A1
+RWACH1   0DF5          SETDP    0378          TXDATA   07BF
+RWACH2   0DFE          SETREG   0676          UPDATE   0359
+RWACH3   0E10          SKATE    0C5B          UPDBF1   0CD9
+RWATCH   0DE9          SKATE1   0C60          UPDBF2   0CFB
+RXDAT1   07EC          SKATE2   0C68          UPDBF3   0D1F
+RXDAT2   0809          SKATE3   0C71          UPDBF4   0D31
+RXDAT3   0819          SKEYIN   040A          UPDBF5   0D4A
+RXDATA   07EA          SKEYL1   0417          UPDBUF   0CD3
+SCAN     0085          SKEYRL   0416          VERS     037E
+SCAND    03D0          SPLIT    0B5B          WIN      0B4B
+SCAND1   03D8          SPTEMP   3FC4          WWACH1   0E8D
+SCAND2   03E2          SP_REG   3FEE          WWACH2   0E8F
+SCAND3   03EB          SSTEP    056D          WWACH3   0EAA
+SCOPE    0BC7          STEP     04AC          WWACH4   0EAD
+SCOPE2   0BDC          STEP1    04C1          WWACH5   0EAF
+SCOPE3   0BE4          STEP2    04CB          WWACH6   0EC0
+SCOPE4   0BF3          STEP3    04D6          WWATCH   0E73
+SCOPE5   0BFA          SWBEEP   0953          
+SCOPE6   0C01          SWREG0   3FB8          
+                
+***** No Errors Detected *****
+
+
