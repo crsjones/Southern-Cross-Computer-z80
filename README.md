@@ -1,4 +1,4 @@
-# Southern-Cross-Computer-z80
+# Southern Cross Computer
 
 I developed the Z80 Southern Cross Computer for Hong Kong based Kitsrus in 1992/93.
 The kit was based on the TEC-1 Computer that was designed by John Hardy
