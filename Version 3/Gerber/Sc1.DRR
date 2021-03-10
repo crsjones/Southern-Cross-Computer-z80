@@ -1,0 +1,21 @@
+----------------------------------------------------------------------------------------------------------------------------------
+NCDrill File Report For: Sc1.pcb   2/03/2021  3:58:05 PM
+----------------------------------------------------------------------------------------------------------------------------------
+
+Layer Pair : Top Layer to Bottom Layer
+ASCII RoundHoles File : Sc1-RoundHoles.TXT
+ASCII SlotHoles File : Sc1-SlotHoles.TXT
+
+Tool       Hole Size               Hole Tolerance               Hole Type       Hole Count   Plated         Tool Travel
+----------------------------------------------------------------------------------------------------------------------------------
+T1      28mil (0.711mm)                                           Round             108       PTH        49.10inch (1247.11mm)
+T2      31mil (0.787mm)                                           Round             395       PTH        80.22inch (2037.65mm)
+T3      39mil (0.991mm)                                           Round             208       PTH        63.38inch (1609.84mm)
+T4      45mil (1.143mm)                                           Round             3         PTH        0.20inch (5.08mm)
+T5      45mil (1.143mm)                                           Slot              3         PTH        1.31inch (33.32mm)
+T6      55mil (1.397mm)                                           Round             2         PTH        0.20inch (5.08mm)
+T7      125mil (3.175mm)                                          Round             5         PTH        23.49inch (596.55mm)
+----------------------------------------------------------------------------------------------------------------------------------
+Totals                                                                              724
+
+Total Processing Time (hh:mm:ss) : 00:00:00
