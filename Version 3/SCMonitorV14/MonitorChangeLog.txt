@@ -1,0 +1,95 @@
+
+Southern Cross Monitor Version 1.2
+----------------------------------
+
+Changes to Southern Cross Monitor Version 1.1   February, 1993.
+
+1. When the Function Key is pressed twice, the routine jumps to the
+address loaded at FUNJMP. It is set to CANCEL in the Fn routine and is
+reloaded after Reset.
+
+2. The table in the Function routine is now accessed by pointer FUNTBL
+this will allow users to change the Function key assignments. It is set to
+FUNLST (the Function key table) and is reloaded after Reset.
+
+3. RAMCHK has been renamed as DALLAS as it is used in the Dallas
+Smartwatch routines.
+
+4. Read and write Smartwatch have had more explanation added to the
+subroutine headers.
+
+5. The Default serial BAUD rate is now 4800 Baud, which is reloaded after
+Reset.
+
+6. IO7 has been added as it is now used for the Single Stepper Hardware.
+
+7. CALMDE has been added to the Smartwatch registers, if bit 7 is high the
+calendar (Fn F) shows the date in MM/DD/YY mode, if bit 7 is low it is
+shown in DD/MM/YY. This allows the setting of the date in the Smartwatch
+to the country preference.
+
+8. DELAYR has been renamed DELONE.
+
+9. The Relay test program is now Fn D and not Fn 7.
+
+10. Fn 7 is used to toggle the hardware single stepper if attached.It
+displays a T in the rightmost Data display briefly to indicate the Trace
+toggle.
+
+11. All of the Relay code has been moved above to Fn D.
+ (All the code for each function key is now in order).
+
+12. Corrected spelling of 'Separate'
+
+                      - - - - - - - - - - - - - - -
+
+July, 1993.  Version 1.21
+-------------------------
+
+A buyer rang to point out that the relay test did not test all relays. We
+found that a 05H instead of 55H at 0B7D in the Monitor was to blame. The
+test was missing relay positions D4 and D6.
+
+                      - - - - - - - - - - - - - - -
+
+February 2003. Version 1.3  (This version was UNRELEASED)
+--------------------------
+
+The 74C923 code was removed and replaced with software scanned keyboard code.
+
+1. Added SYSFLG at 3FB3H 'System Flags' 
+Bit 1 is used to indicate the type of keyboard.
+  
+Bit 1 = 1 Software scanned keyboard.
+Bit 1 = 0 Hardware scanned keyboard.
+
+Initialization routine checks if DA is high ( software scanned keyboard
+has DA tied high to allow for detection) and sets Bit 1 accordingly.
+
+2. Added SCANKEY routine to scan keyboard, replaced all
+ 
+IN      A,(KEYBUF) with 
+
+with
+
+CALL    SCANKEY
+
+except for the increment/ decrement key handling which required some additional mods.
+Added SCANKEY to system call jump table.
+
+                      - - - - - - - - - - - - - - -
+
+March 2021 Version 1.4
+----------------------
+
+1. Cleared SYSFLG on Reset and changed the keyboard flag to bit 0.
+
+2. The receive INTEL hex routine did not work in the 1.3 version.
+   The RXDATA routine had a cancel feature allowing a keypress to break out of the 'waiting for serial character' loop. 
+   The SCANKEY routine takes a lot longer than IN  A,(KEYBUF) so the receive INTEL hex routine was now not fast enough to process incoming bytes.
+   The cancel functionality was removed from the RXDATA routine, the receive INTEL hex routine now just returns to the monitor if the file download was
+   successful.
+   
+3. The Receive INTEL Hex routine (INTELH) was made stand alone and added to the system call jump table so it could be called from outside the monitor.
+
+                      - - - - - - - - - - - - - - -
