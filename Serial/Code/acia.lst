@@ -1,0 +1,148 @@
+0001   0000             ;---------------------------
+0002   0000             ; Southern Cross 6850 Serial
+0003   0000             ;---------------------------
+0004   0000             ;
+0005   0000             ;  Craig Jones  August 2021
+0006   0000             ;  Version 1
+0007   0000             ;
+0008   0000             ; SC-Serial Add-on board for Southern Cross Z80 SBC 
+0009   0000             ;                           using  Southern Cross Monitor SCM V1.5 
+0010   0000             ; 
+0011   0000             ; $2000 blink
+0012   0000             ; The blink routine at $2000  toggles the RTS output of the 6850,
+0013   0000             ; connect a high efficiency LED and series 2k2 resistor between RTS and 5V to check that you have
+0014   0000             ; the board connected properly with the default IO address.
+0015   0000             ;
+0016   0000             ; $2030 connect the ACIA to the serial monitor
+0017   0000             ; substitute the ACIA transmit and receive routines for the bit banged serial routines in the serial monitor. 
+0018   0000             ;
+0019   0000             ; monitor V1.5 vectors
+0020   0000             ;
+0021   0000             PUTCH   .EQU $3faa   ;output a serial character
+0022   0000             GETCH   .EQU $3fac   ;get a serial character
+0023   0000             RST38   .EQU $3ffa   ;interrupt vector
+0024   0000             ;
+0025   0000             ;monitor V1.5 entry points
+0026   0000             ;
+0027   0000             WARM    .EQU $0f8c   ;serial monitor warm entry point
+0028   0000             ;
+0029   0000             ; 6850 ACIA registers
+0030   0000             ;----------------------
+0031   0000             CONTROL         .EQU      $80   ;(write) 
+0032   0000             STATUS          .EQU      $80   ;(read)
+0033   0000             TDR             .EQU      $81   ;(write)
+0034   0000             RDR             .EQU      $81   ;(read)
+0035   0000             ;
+0036   0000             ; control register bits
+0037   0000             ;----------------------
+0038   0000             ;
+0039   0000             ;clock divisor
+0040   0000             ;
+0041   0000             MRESET  .EQU  $03        ;master reset the ACIA
+0042   0000             DIV0    .EQU  $00        ;CLOCK/1
+0043   0000             DIV16   .EQU  $01        ;CLOCK/16
+0044   0000             DIV64   .EQU  $02        ;CLOCK/64
+0045   0000             ;
+0046   0000             ; format select
+0047   0000             ;
+0048   0000             F7E2    .EQU   $00        ;7 data bits, EVEN parity, 2 stop bits (1+7+1+2= 11 bits)
+0049   0000             F7O2    .EQU   $04        ;7 data bits, ODD parity, 2 stop bits (1+7+1+2= 11 bits)
+0050   0000             F7E1    .EQU   $08        ;7 data bits, EVEN parity, 1 stop bit (1+7+1+1= 10 bits)
+0051   0000             F7O1    .EQU   $0C        ;7 data bits, ODD parity, 1 stop bit (1+7+1+1= 10 bits)
+0052   0000             F8N2    .EQU   $10        ;8 data bits, NO parity, 2 stop bits (1+8+0+2= 11 bits)
+0053   0000             F8N1    .EQU   $14        ;8 data bits, NO parity, 1 stop bit (1+8+0+1= 10 bits)
+0054   0000             F8E1    .EQU   $18        ;8 data bits, EVEN parity, 1 stop bit (1+8+1+1= 11 bits)
+0055   0000             F8O1    .EQU   $1C        ;8 data bits, ODD parity,1 stop bit (1+8+1+1= 11 bits)
+0056   0000             ;
+0057   0000             ; transmitter control
+0058   0000             ;
+0059   0000             RTSLID .EQU   $00        ;RTS LOW, transmit interrupt disabled
+0060   0000             RTSLIE .EQU   $20        ;RTS LOW, transmit interrupt enabled
+0061   0000             RTSHID .EQU   $40        ;RTS HIGH, transmit interrupt disabled
+0062   0000             RTSLIDB .EQU  $60        ;RTS LOW, transmit interrupt disabled and 'break' transmitted
+0063   0000             ;
+0064   0000             ; receiver interrupt
+0065   0000             ;
+0066   0000             RIE    .EQU   $80        ;receiver interrupt enabled
+0067   0000             ;
+0068   0000             ; status register bits
+0069   0000             ;---------------------
+0070   0000             RDRF   .EQU   0          ;receive data register full
+0071   0000             TDRE   .EQU   1          ;transmit data register empty
+0072   0000             DCD    .EQU   2          ;data carrier detect
+0073   0000             CTS    .EQU   3          ;clear to send
+0074   0000             FE     .EQU   4          ;framing error
+0075   0000             OVRN   .EQU   5          ;overrun
+0076   0000             PE     .EQU   6          ;parity error
+0077   0000             IRQ    .EQU   7          ;interrupt request
+0078   0000             ;
+0079   0000             ; blink
+0080   0000             ;-----------
+0081   0000             ; toggles the RTS output of the ACIA
+0082   2000                   .org    $2000
+0083   2000 3E 03       blink: ld    a,MRESET
+0084   2002 D3 80              out   (CONTROL),a           ;reset the ACIA
+0085   2004 16 14              ld    d,20
+0086   2006             blink1: 
+0087   2006 3E 00              ld   a,RTSLID               ;make RTS low to turn LED on
+0088   2008 D3 80              out   (CONTROL),a
+0089   200A 06 C8              ld    b,200
+0090   200C CD 1E 20           call  delae
+0091   200F 3E 40              ld     a,RTSHID             ;make RTS high to turn LED off
+0092   2011 D3 80              out   (CONTROL),a
+0093   2013 06 C8              ld    b,200
+0094   2015 CD 1E 20           call  delae
+0095   2018 15                 dec   d
+0096   2019 20 EB              jr    nz,blink1              ;done enough?
+0097   201B C3 8C 0F           jp    WARM                   ;exit to the serial monitor
+0098   201E             ;
+0099   201E             ; approx. b x 1mS delay @ 4MHz
+0100   201E             ;-----------------------------
+0101   201E C5          delae       push   bc           ;11T
+0102   201F 06 E9                   ld    b,233         ;7T
+0103   2021 00          delae1      nop                 ;4T
+0104   2022 10 FD                   djnz  delae1        ;NZ=13T,Z=8T
+0105   2024 C1                      pop   bc            ;10T
+0106   2025 10 F7                   djnz  delae         ;NZ=13T,Z=8T
+0107   2027 C9                      ret                 ;10T
+0108   2028             ;
+0109   2028             ; Connect the ACIA to the Serial Monitor
+0110   2028             ;----------------------------------------
+0111   2028             ;
+0112   2028             ; initialise the ACIA and use it instead of the bit banged serial routines for the 
+0113   2028             ; serial monitor.
+0114   2028             ;
+0115   2030                    .org   $2030
+0116   2030 3E 03       start: ld    a,MRESET
+0117   2032 D3 80              out   (CONTROL),a           ;reset the ACIA
+0118   2034 3E 12              ld     a,RTSLID+F8N2+DIV64
+0119   2036 D3 80              out   (CONTROL),a           ;initialise ACIA  8 bit word, No parity 2 stop divide by 64 for 115200 baud
+0120   2038             ;point to our new transmit routine
+0121   2038 21 47 20           ld    hl,TxChar
+0122   203B 22 AA 3F           ld    (PUTCH),hl
+0123   203E             ;point to our new receive routine
+0124   203E 21 52 20           ld    hl,RxChar
+0125   2041 22 AC 3F           ld    (GETCH),hl
+0126   2044             ; jump (back) into the serial monitor, the prompt '>' will be displayed on 
+0127   2044             ; the terminal connected to the ACIA, remember that the ACIA communicates at 115200! (with a 7.3728MHz crystal oscillator)
+0128   2044 C3 8C 0F           jp    WARM
+0129   2047             ;
+0130   2047             ; transmit a character in a
+0131   2047             ;--------------------------
+0132   2047 47          TxChar:  ld    b,a                   ;save the character  for later
+0133   2048 DB 80       TxChar1: in    a,(STATUS)            ;get the ACIA status 
+0134   204A CB 4F                bit   TDRE,a                ;is the TDRE bit high?
+0135   204C 28 FA                jr    z,TxChar1             ;no, the TDR is not empty
+0136   204E 78                   ld    a,b                   ;yes, get the character
+0137   204F D3 81                out   (TDR),a               ;and put it in the TDR
+0138   2051 C9                   ret
+0139   2052             ;
+0140   2052             ; receive  a character in a
+0141   2052             ;---------------------------------
+0142   2052 DB 80       RxChar:  in    a,(STATUS)         ;get the ACIA status
+0143   2054 CB 47                bit   RDRF,a             ;is the RDRF bit high?
+0144   2056 28 FA                jr    z,RxChar           ;no, the RDR is empty
+0145   2058 DB 81                in    a,(RDR)            ;yes, read the received char
+0146   205A C9                   ret
+0147   205B                    .end
+tasm: Number of errors = 0
