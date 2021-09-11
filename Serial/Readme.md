@@ -1,6 +1,6 @@
 
 
-![SC Serial Board](serialpopulated.jpg "SC Serial Board").
+![SC Serial Board](/Southern-Cross-Computer-z80/serial/serialpopulated.jpg "SC Serial Board").
 
 # Southern Cross Serial
 
@@ -9,3 +9,4 @@ This circuit is based on the “Minimum chip count z80 computer” design by Gra
 Here it has been adapted for the Southern Cross Computer adding the expansion connector, I/O decoding, 
 and a header for a FTDI USB to serial converter.
 
+D:\github\Southern-Cross-Computer-z80
