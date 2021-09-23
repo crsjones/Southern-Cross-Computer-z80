@@ -1,0 +1,11 @@
+The how-to info a bit thin on the ground, so a quick start primer is:-
+
+1. Set your serial port to 4800bps, 8 bits, no partity, 1 stop bit.
+2. Connect DOUT to serial Rx. Connect DIN2 to Serial Tx. (anf GND to GND). NB: You'll need a TTL to RS-232 adaptor of some sort (e.g. MAX232 chip)
+3. Press Fn Fn (Requires ROM v1.5) to start the interface.
+
+
+More info on the serial port interfacing and TTL to RS-232 is in the original user's maual in the "PC Connection" section.
+
+Craig Hart
+June 2021
