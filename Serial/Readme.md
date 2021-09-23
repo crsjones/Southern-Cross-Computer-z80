@@ -1,3 +1,4 @@
+![SC Serial Board](https://github.com/crsjones/Southern-Cross-Computer-z80/blob/main/Serial/SerialPopulated.jpg)
 
 # Southern Cross Serial
 
