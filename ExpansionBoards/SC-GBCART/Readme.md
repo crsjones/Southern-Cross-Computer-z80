@@ -20,9 +20,12 @@ He sells the Flash Cartridges on his website;  https://bennvenn.myshopify.com/
 
 Memory map:
 0x0000-0x3FFF:  16kBytes - fixed to Flash Address 0x0000-0x3FFF
+
 0x4000-0x7FFF:  16kBytes - 4MBytes in 256 banks, swapped by writing to address 0x2000.
+
 0xA000-0xBFFF:    8kBytes - 32kBytes in 8k banks, swapped by writing to 0x4000. 
-                               Write protected unless 0x0A written to 0x0000. Protected if any other value is written to that address.
+
+                 Write protected unless 0x0A written to 0x0000. Protected if any other value is written to that address.
 
 
 
