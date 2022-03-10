@@ -1,0 +1,15 @@
+.engine mycomputer
+
+
+           .ORG    $0000 
+RSTVEC:     JP      start
+
+            .ORG    $0100 
+
+start:      LD      sp,$3fff 
+            CALL    InitialiseSerial 
+            jp      main
+
+
+.include LLL-FP-Example.z80
+.include Char-6850.z80

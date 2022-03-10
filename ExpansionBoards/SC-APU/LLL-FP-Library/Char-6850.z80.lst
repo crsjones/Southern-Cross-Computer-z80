@@ -1,0 +1,155 @@
+0000                             ; *************************************************************************
+0000                             ; 
+0000                             ;       MINT Minimal Interpreter for the Z80
+0000                             ; 
+0000                             ;       Ken Boak, John Hardy and Craig Jones.
+0000                             ; 
+0000                             ;       GNU GENERAL PUBLIC LICENSE                   Version 3, 29 June 2007
+0000                             ; 
+0000                             ;       see the LICENSE file in this repo for more information
+0000                             ; 
+0000                             ; *****************************************************************************
+0000                             ; 
+0000                             ; 6850 ACIA registers
+0000                             ;----------------------
+0000                CONTROL:   EQU   $80   ;(write)
+0000                STATUS:   EQU   $80   ;(read)
+0000                TDR:      EQU   $81   ;(write)
+0000                RDR:      EQU   $81   ;(read)
+0000                             ; 
+0000                             ; control register bits
+0000                             ;----------------------
+0000                             ; 
+0000                             ;clock divisor
+0000                             ; 
+0000                MRESET:   EQU   $03   ;master reset the ACIA
+0000                CLKDIV_0:   EQU   $00   ;CLOCK/1
+0000                CLKDIV_16:   EQU   $01   ;CLOCK/16
+0000                CLKDIV_64:   EQU   $02   ;CLOCK/64
+0000                             ; 
+0000                             ; format select
+0000                             ; 
+0000                F7E2:     EQU   $00   ;7 data bits, EVEN parity, 2 stop bits (1+7+1+2= 11 bits)
+0000                F7O2:     EQU   $04   ;7 data bits, ODD parity, 2 stop bits (1+7+1+2= 11 bits)
+0000                F7E1:     EQU   $08   ;7 data bits, EVEN parity, 1 stop bit (1+7+1+1= 10 bits)
+0000                F7O1:     EQU   $0C   ;7 data bits, ODD parity, 1 stop bit (1+7+1+1= 10 bits)
+0000                F8N2:     EQU   $10   ;8 data bits, NO parity, 2 stop bits (1+8+0+2= 11 bits)
+0000                F8N1:     EQU   $14   ;8 data bits, NO parity, 1 stop bit (1+8+0+1= 10 bits)
+0000                F8E1:     EQU   $18   ;8 data bits, EVEN parity, 1 stop bit (1+8+1+1= 11 bits)
+0000                F8O1:     EQU   $1C   ;8 data bits, ODD parity,1 stop bit (1+8+1+1= 11 bits)
+0000                             ; 
+0000                             ; transmitter control
+0000                             ; 
+0000                RTSLID:   EQU   $00   ;RTS LOW, transmit interrupt disabled
+0000                RTSLIE:   EQU   $20   ;RTS LOW, transmit interrupt enabled
+0000                RTSHID:   EQU   $40   ;RTS HIGH, transmit interrupt disabled
+0000                RTSLIDB:   EQU   $60   ;RTS LOW, transmit interrupt disabled and "break" transmitted
+0000                             ; 
+0000                             ; receiver interrupt
+0000                             ; 
+0000                RIE:      EQU   $80   ;receiver interrupt enabled
+0000                             ; 
+0000                             ; status register bits
+0000                             ;---------------------
+0000                RDRF:     EQU   0   ;receive data register full
+0000                TDRE:     EQU   1   ;transmit data register empty
+0000                DCD:      EQU   2   ;data carrier detect
+0000                CTS:      EQU   3   ;clear to send
+0000                FE:       EQU   4   ;framing error
+0000                OVRN:     EQU   5   ;overrun
+0000                PE:       EQU   6   ;parity error
+0000                IRQ:      EQU   7   ;interrupt request
+0000                          .ORG   $0000   
+0000   C3 00 01     RSTVEC:   JP   main   
+0100                          .ORG   $0100   
+0100   31 FF 3F     MAIN:     LD   sp,$3fff   
+0103   CD 0E 01               CALL   InitialiseSerial   
+0106   3E 41        MAIN1:    LD   a,0x41   
+0108   CD 17 01               CALL   TxChar   
+010B   C3 06 01               JP   main1   
+010E                             ; 
+010E                             ; initialise ACIA
+010E                             ;----------------
+010E                INITIALISESERIAL:      
+010E   3E 03                  LD   a,MRESET   
+0110   D3 80                  OUT   (CONTROL),a   ;reset the ACIA
+0112                             ;initialise ACIA  8 bit word, No parity 2 stop divide by 64 for 115200 baud
+0112   3E 12                  LD   a,RTSLID+F8N2+CLKDIV_64   
+0114   D3 80                  OUT   (CONTROL),a   
+0116   C9                     RET      
+0117                             ; 
+0117                             ; transmit a character in a
+0117                             ;--------------------------
+0117                TXCHAR:      
+0117   F5                     PUSH   af   ;save the character for later
+0118                TXCHAR1:      
+0118   DB 80                  IN   a,(STATUS)   ;get the ACIA status
+011A   CB 4F                  BIT   1,a   ;bit   TDRE,a is the TDRE bit high?
+011C   28 FA                  JR   z,TxChar1   ;no, the TDR is not empty
+011E   F1                     POP   af   ;yes, get the character back
+011F   D3 81                  OUT   (TDR),a   ;and put it in the TDR
+0121   C9                     RET      
+0122                             ; 
+0122                             ; receive  a character in a
+0122                             ;---------------------------------
+0122                RXCHAR:      
+0122   DB 80                  IN   a,(STATUS)   ;get the ACIA status
+0124   CB 47                  BIT   0,a   ;bit   RDRF,a is the RDRF bit high?
+0126   28 FA                  JR   z,RxChar   ;no, the RDR is empty
+0128   DB 81                  IN   a,(RDR)   ;yes, read the received char
+012A   C9                     RET      
+012B                          .END      
+
+
+CONTROL:            0080 DEFINED AT LINE 16
+                    > USED AT LINE 84
+                    > USED AT LINE 87
+STATUS:             0080 DEFINED AT LINE 17
+                    > USED AT LINE 95
+                    > USED AT LINE 105
+TDR:                0081 DEFINED AT LINE 18
+                    > USED AT LINE 99
+RDR:                0081 DEFINED AT LINE 19
+                    > USED AT LINE 108
+MRESET:             0003 DEFINED AT LINE 26
+                    > USED AT LINE 83
+CLKDIV_0:           0000 DEFINED AT LINE 27
+CLKDIV_16:          0001 DEFINED AT LINE 28
+CLKDIV_64:          0002 DEFINED AT LINE 29
+                    > USED AT LINE 86
+F7E2:               0000 DEFINED AT LINE 33
+F7O2:               0004 DEFINED AT LINE 34
+F7E1:               0008 DEFINED AT LINE 35
+F7O1:               000C DEFINED AT LINE 36
+F8N2:               0010 DEFINED AT LINE 37
+                    > USED AT LINE 86
+F8N1:               0014 DEFINED AT LINE 38
+F8E1:               0018 DEFINED AT LINE 39
+F8O1:               001C DEFINED AT LINE 40
+RTSLID:             0000 DEFINED AT LINE 44
+                    > USED AT LINE 86
+RTSLIE:             0020 DEFINED AT LINE 45
+RTSHID:             0040 DEFINED AT LINE 46
+RTSLIDB:            0060 DEFINED AT LINE 47
+RIE:                0080 DEFINED AT LINE 51
+RDRF:               0000 DEFINED AT LINE 55
+TDRE:               0001 DEFINED AT LINE 56
+DCD:                0002 DEFINED AT LINE 57
+CTS:                0003 DEFINED AT LINE 58
+FE:                 0004 DEFINED AT LINE 59
+OVRN:               0005 DEFINED AT LINE 60
+PE:                 0006 DEFINED AT LINE 61
+IRQ:                0007 DEFINED AT LINE 62
+RSTVEC:             0000 DEFINED AT LINE 67
+MAIN:               0100 DEFINED AT LINE 72
+                    > USED AT LINE 67
+MAIN1:              0106 DEFINED AT LINE 75
+                    > USED AT LINE 77
+INITIALISESERIAL:   010E DEFINED AT LINE 82
+                    > USED AT LINE 73
+TXCHAR:             0117 DEFINED AT LINE 92
+                    > USED AT LINE 76
+TXCHAR1:            0118 DEFINED AT LINE 94
+                    > USED AT LINE 97
+RXCHAR:             0122 DEFINED AT LINE 104
+                    > USED AT LINE 107
