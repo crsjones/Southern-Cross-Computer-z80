@@ -1,0 +1,49 @@
+
+How it Works. The maze is organised as a matrix of 8 byte 'views'. Each of
+these views is displayed on the 8x8 display as a result of the cursor
+moving around the maze. As the cursor moves off one view a new view is
+loaded into the display buffer. The main maze loop handles the scanning of
+the 8 x 8 display, blinking the cursor, exit LED's, checking if the
+cursor is on top of the exit and checking if a key has been pressed. When
+a key is pressed there are routines for each key to determine what
+movement through the maze should occur. The first thing to do is to see if
+the cursor is at the edge of the display to determine if a new view should
+be loaded or not. If a new view is not required then the place where the
+cursor is to be moved to needs to be checked to see if there is a wall
+there. Obviously if a wall is in the way the cursor cannot be moved to
+that position. If a new view is required then the new view must also be
+checked to see if there is a wall in the place that the cursor will appear
+once the new view is displayed.
+
+The Left and Right keys move the cursor along a row of views which are
+held in memory one after the other.Therefore the VIEW pointer needs to
+have eight added to or subtracted from it to point to the next or previous
+view in the row. The Up and Down keys move the cursor up and down the
+columns. Because the rows are in consecutive memory locations the columns
+are separated by all the bytes in each row so the Up and Down keys must
+add to or subtract from the VIEW pointer the total number of bytes in a
+row. The size of the maze is a variable and the number of bytes in a row
+is set up in the DIM register. YREG holds the number of the row that the
+cursor is displayed on - the top row is 0 and the bottom row is 7. XREG
+shows the bit position that the cursor is on and is used to move the
+cursor left or right across the columns. Both these registers are used to
+determine where to blink the cursor in the 8x8 display buffer.
+
+DESIGN YOUR OWN. Decide how big you want your maze to be, the one our
+program has 36 views, which is 288 bytes. It took a couple of hours to
+design and code. A 16 x 16  or 256 views, is 2K bytes! Firstly draw up a
+grid of 8x8 views in the size of your choice on some graph paper, colour
+in the squares or bits that you want to be walls and convert each view
+into its eight hex values. Put a border around the outside of your maze as
+the program does not know where the edges of your maze are. The walls are
+the only way the cursor is kept in the maze. Put your maze in ram or
+modify the source code of the example maze Then it is just a simple
+matter to setup the following registers and get lost in your own maze.
+
+VIEW      The address of the first view to display.
+YREG      The Y position of the cursor in the first view.
+XREG      The X position of the cursor on the first view.
+EXVIEW    The address of the view that the exit is in.
+EXYREG    The Y position of the exit.
+EXXREG    The X position of the exit.
+DIM       The number of bits in a whole row. eg. 4x4 = 0020h, 6x6 = 0030h

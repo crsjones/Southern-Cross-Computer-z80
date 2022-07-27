@@ -1,0 +1,265 @@
+0001   0000             
+0002   0000             speed:         .equ 12       ;time delay before shift
+0003   0000             
+0004   2000                            .org  2000h
+0005   2000             
+0006   2000 11 AA 24                   ld de,dis_buff      ;DE is pointer into dis_buff
+0007   2003 21 00 24                   ld hl,ASCII_tab     ;HL points to character to display
+0008   2006 22 A8 24                   ld (code_buff),hl   ;save pointer
+0009   2009 2A A8 24    loop:          ld hl,(code_buff)   ;looping here: get pointer
+0010   200C 7E                         ld a,(hl)           ;put character code in A
+0011   200D 23                         inc hl              ;up pointer to next char
+0012   200E 22 A8 24                   ld (code_buff),hl   ;save pointer
+0013   2011 FE FF                      cp 0ffh             ;done all characters?
+0014   2013 28 1B                      jr z,scaninit       ;jump if ffh as all converted
+0015   2015 6F                         ld l,a              ;put char code into HL
+0016   2016 26 00                      ld h,0              ;zero H
+0017   2018 E5                         push hl             ;put char code into BC also
+0018   2019 C1                         pop bc              ;by using the stack
+0019   201A B7                         or a                ;this clears carry flag
+0020   201B ED 6A                      adc hl,hl           ;double char code
+0021   201D ED 6A                      adc hl,hl           ;double char code again (x4)
+0022   201F ED 4A                      adc hl,bc           ;add original char code (x5)
+0023   2021 01 60 20                   ld bc,char_tab-(20h*5)  ;load BC with base of character
+0024   2024 ED 4A                      adc hl,bc           ;table; add offset
+0025   2026 01 05 00                   ld bc,5             ;now setup for transfer of 5 bytes
+0026   2029 ED B0                      ldir                ;from (HL) to (DE); do transfer
+0027   202B AF                         xor a               ;clear A
+0028   202C 12                         ld (de),a           ;add space to end of char
+0029   202D 13                         inc de              ;next display buffer location
+0030   202E 18 D9                      jr loop             ;do rest of characters
+0031   2030             
+0032   2030 3E FF       scaninit:      ld a,0ffh           ;mark end of display buffer
+0033   2032 12                         ld (de),a           ;pointed to by DE
+0034   2033              
+0035   2033 21 AA 24    scan_in2:      ld hl,dis_buff      ;point HL to start of dis_buff
+0036   2036 22 A0 24                   ld (ptr1),hl        ;save start
+0037   2039 B7                         or a                ;clear carry
+0038   203A 11 08 00                   ld de,08            ;now get start for second 8x8
+0039   203D ED 5A                      adc hl,de           ;8 bytes from first
+0040   203F 22 A2 24                   ld (ptr2),hl        ;save second start
+0041   2042 06 0C       scan_dly:      ld b,speed          ;static scan time
+0042   2044 C5          scan_lp1:      push bc             ;save scan time
+0043   2045 2A A0 24                   ld hl,(ptr1)        ;move pointer to
+0044   2048 22 A4 24                   ld (aptr1),hl       ;working pointer buffer
+0045   204B 2A A2 24                   ld hl,(ptr2)        ;second pointer
+0046   204E 22 A6 24                   ld (aptr2),hl       ;also
+0047   2051 06 80                      ld b,80h            ;load B with rotating scan bit
+0048   2053 2A A4 24    scan_lp2:      ld hl,(aptr1)       ;get first pointer
+0049   2056 7E                         ld a,(hl)           ;put display code into A
+0050   2057 23                         inc hl              ;up pointer
+0051   2058 FE FF                      cp 0ffh             ;is this end code?
+0052   205A 20 05                      jr nz,notend1       ;jump away if not else reset
+0053   205C 21 AA 24                   ld hl,dis_buff      ;working pointer to start of buff
+0054   205F 7E                         ld a,(hl)           ;get display code
+0055   2060 23                         inc hl              ;up pointer
+0056   2061 22 A4 24    notend1:       ld (aptr1),hl       ;save new working pointer
+0057   2064 D3 82                      out (82h),a         ;output first code to segments
+0058   2066 2A A6 24                   ld hl,(aptr2)       ;now do all again for second code
+0059   2069 7E                         ld a,(hl)           ;put display code into A
+0060   206A 23                         inc hl              ;next
+0061   206B FE FF                      cp 0ffh             ;end?
+0062   206D 20 05                      jr nz,notend2       ;jump no
+0063   206F 21 AA 24                   ld hl,dis_buff      ;else
+0064   2072 7E                         ld a,(hl)           ;get first display code
+0065   2073 23                         inc hl              ;up pointer to second
+0066   2074 22 A6 24    notend2:       ld (aptr2),hl       ;save new pointer
+0067   2077 D3 83                      out (83h),a         ;output second display byte
+0068   2079 78                         ld a,b              ;get scan bit in A
+0069   207A D3 80                      out (80h),a         ;output it to first commons
+0070   207C D3 81                      out (81h),a         ;output it to second commons
+0071   207E 06 00                      ld b,0              ;load B with display on time
+0072   2080 10 FE                      djnz $              ;loop here until delay finished
+0073   2082 47                         ld b,a              ;return scan bit into B
+0074   2083 AF                         xor a               ;trick to zero A
+0075   2084 D3 80                      out (80h),a         ;clear commons to prevent ghosts
+0076   2086 D3 81                      out (81h),a         ;second commons also
+0077   2088 CB 08                      rrc b               ;shift scan bit once to the right
+0078   208A D2 53 20                   jp nc,scan_lp2      ;jump if not fallen into carry flag
+0079   208D C1                         pop bc              ;else all 8 scanned
+0080   208E 10 B4                      djnz scan_lp1       ;rescan until scan timer = 0
+0081   2090 2A A0 24                   ld hl,(ptr1)        ;now up first pointer to
+0082   2093 23                         inc hl              ;shift display along
+0083   2094 7E                         ld a,(hl)           ;test for end
+0084   2095 FE FF                      cp 0ffh             ;of display buffer
+0085   2097 20 03                      jr nz,ptr1_ok       ;jump if not end
+0086   2099 21 AA 24                   ld hl,dis_buff      ;else point to start
+0087   209C 22 A0 24    ptr1_ok:       ld (ptr1),hl        ;save new pointer
+0088   209F 2A A2 24                   ld hl,(ptr2)        ;now up second pointer to
+0089   20A2 23                         inc hl              ;shift display along
+0090   20A3 7E                         ld a,(hl)           ;test for end
+0091   20A4 FE FF                      cp 0ffh             ;of display buffer
+0092   20A6 20 03                      jr nz,ptr2_ok       ;jump if not end
+0093   20A8 21 AA 24                   ld hl,dis_buff      ;else point to start
+0094   20AB 22 A2 24    ptr2_ok:       ld (ptr2),hl        ;save new pointer
+0095   20AE C3 42 20                   jp scan_dly         ;jump if not else return
+0096   20B1             
+0097   2100                            .org 2100h
+0098   2100                                                     ;char  ;ASCII code
+0099   2100 00 00 00 00 char_tab:      .db 0,0,0,0,0              ;space  20h
+0099   2104 00 
+0100   2105 00 00 7B 00                .db 0,0,7bh,0,0            ;!      21h
+0100   2109 00 
+0101   210A 00 70 00 70                .db 0,70h,0,70h,0          ;"      22h
+0101   210E 00 
+0102   210F 14 7F 14 7F                .db 14h,7fh,14h,7fh,14h    ;#      23h
+0102   2113 14 
+0103   2114 12 4A 7F 4A                .db 12h,4ah,7fh,4ah,24h    ;$      24h
+0103   2118 24 
+0104   2119 62 64 08 13                .db 62h,64h,8,13h,23h      ;%      25h
+0104   211D 23 
+0105   211E 36 49 55 22                .db 36h,49h,55h,22h,5      ;&      26h
+0105   2122 05 
+0106   2123 00 50 60 00                .db 0,50h,60h,0,0          ;'      27h
+0106   2127 00 
+0107   2128 00 1C 22 41                .db 0,1ch,22h,41h,0        ;(      28h
+0107   212C 00 
+0108   212D 00 41 22 1C                .db 0,41h,22h,1ch,0        ;)      29h
+0108   2131 00 
+0109   2132 14 08 3E 08                .db 14h,8,3eh,8,14h        ;*      2ah
+0109   2136 14 
+0110   2137 08 08 3E 08                .db 8,8,3eh,8,8            ;+      2bh
+0110   213B 08 
+0111   213C 00 05 06 00                .db 0,5,6,0,0              ;,      2ch
+0111   2140 00 
+0112   2141 08 08 08 08                .db 8,8,8,8,8              ;-      2dh
+0112   2145 08 
+0113   2146 00 03 03 00                .db 0,3,3,0,0              ;.      2eh
+0113   214A 00 
+0114   214B 02 04 08 10                .db 2,4,8,10h,20h          ;/      2fh
+0114   214F 20 
+0115   2150 3E 45 49 51                .db 3eh,45h,49h,51h,3eh    ;0      30h
+0115   2154 3E 
+0116   2155 00 21 7F 01                .db 0,21h,7fh,1,0          ;1      31h
+0116   2159 00 
+0117   215A 21 43 45 49                .db 21h,43h,45h,49h,31h    ;2      32h
+0117   215E 31 
+0118   215F 42 41 51 69                .db 42h,41h,51h,69h,46h    ;3      33h
+0118   2163 46 
+0119   2164 0C 14 24 7F                .db 0ch,14h,24h,7fh,4      ;4      34h
+0119   2168 04 
+0120   2169 72 51 51 51                .db 72h,51h,51h,51h,4eh    ;5      35h
+0120   216D 4E 
+0121   216E 1E 29 49 49                .db 1eh,29h,49h,49h,6      ;6      36h
+0121   2172 06 
+0122   2173 40 40 4F 50                .db 40h,40h,4fh,50h,60h    ;7      37h
+0122   2177 60 
+0123   2178 36 49 49 49                .db 36h,49h,49h,49h,36h    ;8      38h
+0123   217C 36 
+0124   217D 30 49 49 4A                .db 30h,49h,49h,4ah,3ch    ;9      39h
+0124   2181 3C 
+0125   2182 00 36 36 00                .db 0,36h,36h,0,0          ;:      3ah
+0125   2186 00 
+0126   2187 00 35 36 00                .db 0,35h,36h,0,0          ;;      3bh
+0126   218B 00 
+0127   218C 08 14 22 41                .db 8,14h,22h,41h,0        ;<      3ch
+0127   2190 00 
+0128   2191 14 14 14 14                .db 14h,14h,14h,14h,14h    ;=      3dh
+0128   2195 14 
+0129   2196 00 41 22 14                .db 0,41h,22h,14h,8        ;>      3eh
+0129   219A 08 
+0130   219B 20 40 45 48                .db 20h,40h,45h,48h,30h    ;?      3fh
+0130   219F 30 
+0131   21A0 3E 41 5D 45                .db 3eh,41h,5dh,45h,3ah    ;@      40h
+0131   21A4 3A 
+0132   21A5 3F 44 44 44                .db 3fh,44h,44h,44h,3fh    ;A      41h
+0132   21A9 3F 
+0133   21AA 7F 49 49 49                .db 7fh,49h,49h,49h,36h    ;B      42h
+0133   21AE 36 
+0134   21AF 3E 41 41 41                .db 3eh,41h,41h,41h,22h    ;C      43h
+0134   21B3 22 
+0135   21B4 7F 41 41 41                .db 7fh,41h,41h,41h,3eh    ;D      44h
+0135   21B8 3E 
+0136   21B9 7F 49 49 49                .db 7fh,49h,49h,49h,41h    ;E      45h
+0136   21BD 41 
+0137   21BE 7F 48 48 48                .db 7fh,48h,48h,48h,40h    ;E      46h
+0137   21C2 40 
+0138   21C3 3E 41 49 49                .db 3eh,41h,49h,49h,2eh    ;G      47h
+0138   21C7 2E 
+0139   21C8 7F 08 08 08                .db 7fh,8,8,8,7fh          ;H      48h
+0139   21CC 7F 
+0140   21CD 00 41 7F 41                .db 0,41h,7fh,41h,0        ;I      49h
+0140   21D1 00 
+0141   21D2 02 01 41 7E                .db 2,1,41h,7eh,40h        ;J      4ah
+0141   21D6 40 
+0142   21D7 7F 08 14 22                .db 7fh,8,14h,22h,41h      ;k      4bh
+0142   21DB 41 
+0143   21DC 7F 01 01 01                .db 7fh,01,01,01,01h       ;L      4ch
+0143   21E0 01 
+0144   21E1 7F 20 18 20                .db 7fh,20h,18h,20h,7fh    ;M      4dh
+0144   21E5 7F 
+0145   21E6 7F 10 08 04                .db 7fh,10h,8,4,7fh        ;N      4eh
+0145   21EA 7F 
+0146   21EB 3E 41 41 41                .db 3eh,41h,41h,41h,3eh    ;O      4fh
+0146   21EF 3E 
+0147   21F0 7F 48 48 48                .db 7fh,48h,48h,48h,30h    ;P      50h
+0147   21F4 30 
+0148   21F5 3E 41 45 42                .db 3eh,41h,45h,42h,3dh    ;Q      51h
+0148   21F9 3D 
+0149   21FA 7F 48 4C 4A                .db 7fh,48h,4ch,4ah,31h    ;R      52h
+0149   21FE 31 
+0150   21FF 31 49 49 49                .db 31h,49h,49h,49h,46h    ;S      53h
+0150   2203 46 
+0151   2204 40 40 7F 40                .db 40h,40h,7fh,40h,40h    ;T      54h
+0151   2208 40 
+0152   2209 7E 01 01 01                .db 7eh,1,1,1,7eh          ;U      55h
+0152   220D 7E 
+0153   220E 7C 02 01 02                .db 7ch,2,1,2,7ch          ;V      56h
+0153   2212 7C 
+0154   2213 7E 01 0E 01                .db 7eh,1,0eh,1,7eh        ;W      57h
+0154   2217 7E 
+0155   2218 63 14 08 14                .db 63h,14h,8,14h,63h      ;X      58h
+0155   221C 63 
+0156   221D 70 08 07 08                .db 70h,08,7,8,70h         ;Y      59h
+0156   2221 70 
+0157   2222 43 45 49 51                .db 43h,45h,49h,51h,61h    ;Z      5ah
+0157   2226 61 
+0158   2227 00 7F 41 41                .db 0,7fh,41h,41h,0        ;[      5bh
+0158   222B 00 
+0159   222C 10 08 04 02                .db 10h,8,4,2,1            ;\      5ch
+0159   2230 01 
+0160   2231 00 41 41 7F                .db 0,41h,41h,7fh,0        ;]      5dh
+0160   2235 00 
+0161   2236 10 20 40 20                .db 10h,20h,40h,20h,10h    ;^      5eh
+0161   223A 10 
+0162   223B 01 01 01 01                .db 1,1,1,1,1              ;_      5fh
+0162   223F 01 
+0163   2240 00 70 68 00                .db 0,70h,68h,0,0          ;`      60h
+0163   2244 00 
+0164   2245             
+0165   2300                            .org 2300h
+0166   2300 02 15 15 15                .db 2,15h,15h,15h,0fh      ;a      61h
+0166   2304 0F 
+0167   2305             
+0168   2400                            .org 2400h
+0169   2400             
+0170   2400 53 4F 55 54 ASCII_tab       .db "SOUTHERN CROSS SINGLE BOARD COMPUTER  "
+0170   2404 48 45 52 4E 
+0170   2408 20 43 52 4F 
+0170   240C 53 53 20 53 
+0170   2410 49 4E 47 4C 
+0170   2414 45 20 42 4F 
+0170   2418 41 52 44 20 
+0170   241C 43 4F 4D 50 
+0170   2420 55 54 45 52 
+0170   2424 20 20 
+0171   2426 20 57 52 49                 .db " WRITE YOUR OWN MESSAGE HERE.",0ffh
+0171   242A 54 45 20 59 
+0171   242E 4F 55 52 20 
+0171   2432 4F 57 4E 20 
+0171   2436 4D 45 53 53 
+0171   243A 41 47 45 20 
+0171   243E 48 45 52 45 
+0171   2442 2E FF 
+0172   2444             
+0173   24A0                            .org 24A0h
+0174   24A0             
+0175   24A0             ptr1           .equ $
+0176   24A0             ptr2           .equ ptr1+2
+0177   24A0             aptr1          .equ ptr2+2
+0178   24A0             aptr2          .equ aptr1+2
+0179   24A0             code_buff      .equ aptr2+2
+0180   24A0             dis_buff       .equ code_buff+2
+0181   24A0             
+0182   24A0                            .end
+tasm: Number of errors = 0

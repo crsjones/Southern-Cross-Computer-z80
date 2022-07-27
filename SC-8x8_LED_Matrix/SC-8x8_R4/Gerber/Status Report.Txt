@@ -1,0 +1,12 @@
+Output: NC Drill Files
+Type  : NC Drill
+From  : Project [8X8DisplayR4.PrjPcb]
+   Generated File[SC-8X8-R4.TXT]
+   Generated File[SC-8X8-R4.LDP]
+   Generated File[SC-8X8-R4.DRR]
+
+
+Files Generated   : 3
+Documents Printed : 0
+
+Finished Output Generation At 5:36:35 PM On 13/07/2022

@@ -1,14 +1,7 @@
 
+#Southern Cross Version 3.0 PCB
 
-SCMonitorV15 is the current monitor code. It includes the SCBUG serial monitor which uses the bit-bang
-serial to provide several basic commands including downloading Intel Hex files.
-
-
-Southern Cross Version 3.0 PCB
-
-This is the latest revision of the Southern Cross Computer Z80 PCB.
-
-Gerber files have been provided, I have had PCB's fabricated from these files so I know they are good.
+This is the latest revision of the Southern Cross SBC PCB.
 
 Changes to Version 3.0 
 

@@ -1,0 +1,560 @@
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MAZE.Z8T                                            Page  1
+
+
+                ;---------------------------
+                ; 8 X 8 DISPLAY MAZE PROGRAM
+                ;---------------------------
+                ;
+                ; BY CRAIG R.S.JONES  01/93  VERSION 1.0
+                ; DIY ELECTRONICS GPO BOX 904 HONG KONG
+                ;
+                ; THE MAZE CONSISTS OF A MATRIX OF 8 BYTE 'VIEWS' WHICH
+                ; ARE DISPLAYED ON THE 8X8 DISPLAY.
+                ; AS THE PLAYER MOVES HIS 'CURSOR' OFF THE CURRENT VIEW A
+                ; NEW VIEW IS DISPLAYED DEPENDING ON THE DIRECTION OF TRAVEL.
+                ;
+                ; USE THE '2' KEY FOR UP, 'A' IS DOWN, '5' LEFT AND '7' RIGHT.
+                ; THE FUNCTION KEY WILL RETURN YOU TO THE MONITOR.
+                ;
+                ; THE EXIT IS SHOWN AS A LED WHICH FLASHES HALF AS FAST AS THE
+                ; PLAYER'S CURSOR.
+                ;
+                ; I/O PORT
+                ;
+ 0086           KEYBUF  EQU     86H     ;KEYBOARD BUFFER
+                ;
+                ; SYSTEM CALLS
+                ;
+ 0000           MAIN    EQU     00H     ;RESTART MONITOR
+ 000C           KEYREL  EQU     0CH     ;WAIT FOR KEY RELEASE
+ 000D           MENU    EQU     0DH     ;SELECT ENTRY FROM MENU
+ 0015           BEEP    EQU     15H     ;KEY ENTRY BEEP
+ 0016           SKATE   EQU     16H     ;SCAN 8X8 DISPLAY
+                ;
+                ; MAZE PROGRAM  VARIABLES
+                ;
+ 3F00           BUFFER  EQU     3F00H           ;8X8 DISPLAY BUFFER
+ 3F08           VIEW    EQU     3F08H           ;MAZE VIEW ADDRESS
+ 3F0A           XREG    EQU     3F0AH           ;CURSOR X AXIS
+ 3F0B           YREG    EQU     3F0BH           ;CURSOR Y AXIS
+ 3F0C           DIM     EQU     3F0CH           ;MAZE DIMENSION
+ 3F0E           EXVIEW  EQU     3F0EH           ;EXIT VIEW ADDRESS
+ 3F10           EXYREG  EQU     3F10H           ;EXIT Y
+ 3F11           EXXREG  EQU     3F11H           ;EXIT X
+                ;---------------------
+                ; 8 X 8 DISPLAY - MAZE
+                ;---------------------
+ 2000                   ORG     2000H
+                ;
+                ;SET UP THE ENTRY VIEW
+                ;
+ 2000 213423    SETUP   LD      HL,ENTRY
+ 2003 22083F            LD      (VIEW),HL      ;ENTRY VIEW
+ 2006 3E06              LD      A,06H
+ 2008 320B3F            LD      (YREG),A       ;Y ENTRY POSITION
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MAZE.Z8T                                            Page  2
+
+
+ 200B 3E10              LD      A,10H
+ 200D 320A3F            LD      (XREG),A       ;X ENTRY POSITION
+                ;
+                ; SET UP THE EXIT VIEW
+                ;
+ 2010 21B422            LD      HL,EXIT
+ 2013 220E3F            LD      (EXVIEW),HL     ;EXIT VIEW
+ 2016 3E03              LD      A,03H
+ 2018 32103F            LD      (EXYREG),A      ;Y EXIT POSITION
+ 201B 3E02              LD      A,02H
+ 201D 32113F            LD      (EXXREG),A      ;X EXIT POSITION
+                ;
+                ; DIMENSION MAZE SIZE
+                ;
+ 2020 113000            LD      DE,0030H
+ 2023 ED530C3F          LD      (DIM),DE        ;MAZE SIZE
+                ;---------------
+                ; MAIN MAZE LOOP
+                ;---------------
+ 2027 CD2022    MAZE    CALL    MOVBUF
+ 202A CDE721    MAZE1   CALL    CURSOR          ;TOGGLE THE CURSOR
+ 202D CDF421            CALL    TOGEXT          ;CHECK EXIT
+ 2030 06E0              LD      B,0E0H
+ 2032 21003F    MAZE2   LD      HL,BUFFER       ;POINT TO 8X8 BUFFER
+ 2035 0E16              LD      C,SKATE
+ 2037 F7                RST     30H             ;SCAN 8X8 DISPLAY
+ 2038 10F8              DJNZ    MAZE2           ;FOR A WHILE
+ 203A CDE721            CALL    CURSOR          ;TOGGLE THE CURSOR
+ 203D 06E0              LD      B,0E0H
+ 203F 21003F    MAZE3   LD      HL,BUFFER       ;POINT TO 8X8 BUFFER
+ 2042 0E16              LD      C,SKATE
+ 2044 F7                RST     30H             ;SCAN 8X8 DISPLAY
+ 2045 DB86              IN      A,(KEYBUF)
+ 2047 CB6F              BIT     5,A
+ 2049 2005              JR      NZ,MAZE4        ;DA HIGH, PROCESS KEY
+ 204B 10F2              DJNZ    MAZE3           ;FOR A WHILE
+ 204D C32A20            JP      MAZE1           ;NO KEY SO TOGGLE CURSOR
+                ;
+                ; GOT A KEY
+                ;
+ 2050 06FF      MAZE4   LD      B,0FFH          ;DO A KEY ENTRY DELAY
+ 2052 10FE      MAZE5   DJNZ    MAZE5
+ 2054 E61F              AND     1FH             ;STRIP UNUSED BITS
+ 2056 CD0E22            CALL    CURSOFF         ;TURN CURSOR OFF
+ 2059 21BA20            LD      HL,MAZKEY
+ 205C 0E0D              LD      C,MENU          ;DO KEY PROCESSING
+ 205E F7                RST     30H
+                ;
+                ; HAVE WE FOUND THE EXIT?
+                ;
+ 205F 2A083F            LD      HL,(VIEW)
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MAZE.Z8T                                            Page  3
+
+
+ 2062 3A0E3F            LD      A,(EXVIEW)
+ 2065 BD                CP      L
+ 2066 20C2              JR      NZ,MAZE1        ;NOT RIGHT VIEW
+ 2068 3A0F3F            LD      A,(EXVIEW+1)
+ 206B BC                CP      H
+ 206C 20BC              JR      NZ,MAZE1        ;NOT RIGHT VIEW
+ 206E 3A0B3F            LD      A,(YREG)
+ 2071 47                LD      B,A
+ 2072 3A103F            LD      A,(EXYREG)
+ 2075 B8                CP      B
+ 2076 20B2              JR      NZ,MAZE1        ;NOT RIGHT Y REG
+ 2078 3A0A3F            LD      A,(XREG)
+ 207B 47                LD      B,A
+ 207C 3A113F            LD      A,(EXXREG)
+ 207F B8                CP      B
+ 2080 20A8              JR      NZ,MAZE1        ;NOT RIGHT X REG
+                ;
+                ; FOUND THE EXIT!!
+                ;
+ 2082 0E15              LD      C,BEEP
+ 2084 F7                RST     30H
+ 2085 0E0C              LD      C,KEYREL
+ 2087 F7                RST     30H
+ 2088 21CA20    MAZE6   LD      HL,EXIT1
+ 208B 22083F            LD      (VIEW),HL
+ 208E CD2022            CALL    MOVBUF          ;PUT INTO BUFFER
+ 2091 CDAF20            CALL    KEYATE          ;DISPLAY EXIT1 A WHILE
+ 2094 21D220            LD      HL,EXIT2
+ 2097 22083F            LD      (VIEW),HL
+ 209A CD2022            CALL    MOVBUF          ;PUT INTO BUFFER
+ 209D CDAF20            CALL    KEYATE          ;DISPLAY EXIT2 A WHILE
+ 20A0 DB86              IN      A,(KEYBUF)
+ 20A2 CB6F              BIT     5,A
+ 20A4 28E2              JR      Z,MAZE6         ;NO KEY KEEP GOING
+ 20A6 0E15              LD      C,BEEP
+ 20A8 F7                RST     30H
+ 20A9 0E0C              LD      C,KEYREL
+ 20AB F7                RST     30H
+ 20AC 0E00              LD      C,MAIN          ;EXIT TO MONITOR
+ 20AE F7                RST     30H
+                ;
+                ; SCAN 8X8 AND WAIT FOR KEY
+                ;
+ 20AF 06FF      KEYATE  LD      B,0FFH
+ 20B1 21003F    KEYAT1  LD      HL,BUFFER       ;POINT TO 8X8 BUFFER
+ 20B4 0E16              LD      C,SKATE
+ 20B6 F7                RST     30H             ;SCAN 8X8 DISPLAY
+ 20B7 10F8              DJNZ    KEYAT1          ;FOR A WHILE
+ 20B9 C9                RET
+                ;
+                ; MAZE KEY TABLE
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MAZE.Z8T                                            Page  4
+
+
+                ;
+ 20BA 05        MAZKEY  DEFB    05
+ 20BB 020A0507          DEFB    02H,0AH,05H,07H
+ 20BF 10                DEFB    10H
+ 20C0 6621AA21          DEFW    UPKEY,DWNKEY,LFTKEY,RHTKEY
+ 20C8 DA20              DEFW    ENDKEY
+                ;
+                ; EXIT DISPLAY PATTERNS
+                ;
+ 20CA FF81BDA5  EXIT1   DEFB    0FFH,081H,0BDH,0A5H,0A5H,0BDH,081H,0FFH
+ 20D2 007E425A  EXIT2   DEFB    000H,07EH,042H,05AH,05AH,042H,07EH,000H
+                ;----------
+                ; QUIT MAZE
+                ;----------
+ 20DA 0E0C      ENDKEY  LD      C,KEYREL
+ 20DC F7                RST     30H
+ 20DD 0E00              LD      C,MAIN
+ 20DF F7                RST     30H
+                ;-----------------
+                ; MOVE CURSOR LEFT
+                ;-----------------
+ 20E0 3A0A3F    LFTKEY  LD      A,(XREG)        ;ARE WE AT THE LEFT EDGE
+ 20E3 CB17              RL      A               ;OF THE DISPLAY?
+ 20E5 3817              JR      C,LFTKY1        ;YES, SO GET NEXT VIEW
+                ;
+                ; IS THERE A WALL IN THE WAY?
+                ;
+ 20E7 21003F            LD      HL,BUFFER
+ 20EA 3A0B3F            LD      A,(YREG)        ;HL POINTS TO THE BYTE
+ 20ED 6F                LD      L,A             ;THE CURSOR IS ON IN
+ 20EE 3A0A3F            LD      A,(XREG)        ;THE 8X8 BUFFER
+ 20F1 CB17              RL      A               ;IF THERE IS A MAZE
+ 20F3 A6                AND     (HL)            ;WALL IN THE WAY
+ 20F4 C0                RET     NZ              ;THEN RETURN
+ 20F5 3A0A3F            LD      A,(XREG)
+ 20F8 CB17              RL      A               ;NO WALL IN THE WAY
+ 20FA 320A3F            LD      (XREG),A        ;SO MOVE CURSOR TO LEFT
+ 20FD C9                RET
+                ;
+                ; CAN WE MOVE INTO THE NEXT VIEW?
+                ;
+ 20FE 2A083F    LFTKY1  LD      HL,(VIEW)       ;CHECK THE NEXT
+ 2101 110800            LD      DE,0008H        ;VIEW TO ENSURE THAT
+ 2104 A7                AND     A               ;THERE IS NOT
+ 2105 ED52              SBC     HL,DE           ;A WALL IN THE
+ 2107 3A0B3F            LD      A,(YREG)        ;POSITION WHERE THE
+ 210A 5F                LD      E,A             ;CURSOR SHOULD APPEAR
+ 210B 19                ADD     HL,DE
+ 210C 3E01              LD      A,01H           ;STAY IN THE CURRENT
+ 210E A6                AND     (HL)            ;VIEW IF A WALL
+ 210F C0                RET     NZ              ;IS IN THE WAY
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MAZE.Z8T                                            Page  5
+
+
+                ;
+                ; MOVE NEXT VIEW INTO BUFFER
+                ;
+ 2110 2A083F            LD      HL,(VIEW)       ;GET THE VIEW
+ 2113 110800            LD      DE,0008H        ;TO THE LEFT
+ 2116 A7                AND     A               ;OF THE CURRENT ONE
+ 2117 ED52              SBC     HL,DE           ;AND MOVE IT
+ 2119 22083F            LD      (VIEW),HL       ;INTO THE 8X8
+ 211C 3E01              LD      A,01H           ;DISPLAY BUFFER
+ 211E 320A3F            LD      (XREG),A        ;PUT THE CURSOR ON THE
+ 2121 CD2022            CALL    MOVBUF          ;RIGHT OF THE DISPLAY
+ 2124 C9                RET
+                ;------------------
+                ; MOVE CURSOR RIGHT
+                ;------------------
+ 2125 3A0A3F    RHTKEY  LD      A,(XREG)        ;ARE WE AT THE RIGHT EDGE
+ 2128 CB1F              RR      A               ;OF THE DISPLAY?
+ 212A 3817              JR      C,RHTKY1        ;YES, SO GET NEXT VIEW
+                ;
+                ; IS THERE A WALL IN THE WAY?
+                ;
+ 212C 21003F            LD      HL,BUFFER
+ 212F 3A0B3F            LD      A,(YREG)
+ 2132 6F                LD      L,A
+ 2133 3A0A3F            LD      A,(XREG)
+ 2136 CB1F              RR      A
+ 2138 A6                AND     (HL)
+ 2139 C0                RET     NZ              ;WALL IN THE WAY
+ 213A 3A0A3F            LD      A,(XREG)
+ 213D CB1F              RR      A               ;MOVE CURSOR RIGHT
+ 213F 320A3F            LD      (XREG),A
+ 2142 C9                RET
+                ;
+                ; CAN WE MOVE INTO THE NEXT VIEW?
+                ;
+ 2143 2A083F    RHTKY1  LD      HL,(VIEW)
+ 2146 110800            LD      DE,0008H
+ 2149 19                ADD     HL,DE
+ 214A 3A0B3F            LD      A,(YREG)
+ 214D 5F                LD      E,A
+ 214E 19                ADD     HL,DE
+ 214F 3E80              LD      A,80H
+ 2151 A6                AND     (HL)
+ 2152 C0                RET     NZ              ;WALL IN THE WAY
+                ;
+                ; MOVE NEXT VIEW INTO BUFFER
+                ;
+ 2153 2A083F            LD      HL,(VIEW)
+ 2156 110800            LD      DE,0008H
+ 2159 19                ADD     HL,DE
+ 215A 22083F            LD      (VIEW),HL
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MAZE.Z8T                                            Page  6
+
+
+ 215D 3E80              LD      A,80H           ;PUT CURSOR ON LEFT
+ 215F 320A3F            LD      (XREG),A
+ 2162 CD2022            CALL    MOVBUF
+ 2165 C9                RET
+                ;---------------
+                ; MOVE CURSOR UP
+                ;---------------
+ 2166 3A0B3F    UPKEY   LD      A,(YREG)        ;ARE WE AT THE TOP
+ 2169 FE00              CP      00H             ;OF THE DISPLAY?
+ 216B 2815              JR      Z,UPKY1         ;YES, SO GET NEXT VIEW
+                ;
+                ; IS THERE A WALL IN THE WAY?
+                ;
+ 216D 21003F            LD      HL,BUFFER
+ 2170 3A0B3F            LD      A,(YREG)
+ 2173 6F                LD      L,A
+ 2174 2D                DEC     L
+ 2175 3A0A3F            LD      A,(XREG)
+ 2178 A6                AND     (HL)
+ 2179 C0                RET     NZ              ;WALL IN THE WAY
+ 217A 3A0B3F            LD      A,(YREG)
+ 217D 3D                DEC     A               ;MOVE CURSOR UP
+ 217E 320B3F            LD      (YREG),A
+ 2181 C9                RET
+                ;
+                ; CAN WE MOVE INTO THE NEXT VIEW?
+                ;
+ 2182 2A083F    UPKY1   LD      HL,(VIEW)
+ 2185 ED5B0C3F          LD      DE,(DIM)
+ 2189 A7                AND     A
+ 218A ED52              SBC     HL,DE
+ 218C 1E07              LD      E,07H
+ 218E 19                ADD     HL,DE
+ 218F 3A0A3F            LD      A,(XREG)
+ 2192 A6                AND     (HL)
+ 2193 C0                RET     NZ              ;WALL IN THE WAY
+                ;
+                ; MOVE NEXT VIEW INTO BUFFER
+                ;
+ 2194 2A083F            LD      HL,(VIEW)
+ 2197 ED5B0C3F          LD      DE,(DIM)
+ 219B A7                AND     A
+ 219C ED52              SBC     HL,DE
+ 219E 22083F            LD      (VIEW),HL
+ 21A1 3E07              LD      A,07H           ;PUT CURSOR ON BOTTOM
+ 21A3 320B3F            LD      (YREG),A
+ 21A6 CD2022            CALL    MOVBUF
+ 21A9 C9                RET
+                ;-----------------
+                ; MOVE CURSOR DOWN
+                ;-----------------
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MAZE.Z8T                                            Page  7
+
+
+ 21AA 3A0B3F    DWNKEY  LD      A,(YREG)        ;ARE WE AT THE BOTTOM
+ 21AD FE07              CP      07H             ;OF THE DISPLAY?
+ 21AF 2815              JR      Z,DWNKY1        ;YES, SO GET NEXT VIEW
+                ;
+                ; IS THERE A WALL IN THE WAY?
+                ;
+ 21B1 21003F            LD      HL,BUFFER
+ 21B4 3A0B3F            LD      A,(YREG)
+ 21B7 6F                LD      L,A
+ 21B8 2C                INC     L
+ 21B9 3A0A3F            LD      A,(XREG)
+ 21BC A6                AND     (HL)
+ 21BD C0                RET     NZ              ;WALL IN THE WAY
+ 21BE 3A0B3F            LD      A,(YREG)
+ 21C1 3C                INC     A               ;MOVE CURSOR DOWN
+ 21C2 320B3F            LD      (YREG),A
+ 21C5 C9                RET
+                ;
+                ; CAN WE MOVE INTO THE NEXT VIEW?
+                ;
+ 21C6 2A083F    DWNKY1  LD      HL,(VIEW)
+ 21C9 ED5B0C3F          LD      DE,(DIM)
+ 21CD 19                ADD     HL,DE
+ 21CE 3A0A3F            LD      A,(XREG)
+ 21D1 A6                AND     (HL)
+ 21D2 C0                RET     NZ              ;WALL IN THE WAY
+                ;
+                ; MOVE NEXT VIEW INTO BUFFER
+                ;
+ 21D3 2A083F            LD      HL,(VIEW)
+ 21D6 ED5B0C3F          LD      DE,(DIM)
+ 21DA 19                ADD     HL,DE
+ 21DB 22083F            LD      (VIEW),HL
+ 21DE 3E00              LD      A,00H           ;PUT CURSOR UP TOP
+ 21E0 320B3F            LD      (YREG),A
+ 21E3 CD2022            CALL    MOVBUF
+ 21E6 C9                RET
+                ;------------------
+                ; TOGGLE THE CURSOR
+                ;------------------
+ 21E7 21003F    CURSOR  LD      HL,BUFFER
+ 21EA 3A0B3F            LD      A,(YREG)        ;HL POINTS TO
+ 21ED 6F                LD      L,A             ;CURSOR BUFFER ADDRESS
+ 21EE 3A0A3F            LD      A,(XREG)
+ 21F1 AE                XOR     A,(HL)          ;TOGGLE THE CURSOR
+ 21F2 77                LD      (HL),A
+ 21F3 C9                RET
+                ;----------------------
+                ; CHECK AND TOGGLE EXIT
+                ;----------------------
+ 21F4 2A083F    TOGEXT  LD      HL,(VIEW)
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MAZE.Z8T                                            Page  8
+
+
+ 21F7 3A0E3F            LD      A,(EXVIEW)
+ 21FA BD                CP      L
+ 21FB C0                RET     NZ              ;NOT RIGHT VIEW
+ 21FC 3A0F3F            LD      A,(EXVIEW+1)
+ 21FF BC                CP      H
+ 2200 C0                RET     NZ              ;NOT RIGHT VIEW
+ 2201 21003F            LD      HL,BUFFER
+ 2204 3A103F            LD      A,(EXYREG)
+ 2207 6F                LD      L,A
+ 2208 3A113F            LD      A,(EXXREG)      ;X REG
+ 220B AE                XOR     A,(HL)          ;TOGGLE THE EXIT
+ 220C 77                LD      (HL),A
+ 220D C9                RET
+                ;----------------
+                ; TURN CURSOR OFF
+                ;----------------
+ 220E F5        CURSOFF PUSH    AF
+ 220F E5                PUSH    HL
+ 2210 21003F            LD      HL,BUFFER
+ 2213 3A0B3F            LD      A,(YREG)        ;HL POINTS TO ADDRESS
+ 2216 6F                LD      L,A             ;OF CURSOR IN BUFFER
+ 2217 3A0A3F            LD      A,(XREG)
+ 221A 2F                CPL                     ;TURN OFF
+ 221B A6                AND     A,(HL)          ;CURSOR IN BUFFER
+ 221C 77                LD      (HL),A
+ 221D E1                POP     HL
+ 221E F1                POP     AF
+ 221F C9                RET
+                ;----------------------
+                ; MOVE VIEW INTO BUFFER
+                ;----------------------
+ 2220 2A083F    MOVBUF  LD      HL,(VIEW)
+ 2223 11003F            LD      DE,BUFFER
+ 2226 010800            LD      BC,0008H
+ 2229 EDB0              LDIR
+ 222B C9                RET
+                ;----------
+                ; MAZE DATA
+                ;----------
+                ;THE MAZE IS ORGANISED INTO 6 ROWS OF 6 COLUMNS EACH.
+                ;EACH VIEW HAS EIGHT BYTES,FIRST BYTE IS THE DATA FOR
+                ;THE TOP LINE OF THE 8X8 DISPLAY.
+                ;                           COLUMN
+                ;          1       2       3       4       5       6
+                ;     1
+                ;     2
+                ;     3
+                ; ROW 4
+                ;     5
+                ;     6
+                ;
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MAZE.Z8T                                            Page  9
+
+
+                ; FIRST ROW
+                ;
+ 222C FF88A2BE          DEFB    0FFH,088H,0A2H,0BEH,0A2H,0AAH,08AH,0BAH  ;1ST COLU
+                MN
+ 2234 FF11D594          DEFB    0FFH,011H,0D5H,094H,0B7H,084H,0D1H,01DH  ;2
+ 223C FF015D51          DEFB    0FFH,001H,05DH,051H,0D4H,055H,055H,055H  ;3
+ 2244 FF105555          DEFB    0FFH,010H,055H,055H,045H,0DDH,011H,055H  ;4
+ 224C FF08EB0A          DEFB    0FFH,008H,0EBH,00AH,07BH,040H,05FH,051H  ;5
+ 2254 FF11D505          DEFB    0FFH,011H,0D5H,005H,0FDH,005H,0F5H,015H  ;6
+                ;
+                ; SECOND ROW
+                ;
+ 225C 88EB88BF          DEFB    088H,0EBH,088H,0BFH,082H,0BAH,0A2H,0AFH
+ 2264 50D7427A          DEFB    050H,0D7H,042H,07AH,042H,0DEH,010H,0D7H
+ 226C 55D504BF          DEFB    055H,0D5H,004H,0BFH,0A2H,0AAH,088H,0FEH
+ 2274 555457D1          DEFB    055H,054H,057H,0D1H,004H,0BFH,0A0H,0AFH
+ 227C 55555554          DEFB    055H,055H,055H,054H,057H,0C4H,01DH,0C4H
+ 2284 55457D01          DEFB    055H,045H,07DH,001H,0FFH,001H,0F7H,015H
+                ;
+                ; THIRD ROW
+                ;
+ 228C A2BAA0AE          DEFB    0A2H,0BAH,0A0H,0AEH,082H,0FBH,080H,0BEH
+ 2294 14F580BE          DEFB    014H,0F5H,080H,0BEH,010H,0D5H,015H,0D4H
+ 229C 02FA00BF          DEFB    002H,0FAH,000H,0BFH,0A0H,0AFH,0A0H,02FH
+ 22A4 A8AB2AEA          DEFB    0A8H,0ABH,02AH,0EAH,000H,0EFH,028H,0AAH
+ 22AC 7F00FF20          DEFB    07FH,000H,0FFH,020H,03FH,0A2H,0AAH,0AAH
+ 22B4 D515F505  EXIT    DEFB    0D5H,015H,0F5H,005H,0DDH,051H,015H,0F5H
+                ;
+                ; FOURTH ROW
+                ;
+ 22BC 82FB81BF          DEFB    082H,0FBH,081H,0BFH,081H,0BDH,084H,0B7H
+ 22C4 55545554          DEFB    055H,054H,055H,054H,011H,057H,054H,0D5H
+ 22CC E80AFA12          DEFB    0E8H,00AH,0FAH,012H,0D7H,040H,05FH,040H
+ 22D4 AAAAA23F          DEFB    0AAH,0AAH,0A2H,03FH,0A0H,02FH,0E8H,00AH
+ 22DC 8AFA0AEA          DEFB    08AH,0FAH,00AH,0EAH,02AH,0AAH,0AAH,0AAH
+ 22E4 853D85F1          DEFB    085H,03DH,085H,0F1H,09FH,0B1H,095H,0D5H
+                ;
+                ; FIFTH ROW
+                ;
+ 22EC A0AF81AD          DEFB    0A0H,0AFH,081H,0ADH,0A8H,0ABH,0A0H,0AFH
+ 22F4 555515F5          DEFB    055H,055H,015H,0F5H,004H,0DDH,011H,0F7H
+ 22FC 7F445555          DEFB    07FH,044H,055H,055H,011H,0FFH,000H,05FH
+ 2304 FA425A5A          DEFB    0FAH,042H,05AH,05AH,002H,0EFH,020H,0BEH
+ 230C A2BF80FF          DEFB    0A2H,0BFH,080H,0FFH,000H,0FFH,080H,0BFH
+ 2314 15F505FD          DEFB    015H,0F5H,005H,0FDH,005H,0F5H,015H,055H
+                ;
+                ; SIXTH ROW
+                ;
+ 231C A8AAAAAB          DEFB    0A8H,0AAH,0AAH,0ABH,0A0H,0BFH,080H,0FFH
+ 2324 04F511D5          DEFB    004H,0F5H,011H,0D5H,014H,0D7H,010H,0FFH
+ 232C 42FA025E          DEFB    042H,0FAH,002H,05EH,040H,0FFH,000H,0FFH
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MAZE.Z8T                                            Page 10
+
+
+ 2334 20AFA0BF  ENTRY   DEFB    020H,0AFH,0A0H,0BFH,080H,0FFH,000H,0FFH
+ 233C 81BD20ED          DEFB    081H,0BDH,020H,0EDH,005H,0F5H,004H,0FFH
+ 2344 555545F5          DEFB    055H,055H,045H,0F5H,015H,055H,041H,0FFH
+ 0000                   END
+
+
+               Z8T Cross Assembler Version 1.0              
+
+Source File Name: MAZE.Z8T                                            Page 11
+---- Symbol Table ----
+
+BEEP     0015          EXYREG   3F10          MAZE6    2088
+BUFFER   3F00          KEYAT1   20B1          MAZKEY   20BA
+CURSOFF  220E          KEYATE   20AF          MENU     000D
+CURSOR   21E7          KEYBUF   0086          MOVBUF   2220
+DIM      3F0C          KEYREL   000C          RHTKEY   2125
+DWNKEY   21AA          LFTKEY   20E0          RHTKY1   2143
+DWNKY1   21C6          LFTKY1   20FE          SETUP    2000
+ENDKEY   20DA          MAIN     0000          SKATE    0016
+ENTRY    2334          MAZE     2027          TOGEXT   21F4
+EXIT     22B4          MAZE1    202A          UPKEY    2166
+EXIT1    20CA          MAZE2    2032          UPKY1    2182
+EXIT2    20D2          MAZE3    203F          VIEW     3F08
+EXVIEW   3F0E          MAZE4    2050          XREG     3F0A
+EXXREG   3F11          MAZE5    2052          YREG     3F0B
+                
+***** No Errors Detected *****
+         
+
+Source File Name: MAZE.Z8T                                            Page 11
+---- S

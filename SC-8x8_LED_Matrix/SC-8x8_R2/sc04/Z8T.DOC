@@ -1,0 +1,95 @@
+Known Z8T.COM Information.     
+
+Source code filename extension must be renamed from .MAC (Or .ASM) to .Z8T
+
+Diskette Contents     
+
+1.  Z8T.COM   	Public Domain MSDOS Z80 Assembler, written in 8088 code.
+2.  Z8T.DOC     This doc file.           
+
+Fast assembler, known to run with V20, 8088, and 80286. 
+
+Assembler doesn't like bit 7 being set in source code text. This is usually 
+created by using Wordstar in document mode. To clear bit 7, enter W.S. in 
+non-document mode, do a ^Q^Q^B at the start of the file, and wait for file 
+conversion to 7 bit Ascii text. 
+
+Likewise, it doesn't like out of step carraige returns and line feeds.
+eg:- 0DH, 0AH, 0DH is not a matched pair. The last 0DH needs to be deleted.
+It can be found in the non-document mode by looking at the right hand marker
+which should be a "<" symbol. If it is a "-" then it can be easily deleted
+by doing an enter then del at that point.
+
+Doesn't like instruction in label: field, must be tabbed across.
+Doesn't like global statements.
+
+".Z80"   Command not needed.    (Ignored) 
+".PHASE" Command not supported. (Gives error) 
+
+Two Output Files....
+(1) "FILENAME.HEX" File is in Intel-HEX format.
+(2) "FILENAME.PRN" File is printable output.
+
+Assembly switches are placed after a space on the command line.
+
+Eg:-  Z8T FILENAME C
+
+C Outputs FILENAME.PRN to console
+L Suppresses FILENAME.HEX output
+N Produces printer unformatted FILENAME.PRN file
+O Creats a very short FILENAME.PRN file used for error logging.
+P Outputs FILENAME.PRN to printer
+X Outputs symbol table only as FILENAME.PRN
+Y Outputs normal FILENAME.PRN but without symbol table
+_______________________________________________________________________
+
+Assembly times for the same 35K source code test file....
+
+Using M80 and L80....
+10Mhz V20 in "8080" Mode      47 Seconds (.COM and .PRN output)
+10Mhz V20 in "8080" Mode      33 Seconds (.COM output only)
+
+Using Z8T FILENAME    (Full .PRN File)
+4.77Mhz V20       2 Min 2 Sec             10Mhz V20      1 Min 6 Sec
+8Mhz    80286     49 Seconds              12Mhz 80286    33 Seconds
+16Mhz   80286     22 Seconds              25Mhz 80286    18 Seconds
+
+Using Z8T FILENAME O  (Short .PRN Error Log File)
+4.77Mhz V20       1 Min 34 Sec            10Mhz V20      50 Seconds
+8Mhz    80286     37 Seconds              12Mhz 80286    22 Seconds
+16Mhz   80286     16 Seconds              25Mhz 80286    10 Seconds
+
+I can only assume that faster systems will show faster times.
+_______________________________________________________________________
+
+Known Bugs In Current Version
+-----------------------------
+1. A HEX constant denoted with a leading '$' may cause a syntax error if
+   its last digit is 'B' or 'D'.  Use the alternate form for HEX constants
+   (Trailing 'H').
+
+========================================================================
+
+
+For information about this and other products contact:
+
+QUASAR ELECTRONICS LIMITED
+
+EMAIL: sales@quasarelectronics.com
+
+Website: www.quasarelectronics.com/home.htm
+(Mirror site: www.electronic-kits-and-projects.com)
+
+
+Quasar Electronics Limited
+PO Box 6935
+Bishops Stortford
+CM23 4WP
+UNITED KINGDOM
+
+
+TEL: 0870 246 1826
+Intl +44 870 246 1826
+FAX: 0870 460 1045
+Intl +44 870 460 1045
+

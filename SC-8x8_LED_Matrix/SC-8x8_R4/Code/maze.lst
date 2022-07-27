@@ -1,0 +1,501 @@
+0001   0000             ;---------------------------
+0002   0000             ; 8 X 8 DISPLAY MAZE PROGRAM
+0003   0000             ;---------------------------
+0004   0000             ;
+0005   0000             ; BY CRAIG R.S.JONES  01/93  VERSION 1.0
+0006   0000             ;
+0007   0000             ; THE MAZE CONSISTS OF A MATRIX OF 8 BYTE 'VIEWS' WHICH
+0008   0000             ; ARE DISPLAYED ON THE 8X8 DISPLAY.
+0009   0000             ; AS THE PLAYER MOVES HIS 'CURSOR' OFF THE CURRENT VIEW A
+0010   0000             ; NEW VIEW IS DISPLAYED DEPENDING ON THE DIRECTION OF TRAVEL.
+0011   0000             ;
+0012   0000             ; USE THE '2' KEY FOR UP, 'A' IS DOWN, '5' LEFT AND '7' RIGHT.
+0013   0000             ; THE FUNCTION KEY WILL RETURN YOU TO THE MONITOR.
+0014   0000             ;
+0015   0000             ; THE EXIT IS SHOWN AS A LED WHICH FLASHES HALF AS FAST AS THE
+0016   0000             ; PLAYER'S CURSOR.
+0017   0000             ;
+0018   0000             ; I/O PORT
+0019   0000             ;
+0020   0000             KEYBUF  .EQU     86H     ;KEYBOARD BUFFER
+0021   0000             ;
+0022   0000             ; SYSTEM CALLS
+0023   0000             ;
+0024   0000             MAIN    .EQU     00H     ;RESTART MONITOR
+0025   0000             KEYREL  .EQU     0CH     ;WAIT FOR KEY RELEASE
+0026   0000             MENU    .EQU     0DH     ;SELECT ENTRY FROM MENU
+0027   0000             BEEP    .EQU     15H     ;KEY ENTRY BEEP
+0028   0000             SKATE   .EQU     16H     ;SCAN 8X8 DISPLAY
+0029   0000             ;
+0030   0000             ; MAZE PROGRAM  VARIABLES
+0031   0000             ;
+0032   0000             BUFFER  .EQU     3F00H           ;8X8 DISPLAY BUFFER
+0033   0000             VIEW    .EQU     3F08H           ;MAZE VIEW ADDRESS
+0034   0000             XREG    .EQU     3F0AH           ;CURSOR X AXIS
+0035   0000             YREG    .EQU     3F0BH           ;CURSOR Y AXIS
+0036   0000             DIM     .EQU     3F0CH           ;MAZE DIMENSION
+0037   0000             EXVIEW  .EQU     3F0EH           ;EXIT VIEW ADDRESS
+0038   0000             EXYREG  .EQU     3F10H           ;EXIT Y
+0039   0000             EXXREG  .EQU     3F11H           ;EXIT X
+0040   0000             ;---------------------
+0041   0000             ; 8 X 8 DISPLAY - MAZE
+0042   0000             ;---------------------
+0043   2000             	.ORG     2000H
+0044   2000             ;
+0045   2000             ;SET UP THE ENTRY VIEW
+0046   2000             ;
+0047   2000 21 34 23    SETUP   LD      HL,ENTRY
+0048   2003 22 08 3F    	LD      (VIEW),HL      ;ENTRY VIEW
+0049   2006 3E 06       	LD      A,06H
+0050   2008 32 0B 3F    	LD      (YREG),A       ;Y ENTRY POSITION
+0051   200B 3E 10       	LD      A,10H
+0052   200D 32 0A 3F    	LD      (XREG),A       ;X ENTRY POSITION
+0053   2010             ;
+0054   2010             ; SET UP THE EXIT VIEW
+0055   2010             ;
+0056   2010 21 B4 22    	LD      HL,EXIT
+0057   2013 22 0E 3F    	LD      (EXVIEW),HL     ;EXIT VIEW
+0058   2016 3E 03       	LD      A,03H
+0059   2018 32 10 3F    	LD      (EXYREG),A      ;Y EXIT POSITION
+0060   201B 3E 02       	LD      A,02H
+0061   201D 32 11 3F    	LD      (EXXREG),A      ;X EXIT POSITION
+0062   2020             ;
+0063   2020             ; DIMENSION MAZE SIZE
+0064   2020             ;
+0065   2020 11 30 00    	LD      DE,0030H
+0066   2023 ED 53 0C 3F 	LD      (DIM),DE        ;MAZE SIZE
+0067   2027             ;---------------
+0068   2027             ; MAIN MAZE LOOP
+0069   2027             ;---------------
+0070   2027 CD 20 22    MAZE    CALL    MOVBUF
+0071   202A CD E7 21    MAZE1   CALL    CURSOR          ;TOGGLE THE CURSOR
+0072   202D CD F4 21    	CALL    TOGEXT          ;CHECK EXIT
+0073   2030 06 E0       	LD      B,0E0H
+0074   2032 21 00 3F    MAZE2   LD      HL,BUFFER       ;POINT TO 8X8 BUFFER
+0075   2035 0E 16       	LD      C,SKATE
+0076   2037 F7          	RST     30H             ;SCAN 8X8 DISPLAY
+0077   2038 10 F8       	DJNZ    MAZE2           ;FOR A WHILE
+0078   203A CD E7 21    	CALL    CURSOR          ;TOGGLE THE CURSOR
+0079   203D 06 E0       	LD      B,0E0H
+0080   203F 21 00 3F    MAZE3   LD      HL,BUFFER       ;POINT TO 8X8 BUFFER
+0081   2042 0E 16       	LD      C,SKATE
+0082   2044 F7          	RST     30H             ;SCAN 8X8 DISPLAY
+0083   2045 DB 86       	IN      A,(KEYBUF)
+0084   2047 CB 6F       	BIT     5,A
+0085   2049 20 05       	JR      NZ,MAZE4        ;DA HIGH, PROCESS KEY
+0086   204B 10 F2       	DJNZ    MAZE3           ;FOR A WHILE
+0087   204D C3 2A 20    	JP      MAZE1           ;NO KEY SO TOGGLE CURSOR
+0088   2050             ;
+0089   2050             ; GOT A KEY
+0090   2050             ;
+0091   2050 06 FF       MAZE4   LD      B,0FFH          ;DO A KEY ENTRY DELAY
+0092   2052 10 FE       MAZE5   DJNZ    MAZE5
+0093   2054 E6 1F       	AND     1FH             ;STRIP UNUSED BITS
+0094   2056 CD 0E 22    	CALL    CURSOFF         ;TURN CURSOR OFF
+0095   2059 21 BA 20    	LD      HL,MAZKEY
+0096   205C 0E 0D       	LD      C,MENU          ;DO KEY PROCESSING
+0097   205E F7          	RST     30H
+0098   205F             ;
+0099   205F             ; HAVE WE FOUND THE EXIT?
+0100   205F             ;
+0101   205F 2A 08 3F    	LD      HL,(VIEW)
+0102   2062 3A 0E 3F    	LD      A,(EXVIEW)
+0103   2065 BD          	CP      L
+0104   2066 20 C2       	JR      NZ,MAZE1        ;NOT RIGHT VIEW
+0105   2068 3A 0F 3F    	LD      A,(EXVIEW+1)
+0106   206B BC          	CP      H
+0107   206C 20 BC       	JR      NZ,MAZE1        ;NOT RIGHT VIEW
+0108   206E 3A 0B 3F    	LD      A,(YREG)
+0109   2071 47          	LD      B,A
+0110   2072 3A 10 3F    	LD      A,(EXYREG)
+0111   2075 B8          	CP      B
+0112   2076 20 B2       	JR      NZ,MAZE1        ;NOT RIGHT Y REG
+0113   2078 3A 0A 3F    	LD      A,(XREG)
+0114   207B 47          	LD      B,A
+0115   207C 3A 11 3F    	LD      A,(EXXREG)
+0116   207F B8          	CP      B
+0117   2080 20 A8       	JR      NZ,MAZE1        ;NOT RIGHT X REG
+0118   2082             ;
+0119   2082             ; FOUND THE EXIT!!
+0120   2082             ;
+0121   2082 0E 15       	LD      C,BEEP
+0122   2084 F7          	RST     30H
+0123   2085 0E 0C       	LD      C,KEYREL
+0124   2087 F7          	RST     30H
+0125   2088 21 CA 20    MAZE6   LD      HL,EXIT1
+0126   208B 22 08 3F    	LD      (VIEW),HL
+0127   208E CD 20 22    	CALL    MOVBUF          ;PUT INTO BUFFER
+0128   2091 CD AF 20    	CALL    KEYATE          ;DISPLAY EXIT1 A WHILE
+0129   2094 21 D2 20    	LD      HL,EXIT2
+0130   2097 22 08 3F    	LD      (VIEW),HL
+0131   209A CD 20 22    	CALL    MOVBUF          ;PUT INTO BUFFER
+0132   209D CD AF 20    	CALL    KEYATE          ;DISPLAY EXIT2 A WHILE
+0133   20A0 DB 86       	IN      A,(KEYBUF)
+0134   20A2 CB 6F       	BIT     5,A
+0135   20A4 28 E2       	JR      Z,MAZE6         ;NO KEY KEEP GOING
+0136   20A6 0E 15       	LD      C,BEEP
+0137   20A8 F7          	RST     30H
+0138   20A9 0E 0C       	LD      C,KEYREL
+0139   20AB F7          	RST     30H
+0140   20AC 0E 00       	LD      C,MAIN          ;EXIT TO MONITOR
+0141   20AE F7          	RST     30H
+0142   20AF             ;
+0143   20AF             ; SCAN 8X8 AND WAIT FOR KEY
+0144   20AF             ;
+0145   20AF 06 FF       KEYATE  LD      B,0FFH
+0146   20B1 21 00 3F    KEYAT1  LD      HL,BUFFER       ;POINT TO 8X8 BUFFER
+0147   20B4 0E 16       	LD      C,SKATE
+0148   20B6 F7          	RST     30H             ;SCAN 8X8 DISPLAY
+0149   20B7 10 F8       	DJNZ    KEYAT1          ;FOR A WHILE
+0150   20B9 C9          	RET
+0151   20BA             ;
+0152   20BA             ; MAZE KEY TABLE
+0153   20BA             ;
+0154   20BA 05          MAZKEY  .DB    05
+0155   20BB 02 0A 05 07 	.DB    02H,0AH,05H,07H
+0156   20BF 10          	.DB    10H
+0157   20C0 66 21 AA 21 	.DW    UPKEY,DWNKEY,LFTKEY,RHTKEY
+0157   20C4 E0 20 25 21 
+0158   20C8 DA 20       	.DW    ENDKEY
+0159   20CA             ;
+0160   20CA             ; EXIT DISPLAY PATTERNS
+0161   20CA             ;
+0162   20CA FF 81 BD A5 EXIT1   .DB    0FFH,081H,0BDH,0A5H,0A5H,0BDH,081H,0FFH
+0162   20CE A5 BD 81 FF 
+0163   20D2 00 7E 42 5A EXIT2   .DB    000H,07EH,042H,05AH,05AH,042H,07EH,000H
+0163   20D6 5A 42 7E 00 
+0164   20DA             ;----------
+0165   20DA             ; QUIT MAZE
+0166   20DA             ;----------
+0167   20DA 0E 0C       ENDKEY  LD      C,KEYREL
+0168   20DC F7          	RST     30H
+0169   20DD 0E 00       	LD      C,MAIN
+0170   20DF F7          	RST     30H
+0171   20E0             ;-----------------
+0172   20E0             ; MOVE CURSOR LEFT
+0173   20E0             ;-----------------
+0174   20E0 3A 0A 3F    LFTKEY  LD      A,(XREG)        ;ARE WE AT THE LEFT EDGE
+0175   20E3 CB 17       	RL      A               ;OF THE DISPLAY?
+0176   20E5 38 17       	JR      C,LFTKY1        ;YES, SO GET NEXT VIEW
+0177   20E7             ;
+0178   20E7             ; IS THERE A WALL IN THE WAY?
+0179   20E7             ;
+0180   20E7 21 00 3F    	LD      HL,BUFFER
+0181   20EA 3A 0B 3F    	LD      A,(YREG)        ;HL POINTS TO THE BYTE
+0182   20ED 6F          	LD      L,A             ;THE CURSOR IS ON IN
+0183   20EE 3A 0A 3F    	LD      A,(XREG)        ;THE 8X8 BUFFER
+0184   20F1 CB 17       	RL      A               ;IF THERE IS A MAZE
+0185   20F3 A6          	AND     (HL)            ;WALL IN THE WAY
+0186   20F4 C0          	RET     NZ              ;THEN RETURN
+0187   20F5 3A 0A 3F    	LD      A,(XREG)
+0188   20F8 CB 17       	RL      A               ;NO WALL IN THE WAY
+0189   20FA 32 0A 3F    	LD      (XREG),A        ;SO MOVE CURSOR TO LEFT
+0190   20FD C9          	RET
+0191   20FE             ;
+0192   20FE             ; CAN WE MOVE INTO THE NEXT VIEW?
+0193   20FE             ;
+0194   20FE 2A 08 3F    LFTKY1  LD      HL,(VIEW)       ;CHECK THE NEXT
+0195   2101 11 08 00    	LD      DE,0008H        ;VIEW TO ENSURE THAT
+0196   2104 A7          	AND     A               ;THERE IS NOT
+0197   2105 ED 52       	SBC     HL,DE           ;A WALL IN THE
+0198   2107 3A 0B 3F    	LD      A,(YREG)        ;POSITION WHERE THE
+0199   210A 5F          	LD      E,A             ;CURSOR SHOULD APPEAR
+0200   210B 19          	ADD     HL,DE
+0201   210C 3E 01       	LD      A,01H           ;STAY IN THE CURRENT
+0202   210E A6          	AND     (HL)            ;VIEW IF A WALL
+0203   210F C0          	RET     NZ              ;IS IN THE WAY
+0204   2110             ;
+0205   2110             ; MOVE NEXT VIEW INTO BUFFER
+0206   2110             ;
+0207   2110 2A 08 3F    	LD      HL,(VIEW)       ;GET THE VIEW
+0208   2113 11 08 00    	LD      DE,0008H        ;TO THE LEFT
+0209   2116 A7          	AND     A               ;OF THE CURRENT ONE
+0210   2117 ED 52       	SBC     HL,DE           ;AND MOVE IT
+0211   2119 22 08 3F    	LD      (VIEW),HL       ;INTO THE 8X8
+0212   211C 3E 01       	LD      A,01H           ;DISPLAY BUFFER
+0213   211E 32 0A 3F    	LD      (XREG),A        ;PUT THE CURSOR ON THE
+0214   2121 CD 20 22    	CALL    MOVBUF          ;RIGHT OF THE DISPLAY
+0215   2124 C9          	RET
+0216   2125             ;------------------
+0217   2125             ; MOVE CURSOR RIGHT
+0218   2125             ;------------------
+0219   2125 3A 0A 3F    RHTKEY  LD      A,(XREG)        ;ARE WE AT THE RIGHT EDGE
+0220   2128 CB 1F       	RR      A               ;OF THE DISPLAY?
+0221   212A 38 17       	JR      C,RHTKY1        ;YES, SO GET NEXT VIEW
+0222   212C             ;
+0223   212C             ; IS THERE A WALL IN THE WAY?
+0224   212C             ;
+0225   212C 21 00 3F    	LD      HL,BUFFER
+0226   212F 3A 0B 3F    	LD      A,(YREG)
+0227   2132 6F          	LD      L,A
+0228   2133 3A 0A 3F    	LD      A,(XREG)
+0229   2136 CB 1F       	RR      A
+0230   2138 A6          	AND     (HL)
+0231   2139 C0          	RET     NZ              ;WALL IN THE WAY
+0232   213A 3A 0A 3F    	LD      A,(XREG)
+0233   213D CB 1F       	RR      A               ;MOVE CURSOR RIGHT
+0234   213F 32 0A 3F    	LD      (XREG),A
+0235   2142 C9          	RET
+0236   2143             ;
+0237   2143             ; CAN WE MOVE INTO THE NEXT VIEW?
+0238   2143             ;
+0239   2143 2A 08 3F    RHTKY1  LD      HL,(VIEW)
+0240   2146 11 08 00    	LD      DE,0008H
+0241   2149 19          	ADD     HL,DE
+0242   214A 3A 0B 3F    	LD      A,(YREG)
+0243   214D 5F          	LD      E,A
+0244   214E 19          	ADD     HL,DE
+0245   214F 3E 80       	LD      A,80H
+0246   2151 A6          	AND     (HL)
+0247   2152 C0          	RET     NZ              ;WALL IN THE WAY
+0248   2153             ;
+0249   2153             ; MOVE NEXT VIEW INTO BUFFER
+0250   2153             ;
+0251   2153 2A 08 3F    	LD      HL,(VIEW)
+0252   2156 11 08 00    	LD      DE,0008H
+0253   2159 19          	ADD     HL,DE
+0254   215A 22 08 3F    	LD      (VIEW),HL
+0255   215D 3E 80       	LD      A,80H           ;PUT CURSOR ON LEFT
+0256   215F 32 0A 3F    	LD      (XREG),A
+0257   2162 CD 20 22    	CALL    MOVBUF
+0258   2165 C9          	RET
+0259   2166             ;---------------
+0260   2166             ; MOVE CURSOR UP
+0261   2166             ;---------------
+0262   2166 3A 0B 3F    UPKEY   LD      A,(YREG)        ;ARE WE AT THE TOP
+0263   2169 FE 00       	CP      00H             ;OF THE DISPLAY?
+0264   216B 28 15       	JR      Z,UPKY1         ;YES, SO GET NEXT VIEW
+0265   216D             ;
+0266   216D             ; IS THERE A WALL IN THE WAY?
+0267   216D             ;
+0268   216D 21 00 3F    	LD      HL,BUFFER
+0269   2170 3A 0B 3F    	LD      A,(YREG)
+0270   2173 6F          	LD      L,A
+0271   2174 2D          	DEC     L
+0272   2175 3A 0A 3F    	LD      A,(XREG)
+0273   2178 A6          	AND     (HL)
+0274   2179 C0          	RET     NZ              ;WALL IN THE WAY
+0275   217A 3A 0B 3F    	LD      A,(YREG)
+0276   217D 3D          	DEC     A               ;MOVE CURSOR UP
+0277   217E 32 0B 3F    	LD      (YREG),A
+0278   2181 C9          	RET
+0279   2182             ;
+0280   2182             ; CAN WE MOVE INTO THE NEXT VIEW?
+0281   2182             ;
+0282   2182 2A 08 3F    UPKY1   LD      HL,(VIEW)
+0283   2185 ED 5B 0C 3F 	LD      DE,(DIM)
+0284   2189 A7          	AND     A
+0285   218A ED 52       	SBC     HL,DE
+0286   218C 1E 07       	LD      E,07H
+0287   218E 19          	ADD     HL,DE
+0288   218F 3A 0A 3F    	LD      A,(XREG)
+0289   2192 A6          	AND     (HL)
+0290   2193 C0          	RET     NZ              ;WALL IN THE WAY
+0291   2194             ;
+0292   2194             ; MOVE NEXT VIEW INTO BUFFER
+0293   2194             ;
+0294   2194 2A 08 3F    	LD      HL,(VIEW)
+0295   2197 ED 5B 0C 3F 	LD      DE,(DIM)
+0296   219B A7          	AND     A
+0297   219C ED 52       	SBC     HL,DE
+0298   219E 22 08 3F    	LD      (VIEW),HL
+0299   21A1 3E 07       	LD      A,07H           ;PUT CURSOR ON BOTTOM
+0300   21A3 32 0B 3F    	LD      (YREG),A
+0301   21A6 CD 20 22    	CALL    MOVBUF
+0302   21A9 C9          	RET
+0303   21AA             ;-----------------
+0304   21AA             ; MOVE CURSOR DOWN
+0305   21AA             ;-----------------
+0306   21AA 3A 0B 3F    DWNKEY  LD      A,(YREG)        ;ARE WE AT THE BOTTOM
+0307   21AD FE 07       	CP      07H             ;OF THE DISPLAY?
+0308   21AF 28 15       	JR      Z,DWNKY1        ;YES, SO GET NEXT VIEW
+0309   21B1             ;
+0310   21B1             ; IS THERE A WALL IN THE WAY?
+0311   21B1             ;
+0312   21B1 21 00 3F    	LD      HL,BUFFER
+0313   21B4 3A 0B 3F    	LD      A,(YREG)
+0314   21B7 6F          	LD      L,A
+0315   21B8 2C          	INC     L
+0316   21B9 3A 0A 3F    	LD      A,(XREG)
+0317   21BC A6          	AND     (HL)
+0318   21BD C0          	RET     NZ              ;WALL IN THE WAY
+0319   21BE 3A 0B 3F    	LD      A,(YREG)
+0320   21C1 3C          	INC     A               ;MOVE CURSOR DOWN
+0321   21C2 32 0B 3F    	LD      (YREG),A
+0322   21C5 C9          	RET
+0323   21C6             ;
+0324   21C6             ; CAN WE MOVE INTO THE NEXT VIEW?
+0325   21C6             ;
+0326   21C6 2A 08 3F    DWNKY1  LD      HL,(VIEW)
+0327   21C9 ED 5B 0C 3F 	LD      DE,(DIM)
+0328   21CD 19          	ADD     HL,DE
+0329   21CE 3A 0A 3F    	LD      A,(XREG)
+0330   21D1 A6          	AND     (HL)
+0331   21D2 C0          	RET     NZ              ;WALL IN THE WAY
+0332   21D3             ;
+0333   21D3             ; MOVE NEXT VIEW INTO BUFFER
+0334   21D3             ;
+0335   21D3 2A 08 3F    	LD      HL,(VIEW)
+0336   21D6 ED 5B 0C 3F 	LD      DE,(DIM)
+0337   21DA 19          	ADD     HL,DE
+0338   21DB 22 08 3F    	LD      (VIEW),HL
+0339   21DE 3E 00       	LD      A,00H           ;PUT CURSOR UP TOP
+0340   21E0 32 0B 3F    	LD      (YREG),A
+0341   21E3 CD 20 22    	CALL    MOVBUF
+0342   21E6 C9          	RET
+0343   21E7             ;------------------
+0344   21E7             ; TOGGLE THE CURSOR
+0345   21E7             ;------------------
+0346   21E7 21 00 3F    CURSOR  LD      HL,BUFFER
+0347   21EA 3A 0B 3F    	LD      A,(YREG)        ;HL POINTS TO
+0348   21ED 6F          	LD      L,A             ;CURSOR BUFFER ADDRESS
+0349   21EE 3A 0A 3F    	LD      A,(XREG)
+0350   21F1 AE          	XOR     (HL)          ;TOGGLE THE CURSOR
+0351   21F2 77          	LD      (HL),A
+0352   21F3 C9          	RET
+0353   21F4             ;----------------------
+0354   21F4             ; CHECK AND TOGGLE EXIT
+0355   21F4             ;----------------------
+0356   21F4 2A 08 3F    TOGEXT  LD      HL,(VIEW)
+0357   21F7 3A 0E 3F    	LD      A,(EXVIEW)
+0358   21FA BD          	CP      L
+0359   21FB C0          	RET     NZ              ;NOT RIGHT VIEW
+0360   21FC 3A 0F 3F    	LD      A,(EXVIEW+1)
+0361   21FF BC          	CP      H
+0362   2200 C0          	RET     NZ              ;NOT RIGHT VIEW
+0363   2201 21 00 3F    	LD      HL,BUFFER
+0364   2204 3A 10 3F    	LD      A,(EXYREG)
+0365   2207 6F          	LD      L,A
+0366   2208 3A 11 3F    	LD      A,(EXXREG)      ;X REG
+0367   220B AE          	XOR     (HL)          ;TOGGLE THE EXIT
+0368   220C 77          	LD      (HL),A
+0369   220D C9          	RET
+0370   220E             ;----------------
+0371   220E             ; TURN CURSOR OFF
+0372   220E             ;----------------
+0373   220E F5          CURSOFF PUSH    AF
+0374   220F E5          	PUSH    HL
+0375   2210 21 00 3F    	LD      HL,BUFFER
+0376   2213 3A 0B 3F    	LD      A,(YREG)        ;HL POINTS TO ADDRESS
+0377   2216 6F          	LD      L,A             ;OF CURSOR IN BUFFER
+0378   2217 3A 0A 3F    	LD      A,(XREG)
+0379   221A 2F          	CPL                     ;TURN OFF
+0380   221B A6          	AND     (HL)            ;CURSOR IN BUFFER
+0381   221C 77          	LD      (HL),A
+0382   221D E1          	POP     HL
+0383   221E F1          	POP     AF
+0384   221F C9          	RET
+0385   2220             ;----------------------
+0386   2220             ; MOVE VIEW INTO BUFFER
+0387   2220             ;----------------------
+0388   2220 2A 08 3F    MOVBUF  LD      HL,(VIEW)
+0389   2223 11 00 3F    	LD      DE,BUFFER
+0390   2226 01 08 00    	LD      BC,0008H
+0391   2229 ED B0       	LDIR
+0392   222B C9          	RET
+0393   222C             ;----------
+0394   222C             ; MAZE DATA
+0395   222C             ;----------
+0396   222C             ;THE MAZE IS ORGANISED INTO 6 ROWS OF 6 COLUMNS EACH.
+0397   222C             ;EACH VIEW HAS EIGHT BYTES,FIRST BYTE IS THE DATA FOR
+0398   222C             ;THE TOP LINE OF THE 8X8 DISPLAY.
+0399   222C             ;                           COLUMN
+0400   222C             ;          1       2       3       4       5       6
+0401   222C             ;     1
+0402   222C             ;     2
+0403   222C             ;     3
+0404   222C             ; ROW 4
+0405   222C             ;     5
+0406   222C             ;     6
+0407   222C             ;
+0408   222C             ; FIRST ROW
+0409   222C             ;
+0410   222C FF 88 A2 BE 	.DB    0FFH,088H,0A2H,0BEH,0A2H,0AAH,08AH,0BAH  ;1ST COLUMN
+0410   2230 A2 AA 8A BA 
+0411   2234 FF 11 D5 94 	.DB    0FFH,011H,0D5H,094H,0B7H,084H,0D1H,01DH  ;2
+0411   2238 B7 84 D1 1D 
+0412   223C FF 01 5D 51 	.DB    0FFH,001H,05DH,051H,0D4H,055H,055H,055H  ;3
+0412   2240 D4 55 55 55 
+0413   2244 FF 10 55 55 	.DB    0FFH,010H,055H,055H,045H,0DDH,011H,055H  ;4
+0413   2248 45 DD 11 55 
+0414   224C FF 08 EB 0A 	.DB    0FFH,008H,0EBH,00AH,07BH,040H,05FH,051H  ;5
+0414   2250 7B 40 5F 51 
+0415   2254 FF 11 D5 05 	.DB    0FFH,011H,0D5H,005H,0FDH,005H,0F5H,015H  ;6
+0415   2258 FD 05 F5 15 
+0416   225C             ;
+0417   225C             ; SECOND ROW
+0418   225C             ;
+0419   225C 88 EB 88 BF 	.DB    088H,0EBH,088H,0BFH,082H,0BAH,0A2H,0AFH
+0419   2260 82 BA A2 AF 
+0420   2264 50 D7 42 7A 	.DB    050H,0D7H,042H,07AH,042H,0DEH,010H,0D7H
+0420   2268 42 DE 10 D7 
+0421   226C 55 D5 04 BF 	.DB    055H,0D5H,004H,0BFH,0A2H,0AAH,088H,0FEH
+0421   2270 A2 AA 88 FE 
+0422   2274 55 54 57 D1 	.DB    055H,054H,057H,0D1H,004H,0BFH,0A0H,0AFH
+0422   2278 04 BF A0 AF 
+0423   227C 55 55 55 54 	.DB    055H,055H,055H,054H,057H,0C4H,01DH,0C4H
+0423   2280 57 C4 1D C4 
+0424   2284 55 45 7D 01 	.DB    055H,045H,07DH,001H,0FFH,001H,0F7H,015H
+0424   2288 FF 01 F7 15 
+0425   228C             ;
+0426   228C             ; THIRD ROW
+0427   228C             ;
+0428   228C A2 BA A0 AE 	.DB    0A2H,0BAH,0A0H,0AEH,082H,0FBH,080H,0BEH
+0428   2290 82 FB 80 BE 
+0429   2294 14 F5 80 BE 	.DB    014H,0F5H,080H,0BEH,010H,0D5H,015H,0D4H
+0429   2298 10 D5 15 D4 
+0430   229C 02 FA 00 BF 	.DB    002H,0FAH,000H,0BFH,0A0H,0AFH,0A0H,02FH
+0430   22A0 A0 AF A0 2F 
+0431   22A4 A8 AB 2A EA 	.DB    0A8H,0ABH,02AH,0EAH,000H,0EFH,028H,0AAH
+0431   22A8 00 EF 28 AA 
+0432   22AC 7F 00 FF 20 	.DB    07FH,000H,0FFH,020H,03FH,0A2H,0AAH,0AAH
+0432   22B0 3F A2 AA AA 
+0433   22B4 D5 15 F5 05 EXIT    .DB    0D5H,015H,0F5H,005H,0DDH,051H,015H,0F5H
+0433   22B8 DD 51 15 F5 
+0434   22BC             ;
+0435   22BC             ; FOURTH ROW
+0436   22BC             ;
+0437   22BC 82 FB 81 BF 	.DB    082H,0FBH,081H,0BFH,081H,0BDH,084H,0B7H
+0437   22C0 81 BD 84 B7 
+0438   22C4 55 54 55 54 	.DB    055H,054H,055H,054H,011H,057H,054H,0D5H
+0438   22C8 11 57 54 D5 
+0439   22CC E8 0A FA 12 	.DB    0E8H,00AH,0FAH,012H,0D7H,040H,05FH,040H
+0439   22D0 D7 40 5F 40 
+0440   22D4 AA AA A2 3F 	.DB    0AAH,0AAH,0A2H,03FH,0A0H,02FH,0E8H,00AH
+0440   22D8 A0 2F E8 0A 
+0441   22DC 8A FA 0A EA 	.DB    08AH,0FAH,00AH,0EAH,02AH,0AAH,0AAH,0AAH
+0441   22E0 2A AA AA AA 
+0442   22E4 85 3D 85 F1 	.DB    085H,03DH,085H,0F1H,09FH,0B1H,095H,0D5H
+0442   22E8 9F B1 95 D5 
+0443   22EC             ;
+0444   22EC             ; FIFTH ROW
+0445   22EC             ;
+0446   22EC A0 AF 81 AD 	.DB    0A0H,0AFH,081H,0ADH,0A8H,0ABH,0A0H,0AFH
+0446   22F0 A8 AB A0 AF 
+0447   22F4 55 55 15 F5 	.DB    055H,055H,015H,0F5H,004H,0DDH,011H,0F7H
+0447   22F8 04 DD 11 F7 
+0448   22FC 7F 44 55 55 	.DB    07FH,044H,055H,055H,011H,0FFH,000H,05FH
+0448   2300 11 FF 00 5F 
+0449   2304 FA 42 5A 5A 	.DB    0FAH,042H,05AH,05AH,002H,0EFH,020H,0BEH
+0449   2308 02 EF 20 BE 
+0450   230C A2 BF 80 FF 	.DB    0A2H,0BFH,080H,0FFH,000H,0FFH,080H,0BFH
+0450   2310 00 FF 80 BF 
+0451   2314 15 F5 05 FD 	.DB    015H,0F5H,005H,0FDH,005H,0F5H,015H,055H
+0451   2318 05 F5 15 55 
+0452   231C             ;
+0453   231C             ; SIXTH ROW
+0454   231C             ;
+0455   231C A8 AA AA AB 	.DB    0A8H,0AAH,0AAH,0ABH,0A0H,0BFH,080H,0FFH
+0455   2320 A0 BF 80 FF 
+0456   2324 04 F5 11 D5 	.DB    004H,0F5H,011H,0D5H,014H,0D7H,010H,0FFH
+0456   2328 14 D7 10 FF 
+0457   232C 42 FA 02 5E 	.DB    042H,0FAH,002H,05EH,040H,0FFH,000H,0FFH
+0457   2330 40 FF 00 FF 
+0458   2334 20 AF A0 BF ENTRY   .DB    020H,0AFH,0A0H,0BFH,080H,0FFH,000H,0FFH
+0458   2338 80 FF 00 FF 
+0459   233C 81 BD 20 ED 	.DB    081H,0BDH,020H,0EDH,005H,0F5H,004H,0FFH
+0459   2340 05 F5 04 FF 
+0460   2344 55 55 45 F5 	.DB    055H,055H,045H,0F5H,015H,055H,041H,0FFH
+0460   2348 15 55 41 FF 
+0461   234C             	.END
+tasm: Number of errors = 0
