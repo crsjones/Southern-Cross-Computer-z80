@@ -10,13 +10,13 @@ I also designed an 8x8 LED Matrix and an 8 Channel Relay add-on board which also
 After 30 years I revisited this design and made a revision 3 Southern Cross PCB.
 Also creating some new add-on cards and a new revision of the 8x8 LED Matrix. 
 
-#SC-8x8   8 x 8 LED Matrix
+### SC-8x8   8 x 8 LED Matrix
 The original 8 x8 LED Matrix design plus a couple of revisions.
-#SC-GBCART
+### SC-GBCART
 An add-on board that connects a Gameboy FLASH cartridge to the Southern Cross SBC.
-#SC-SERIAL 
+### SC-SERIAL 
 A MC6850 serial board based on the Grant Searle 'Minimum System Z80' design.
-#SC-APU
+### SC-APU
 An add-on card for the AM9511A  Arithmetic Processor Unit.
 
 
