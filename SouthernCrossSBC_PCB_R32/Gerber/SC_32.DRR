@@ -1,0 +1,21 @@
+----------------------------------------------------------------------------------------------------------------------------------
+NCDrill File Report For: SC_32.pcb   21/07/2022  1:58:28 PM
+----------------------------------------------------------------------------------------------------------------------------------
+
+Layer Pair : Top Layer to Bottom Layer
+ASCII RoundHoles File : SC_32-RoundHoles.TXT
+ASCII SlotHoles File : SC_32-SlotHoles.TXT
+
+Tool       Hole Size               Hole Tolerance               Hole Type       Hole Count   Plated         Tool Travel
+----------------------------------------------------------------------------------------------------------------------------------
+T1      28mil (0.7mm)                                             Round             108       PTH        48.33inch (1227.53mm)
+T2      32mil (0.8mm)                                             Round             397       PTH        83.34inch (2116.75mm)
+T3      39mil (1mm)                                               Round             90        PTH        34.53inch (877.05mm)
+T4      45mil (1.143mm)                                           Slot              3         PTH        1.31inch (33.32mm)
+T5      47mil (1.2mm)                                             Round             129       PTH        31.70inch (805.23mm)
+T6      55mil (1.4mm)                                             Round             2         PTH        0.20inch (5.08mm)
+T7      126mil (3.2mm)                                            Round             5         PTH        23.49inch (596.55mm)
+----------------------------------------------------------------------------------------------------------------------------------
+Totals                                                                              734
+
+Total Processing Time (hh:mm:ss) : 00:00:00

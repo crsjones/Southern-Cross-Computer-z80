@@ -1,0 +1,3424 @@
+0001   0000             ;--------------------------------------------
+0002   0000             ; S O U T H E R N   C R O S S   M O N I T O R
+0003   0000             ;--------------------------------------------
+0004   0000             ;
+0005   0000             ; WRITTEN BY CRAIG R. S. JONES
+0006   0000             ; MELBOURNE, AUSTRALIA.
+0007   0000             ; 
+0008   0000             ;
+0009   0000             ; VERSION : 1.2  01/93
+0010   0000             ; VERSION : 1.21  7/93
+0011   0000             ; Version 1.3  02/2003  ADDED SOFTWARE SCANNED KEYBOARD (UNRELEASED)
+0012   0000             ; Version 1.4  03/2021  MADE INTELH A SYSTEM CALL, REMOVED CANCEL FUNCTIONALITY FROM RXDATA
+0013   0000             ;
+0014   0000             ; Version 1.5  06/2021  ADDED SBUG SERIAL MONITOR
+0015   0000             ;                       ADDED HELP FOR SBUG COMMANDS
+0016   0000             ;                       ADDED SBUG ROUTINES TO SYSTEM CALLS
+0017   0000             ;                       MOVED THE STACK DOWN TO 3E00H TO RESERVE SOME MORE ROOM FOR MONITOR VARIABLES  
+0018   0000             ;                       ADDED INITIALISATION CODE FOR KEYTIM
+0019   0000             ; VERSION 1.6  09/2021  CONDITIONAL ASSEMBLY ALLOWS FOR TARGET TO BE TEC-1F OR SOUTHERN CROSS
+0020   0000             ;
+0021   0000             ;THE TARGET IS THE SOUTHERN CROSS
+0022   0000             ;#DEFINE TEC-1F
+0023   0000             ;
+0024   0000~            #IFDEF TEC-1F
+0025   0000~            #DEFINE DA_ACTIVE_LOW
+0026   0000             #ENDIF
+0027   0000             ;-----------------
+0028   0000             ; SYSTEM VARIABLES
+0029   0000             ;-----------------
+0030   0000             RAMSRT:	.EQU	2000H	;START OF USER RAM
+0031   0000             RAMEND:	.EQU	3BFFH	;END OF USER RAM
+0032   0000             SYSTEM:	.EQU	3E00H	;INITIAL STACK POINTER
+0033   0000             ;
+0034   0000             ; BAUD RATE CONSTANTS
+0035   0000             ;
+0036   0000             B300:	.EQU	0220H	;300 BAUD
+0037   0000             B1200:	.EQU	0080H	;1200 BAUD
+0038   0000             B2400:	.EQU	003FH	;2400 BAUD
+0039   0000             B4800:	.EQU	001BH	;4800 BAUD
+0040   0000             B9600:	.EQU	000BH	;9600 BAUD
+0041   0000             ;
+0042   0000             ; I/O PORT ADDRESS
+0043   0000             ;
+0044   0000~            #IFDEF TEC-1F
+0045   0000~            KEYBUF:      .EQU 00H             ;MM74C923N KEYBOARD ENCODER
+0046   0000~            SCAN:        .EQU 01H             ;DISPLAY SCAN LATCH
+0047   0000~            DISPLY:      .EQU 02H             ;DISPLAY LATCH
+0048   0000~            PORT3:       .EQU 03H             ;ST3 (8X8), STROBE (RELAY BOARD) DATLATCH (DAT BOARD)
+0049   0000~            PORT4:       .EQU 04H             ;ST4 (8X8), LCD 'E' (DAT BOARD)
+0050   0000~            PORT5:       .EQU 05H
+0051   0000~            PORT6:       .EQU 06H
+0052   0000~            PORT7:       .EQU 07H             ;ENABLE/DISABLE SINGLE STEPPER (IF INSTALLED)
+0053   0000             #ELSE
+0054   0000             IO0:         .EQU 80H             ;IO PORT 0
+0055   0000             IO1:         .EQU 81H             ;IO PORT 1
+0056   0000             IO2:         .EQU 82H             ;IO PORT 2
+0057   0000             IO3:         .EQU 83H             ;IO PORT 3
+0058   0000             DISPLY:      .EQU 84H             ;DISPLAY LATCH
+0059   0000             SCAN:        .EQU 85H             ;DISPLAY SCAN LATCH
+0060   0000             KEYBUF:      .EQU 86H             ;KEYBOARD BUFFER
+0061   0000             IO7:         .EQU 87H             ;ENABLE/DISABLE SINGLE STEPPER (IF INSTALLED)
+0062   0000             #ENDIF
+0063   0000             ;-------------------------
+0064   0000             ; MONITOR GLOBAL VARIABLES
+0065   0000             ;-------------------------
+0066   0000             ;
+0067   0000             ; SERIAL MONITOR VARIABLES
+0068   0000             ;
+0069   0000             MSGBUF:  .EQU 3E00H   ;STRING HANDLING AREA
+0070   0000             ;
+0071   0000             PUTCH:   .EQU 3FAAH   ;OUTPUT A CHARACTER TO SERIAL
+0072   0000             GETCH:   .EQU 3FACH   ;WAIT FOR A CHARACTER FROM SERIAL
+0073   0000             ISTACK:  .EQU 3FAEH   ;SAVE THE INITIAL STACK POINTER    
+0074   0000             ADDR:    .EQU 3FB0H   ;THE ADDRESS  
+0075   0000             DATA:    .EQU 3FB2H   ;THE DATA
+0076   0000             ;
+0077   0000             SYSFLG:	.EQU	3FB3H	;SYSTEM FLAGS  BIT 0=KEYBOARD FLAG
+0078   0000             FUNTBL:	.EQU	3FB4H	;FN TABLE ADDRESS
+0079   0000             ;
+0080   0000             ; DALLAS SMARTWATCH REGISTERS
+0081   0000             ;
+0082   0000             CALMDE:	.EQU	3FB6H	;CALENDAR MODE
+0083   0000             SWREG0:	.EQU	3FB8H	;10THS, 100THS
+0084   0000             SWREG1:	.EQU	3FB9H	;SECONDS
+0085   0000             SWREG2:	.EQU	3FBAH	;MINUTES
+0086   0000             SWREG3:	.EQU	3FBBH	;HOURS
+0087   0000             SWREG4:	.EQU	3FBCH	;DAY
+0088   0000             SWREG5:	.EQU	3FBDH	;DATE
+0089   0000             SWREG6:	.EQU	3FBEH	;MONTH
+0090   0000             SWREG7:	.EQU	3FBFH	;YEAR
+0091   0000             ;
+0092   0000             BAUD:	.EQU	3FC0H	;BAUD RATE
+0093   0000             KEYTIM:	.EQU	3FC2H	;BEEP DELAY
+0094   0000             SPTEMP:	.EQU	3FC4H	;TEMP SYSTEM CALL SP
+0095   0000             ;
+0096   0000             ; BLOCK FUNCTIONS
+0097   0000             ;
+0098   0000             COUNT:	.EQU	3FC6H	;NUMBER OF BYTES TO MOVE
+0099   0000             BLKSRT:	.EQU	3FC8H	;BLOCK START ADDRESS
+0100   0000             BLKEND:	.EQU	3FCAH	;BLOCK END ADDRESS
+0101   0000             BLKDST:	.EQU	3FCCH	;DESTINATION ADDRESS
+0102   0000             ;
+0103   0000             FUNJMP:	.EQU	3FCEH	;FN FN KEY JUMP ADDRESS
+0104   0000             ;
+0105   0000             ; DISPLAY SCAN REGISTERS
+0106   0000             ;
+0107   0000             DISBUF:	.EQU	3FD0H	;DISPLAY BUFFER
+0108   0000             ONTIM:	.EQU	3FD6H	;DISPLAY SCAN ON TIME
+0109   0000             OFTIM:	.EQU	3FD7H	;DISPLAY SCAN OFF TIME
+0110   0000             ;
+0111   0000             ; MONITOR VARIABLES
+0112   0000             ;
+0113   0000             MODE:	.EQU	3FD8H	;DISPLAY MODE
+0114   0000             ADRESS:	.EQU	3FDAH	;USER ADDRESS
+0115   0000             KEYDEL:	.EQU	3FDCH	;AUTO INCREMENT DELAY
+0116   0000             ;
+0117   0000             ; TEMPORARY REGISTER STORAGE
+0118   0000             ;
+0119   0000             REGPNT:	.EQU	3FDEH	;REGISTER POINTER
+0120   0000             TMPPC:	.EQU	3FE0H	;PROGRAM COUNTER
+0121   0000             TMPAF:	.EQU	3FE2H	;ACCUMULATOR,FLAG
+0122   0000             TMPBC:	.EQU	3FE4H	;BC REGISTER PAIR
+0123   0000             TMPDE:	.EQU	3FE6H	;DE REGISTER PAIR
+0124   0000             TMPHL:	.EQU	3FE8H	;HL REGISTER PAIR
+0125   0000             TMPIX:	.EQU	3FEAH	;INDEX REGISTER X
+0126   0000             TMPIY:	.EQU	3FECH	;INDEX REGISTER Y
+0127   0000             TMPSP:	.EQU	3FEEH	;STACK POINTER
+0128   0000             ;
+0129   0000             ; RESTART JUMP TABLE AND HARWARE TEST
+0130   0000             ;
+0131   0000             RST08:	.EQU	3FF0H	;RESTART 08H JUMP
+0132   0000             RST10:	.EQU	3FF2H	;RESTART 10H JUMP
+0133   0000             RST18:	.EQU	3FF4H	;RESTART 18H JUMP
+0134   0000             RST20:	.EQU	3FF6H	;RESTART 20H JUMP
+0135   0000             RST28:	.EQU	3FF8H	;RESTART 28H JUMP
+0136   0000             RST38:	.EQU	3FFAH	;INT INTERRUPT JUMP
+0137   0000             RST66:	.EQU	3FFCH	;NMI INTERRUPT JUMP
+0138   0000             RAMSUM:	.EQU	3FFEH	;USER RAM CHECKSUM
+0139   0000             DALLAS:	.EQU	3FFFH	;RAM TEST LOCATION
+0140   0000             ;----------------
+0141   0000             ; RESTART VECTORS
+0142   0000             ;----------------
+0143   0000             ;
+0144   0000             ;  RESTART 00H - RST 0
+0145   0000             ;WHEN POWER IS APPLIED TO THE SOUTHERN CROSS
+0146   0000             ;THE Z80 STARTS EXECUTING INSTRUCTIONS FROM HERE
+0147   0000             ;
+0148   0000             	.ORG	0000H
+0149   0000 C3 00 02    RSTVEC:	JP	RESET
+0150   0003             ;
+0151   0003             ; RESTART 08H - RST 1
+0152   0003             ;
+0153   0008             	.ORG	0008H
+0154   0008 E5          	PUSH	HL
+0155   0009 2A F0 3F    	LD	HL,(RST08)
+0156   000C E9          	JP	(HL)
+0157   000D             ;
+0158   000D             ; RESTART 10H - RST 2
+0159   000D             ;
+0160   0010             	.ORG	0010H
+0161   0010 E5          	PUSH	HL
+0162   0011 2A F2 3F    	LD	HL,(RST10)
+0163   0014 E9          	JP	(HL)
+0164   0015             ;
+0165   0015             ; RESTART 18H - RST 3
+0166   0015             ;
+0167   0018             	.ORG	0018H
+0168   0018 E5          	PUSH	HL
+0169   0019 2A F4 3F    	LD	HL,(RST18)
+0170   001C E9          	JP	(HL)
+0171   001D             ;
+0172   001D             ; RESTART 20H - RST 4
+0173   001D             ;
+0174   0020             	.ORG	0020H
+0175   0020 E5          	PUSH	HL
+0176   0021 2A F6 3F    	LD	HL,(RST20)
+0177   0024 E9          	JP	(HL)
+0178   0025             ;
+0179   0025             ; RESTART 28H - RST 5
+0180   0025             ;
+0181   0028             	.ORG	0028H
+0182   0028 E5          	PUSH	HL
+0183   0029 2A F8 3F    	LD	HL,(RST28)
+0184   002C E9          	JP	(HL)
+0185   002D             ;
+0186   002D             ; RESTART 30H - RST 6 - MONITOR ROUTINES ENTRY POINT
+0187   002D             ;
+0188   0030             	.ORG	0030H
+0189   0030 C3 6B 00    RST30:	JP	SYSCALL
+0190   0033             ;
+0191   0033             ; RESTART 38H - RST 7     BREAKPOINT HANDLER
+0192   0033             ;IF INTERRUPTS ARE ENABLED,AND AN
+0193   0033             ;INT OCCURS- FURTHER INTERRUPTS
+0194   0033             ;ARE DISABLED, THE PROGRAM COUNTER
+0195   0033             ;IS PUSHED ONTO THE STACK, AND EXECUTION
+0196   0033             ;STARTS HERE
+0197   0033             ;
+0198   0038             	.ORG	0038H
+0199   0038 E5          	PUSH	HL
+0200   0039 2A FA 3F    	LD	HL,(RST38)
+0201   003C E9          	JP	(HL)
+0202   003D             ;
+0203   003D             ; RESTART 66H NMI VECTOR
+0204   003D             ; SAME AS ABOVE BUT NMI CANNOT BE DISABLED.
+0205   003D             ;
+0206   0066             	.ORG	0066H
+0207   0066                 
+0208   0066~            #IFDEF TEC-1F
+0209   0066~                RETI
+0210   0066             #ELSE
+0211   0066 E5          	PUSH	HL
+0212   0067 2A FC 3F    	LD	HL,(RST66)
+0213   006A E9          	JP	(HL)
+0214   006B             #ENDIF
+0215   006B             ;--------------------
+0216   006B             ; SYSTEM CALL HANDLER
+0217   006B             ;--------------------
+0218   006B             ;CALLS TO BASIC I/O AND OTHER ROUTINES
+0219   006B             ;WITHIN THE MONITOR HAVE BEEN ASSIGNED
+0220   006B             ;SYSTEM CALL NUMBERS TO AVOID RE-WRITING
+0221   006B             ;USER SOFTWARE IF MONITOR ABSOLUTE ADDRESSES
+0222   006B             ;CHANGE IN SUBSEQUENT MONITORS
+0223   006B             ;
+0224   006B             ;ENTRY : C = CALL NUMBER
+0225   006B             ;SEE ROUTINES FOR ENTRY AND EXIT
+0226   006B             ;PARAMETERS
+0227   006B             ;
+0228   006B 3B          SYSCALL:	DEC	SP
+0229   006C 3B          	DEC	SP	;LEAVE SPACE FOR SYSCALL
+0230   006D ED 73 C4 3F 	LD	(SPTEMP),SP	;POINTS TO SYSCALL LO
+0231   0071 F5          	PUSH	AF
+0232   0072 D5          	PUSH	DE
+0233   0073 E5          	PUSH	HL	;SAVE REGISTERS
+0234   0074 79          	LD	A,C	;GET CALL NUMBER
+0235   0075 E6 7F       	AND	127	;ENSURE IN LIMITS
+0236   0077 CB 27       	SLA	A	;MULTIPLY BY TWO
+0237   0079 26 01       	LD	H,1	;LOAD JUMP TABLE HIGH BYTE
+0238   007B 6F          	LD	L,A	;LOAD INDEX
+0239   007C 7E          	LD	A,(HL)
+0240   007D 23          	INC	HL
+0241   007E 56          	LD	D,(HL)	;GET JUMP ADDRESS
+0242   007F 2A C4 3F    	LD	HL,(SPTEMP)	;POINT TO SYSCALL LO
+0243   0082 77          	LD	(HL),A	;PUT SYSCALL LO ON STACK
+0244   0083 23          	INC	HL
+0245   0084 7A          	LD	A,D
+0246   0085 77          	LD	(HL),A	;PUT SYSCALL HI ON STACK
+0247   0086 E1          	POP	HL
+0248   0087 D1          	POP	DE
+0249   0088 F1          	POP	AF	;RESTORE REGISTERS
+0250   0089 C9          	RET		;JUMPS TO SYSTEM CALL
+0251   008A             ;-----------------------
+0252   008A             ; SYSTEM CALL JUMP TABLE
+0253   008A             ;-----------------------
+0254   0100             	.ORG	0100H
+0255   0100 8E 02 9E 03 SYSJMP:	.DW	MAIN,VERS
+0256   0104 A2 03 B7 03 	.DW	DISADD,DISBYT,CLRBUF,SCAND
+0256   0108 1B 04 F0 03 
+0257   010C C0 03 CD 03 	.DW	CONBYT,CONVHI,CONVLO
+0257   0110 D1 03 
+0258   0112 76 04 82 04 	.DW	SKEYIN,SKEYRL,KEYIN,KEYREL
+0258   0116 8E 04 97 04 
+0259   011A A0 04 C3 04 	.DW	MENU,CHKSUM
+0260   011E FB 04 E3 04 	.DW	MUL16,RAND
+0261   0122 D3 04 DA 04 	.DW	INDEXB,INDEXW
+0262   0126 12 05 8F 05 	.DW	MUSIC,TONE,BEEP
+0262   012A AF 05 
+0263   012C A8 0C       	.DW	SKATE
+0264   012E 11 08 3C 08 	.DW	TXDATA,RXDATA,ASCHEX
+0264   0132 08 08 
+0265   0134 C1 0E 37 0E 	.DW	WWATCH,RWATCH,ONESEC
+0265   0138 21 0F 
+0266   013A D0 0B FE 0B 	.DW	RLSTEP,DELONE,SCANKEY
+0266   013E 2A 04 
+0267   0140 80 07 A8 0B     .DW INTELH,SPLIT
+0268   0144 6C 11 57 11     .DW SNDMSG,BITASC
+0269   0148 3E 11 43 11     .DW WRDASC,BYTASC,NYBASC
+0269   014C 4C 11 
+0270   014E             ;------------------------------
+0271   014E             ; POWER UP RESET / MANUAL RESET
+0272   014E             ;------------------------------
+0273   0200             	.ORG	0200H
+0274   0200             ;
+0275   0200             ; WAIT FOR SMART SOCKET
+0276   0200             ; TO RECOVER FROM POWER DOWN
+0277   0200             ;
+0278   0200 3E 55       RESET:	LD	A,55H
+0279   0202 32 FF 3F    	LD	(DALLAS),A	;WRITE TO RAM
+0280   0205 AF          	XOR	A
+0281   0206 D3 84       	OUT	(DISPLY),A	;WRITE NOTHING TO
+0282   0208 D3 85       	OUT	(SCAN),A	;ON BOARD I/O
+0283   020A DB 86       	IN	A,(KEYBUF)	;TO HELP DEBUGGING
+0284   020C 3A FF 3F    	LD	A,(DALLAS)	;READ FROM RAM
+0285   020F FE 55       	CP	55H	;IS IT READY?
+0286   0211 C2 00 02    	JP	NZ,RESET	;KEEP TRYING
+0287   0214             ;
+0288   0214             ; LOAD STACK POINTER
+0289   0214             ;
+0290   0214 31 00 3E    RESET1:	LD	SP,SYSTEM
+0291   0217             ;
+0292   0217             ; SET UP RESTART VECTORS
+0293   0217             ;
+0294   0217 21 14 02    	LD	HL,RESET1
+0295   021A 22 F0 3F    	LD	(RST08),HL
+0296   021D 22 F2 3F    	LD	(RST10),HL
+0297   0220 22 F4 3F    	LD	(RST18),HL
+0298   0223 22 F6 3F    	LD	(RST20),HL
+0299   0226 22 F8 3F    	LD	(RST28),HL
+0300   0229 22 FC 3F    	LD	(RST66),HL	;NMI INTERRUPT
+0301   022C 21 D9 05    	LD	HL,SSTEP
+0302   022F 22 FA 3F    	LD	(RST38),HL	;SINGLE STEPPER
+0303   0232             ;
+0304   0232             ; SET INTERRUPT MODE 1 - USE THE AUTOMATED INTERRUPT
+0305   0232             ;
+0306   0232 ED 56       	IM	1
+0307   0234             ;
+0308   0234 FB          	EI		;ENABLE INTERRUPTS
+0309   0235             ;
+0310   0235             ; PERFORM CHECKSUM ON USER RAM
+0311   0235             ;
+0312   0235 21 00 20    	LD	HL,RAMSRT	;START OF USER RAM
+0313   0238 11 FF 3B    	LD	DE,RAMEND	;END OF USER RAM
+0314   023B CD C3 04    	CALL	CHKSUM
+0315   023E 32 FE 3F    	LD	(RAMSUM),A	;RAM CHECKSUM
+0316   0241             ;
+0317   0241             ; SET UP DEFAULT VARIABLES
+0318   0241             ;
+0319   0241 21 2E 07    	LD	HL,FUNLST
+0320   0244 22 B4 3F    	LD	(FUNTBL),HL	;FUNCTION KEY TABLE
+0321   0247             ;
+0322   0247             ; PRESS THE FUNCTION KEY TWICE TO JUMP INTO THE SERIAL MONITOR
+0323   0247             ;
+0324   0247 21 37 0F        LD  HL,SCBUG    ;JUMP TO SERIAL MONITOR 
+0325   024A 22 CE 3F    	LD	(FUNJMP),HL	;FN FN JUMP
+0326   024D             
+0327   024D 3E 00       	LD	A,00H
+0328   024F 32 DE 3F    	LD	(REGPNT),A	;INIT SINGLE STEPPER
+0329   0252 21 1B 00    	LD	HL,B4800
+0330   0255 22 C0 3F    	LD	(BAUD),HL	;DEFAULT SERIAL=4800 BAUD
+0331   0258 21 00 01    	LD	HL,0100H
+0332   025B 22 DC 3F    	LD	(KEYDEL),HL	;AUTO-INC/DEC DELAY
+0333   025E 21 00 10        LD  HL,1000H
+0334   0261 22 C2 3F        LD  (KEYTIM),HL ;DELAY TIME INSTEAD OF A BEEP
+0335   0264 3E 0A       	LD	A,0AH
+0336   0266 32 D7 3F    	LD	(OFTIM),A	;DISPLAY OFF TIME
+0337   0269 CD AF 05    	CALL	BEEP
+0338   026C CD AF 05    	CALL	BEEP
+0339   026F             ;
+0340   026F             ; SOFTWARE KEYBOARD ENCODER
+0341   026F             ;
+0342   026F 3E 00       	LD	A,00H
+0343   0271 CB C7       	SET	0,A		        ;SOFTWARE SCANNED
+0344   0273 32 B3 3F    	LD	(SYSFLG),A
+0345   0276~            #IFDEF TEC-1F
+0346   0276~            	LD	A,08H
+0347   0276~            	LD	(ONTIM),A	    ;DISPLAY ON TIME FOR SOFTWARE KEYBOARD    
+0348   0276             #ELSE    
+0349   0276 3E 20       	LD	A,20H
+0350   0278 32 D6 3F    	LD	(ONTIM),A	    ;DISPLAY ON TIME FOR SOFTWARE KEYBOARD
+0351   027B             #ENDIF
+0352   027B             
+0353   027B~            #IFDEF TEC-1F    
+0354   027B~            	IN  A,(KEYBUF)      ;READ KEY BUFFER
+0355   027B~            	BIT	6,A		        ;DA LOW? MUST BE SOFTWARE SCANNING
+0356   027B~            	JR	Z,MAIN    
+0357   027B             #ELSE    
+0358   027B DB 86       	IN  A,(KEYBUF)      ;READ KEY BUFFER
+0359   027D CB 6F       	BIT	5,A		        ;DA HIGH? MUST BE SOFTWARE SCANNING
+0360   027F 20 0D       	JR	NZ,MAIN
+0361   0281             #ENDIF
+0362   0281             ;
+0363   0281             ; HARDWARE KEYBOARD ENCODER
+0364   0281             ;
+0365   0281 3A B3 3F    	LD	A,(SYSFLG)	    ;GET SYSTEM FLAGS
+0366   0284 CB 87       	RES	0,A		        ;HARDWARE ENCODER
+0367   0286 32 B3 3F    	LD	(SYSFLG),A
+0368   0289~            #IFDEF TEC-1F
+0369   0289~            	LD	A,08H
+0370   0289             #ELSE
+0371   0289 3E 20       	LD	A,20H
+0372   028B             #ENDIF
+0373   028B                 
+0374   028B 32 D6 3F    	LD	(ONTIM),A	;DISPLAY ON TIME FOR KEYBOARD ENCODER
+0375   028E              
+0376   028E             ;-----------------
+0377   028E             ; SET UP MAIN LOOP
+0378   028E             ;-----------------
+0379   028E 31 00 3E    MAIN:	LD	SP,SYSTEM	;SET STACK
+0380   0291 21 00 20    	LD	HL,RAMSRT
+0381   0294 22 DA 3F    	LD	(ADRESS),HL	;DEFAULT ADDRESS
+0382   0297 3A D8 3F    	LD	A,(MODE)
+0383   029A F6 80       	OR	80H	;START OFF IN DATA MODE
+0384   029C 32 D8 3F    	LD	(MODE),A 
+0385   029F             ;
+0386   029F             ; SCAN THE DISPLAYS UNTIL A KEY IS PRESSED
+0387   029F             ;
+0388   029F CD 79 03    MAIN1:	CALL	UPDATE
+0389   02A2 CD 76 04    MAIN2:	CALL	SKEYIN	;WAIT FOR A KEY
+0390   02A5 21 B4 02    	LD	HL,MENLST	;USE THE MENU HANDLER
+0391   02A8 CD A0 04    	CALL	MENU	;ROUTINE FOR EACH KEY
+0392   02AB CD 79 03    	CALL	UPDATE	;UPDATE BUFFER AND
+0393   02AE CD 82 04    	CALL	SKEYRL	;WAIT FOR KEY RELEASE
+0394   02B1 C3 A2 02    	JP	MAIN2
+0395   02B4             ;
+0396   02B4             ; MAIN MENU KEY TABLE
+0397   02B4             ;
+0398   02B4 14          MENLST:      .DB 20
+0399   02B5 00 01 02 03             .DB 00H,01H,02H,03H,04H,05H,06H,07H
+0399   02B9 04 05 06 07 
+0400   02BD 08 09 0A 0B             .DB 08H,09H,0AH,0BH,0CH,0DH,0EH,0FH
+0400   02C1 0C 0D 0E 0F 
+0401   02C5 10 11 12 13             .DB 10H,11H,12H,13H
+0402   02C9 F1 02 F1 02             .DW HEXKEY,HEXKEY,HEXKEY,HEXKEY
+0402   02CD F1 02 F1 02 
+0403   02D1 F1 02 F1 02             .DW HEXKEY,HEXKEY,HEXKEY,HEXKEY
+0403   02D5 F1 02 F1 02 
+0404   02D9 F1 02 F1 02             .DW HEXKEY,HEXKEY,HEXKEY,HEXKEY
+0404   02DD F1 02 F1 02 
+0405   02E1 F1 02 F1 02             .DW HEXKEY,HEXKEY,HEXKEY,HEXKEY
+0405   02E5 F1 02 F1 02 
+0406   02E9~            #IFDEF TEC-1F           
+0407   02E9~                        .DW INCKEY,DECKEY,FUNKEY,ADDKEY    ;TEC KEYS    +  -  GO  AD        
+0408   02E9             #ELSE                   
+0409   02E9 02 07 23 03             .DW FUNKEY,ADDKEY,INCKEY,DECKEY    ;SC-1 KEYS  FN  AD  +  -
+0409   02ED 2F 03 54 03 
+0410   02F1             #ENDIF
+0411   02F1             ;---------------------------------------------------
+0412   02F1             ; ENTER HEX KEY AS LEAST SIGNIFICANT ADDRESS OR DATA
+0413   02F1             ;---------------------------------------------------
+0414   02F1 CD AF 05    HEXKEY:	CALL	BEEP
+0415   02F4 21 D8 3F    	LD	HL,MODE
+0416   02F7 CB 7E       	BIT	7,(HL)	;ADDR OR DATA MODE?
+0417   02F9 CA 0A 03    	JP	Z,HEXKY2	;IN ADDR MODE
+0418   02FC             ;
+0419   02FC             ; IN DATA MODE
+0420   02FC             ;
+0421   02FC 2A DA 3F    HEXKY1:	LD	HL,(ADRESS)
+0422   02FF CB 26       	SLA	(HL)	;FROM THE CURRENT
+0423   0301 CB 26       	SLA	(HL)	;ADDRESS,MOVE THE
+0424   0303 CB 26       	SLA	(HL)	;LSN TO THE MSN.
+0425   0305 CB 26       	SLA	(HL)	;PUT THE KEY IN
+0426   0307 B6          	OR	(HL)	;THE NEW DATA BACK AT
+0427   0308 77          	LD	(HL),A	;THE CURRENT ADDRESS.
+0428   0309 C9          	RET
+0429   030A             ;
+0430   030A             ; IN ADDRESS MODE
+0431   030A             ;
+0432   030A 2A DA 3F    HEXKY2:	LD	HL,(ADRESS)
+0433   030D CB 25       	SLA	L	;CURRENT ADDRESS
+0434   030F CB 14       	RL	H	;AND DO A 16 BIT
+0435   0311 CB 25       	SLA	L	;LEFT SHIFT 4 TIMES
+0436   0313 CB 14       	RL	H	;TO MAKE  ROOM
+0437   0315 CB 25       	SLA	L	;FOR THE NEW KEY
+0438   0317 CB 14       	RL	H
+0439   0319 CB 25       	SLA	L
+0440   031B CB 14       	RL	H
+0441   031D B5          	OR	L	;IT IN THE LEAST
+0442   031E 6F          	LD	L,A	;SIGNIFICANT NYBBLE
+0443   031F 22 DA 3F    	LD	(ADRESS),HL	;SAVE CURRENT ADDRESS
+0444   0322 C9          	RET
+0445   0323             ;-------------
+0446   0323             ; CHANGE MODES
+0447   0323             ;-------------
+0448   0323 CD AF 05    ADDKEY:	CALL	BEEP
+0449   0326 3A D8 3F    	LD	A,(MODE)
+0450   0329 EE 80       	XOR	80H	;TOGGLE MODE
+0451   032B 32 D8 3F    	LD	(MODE),A
+0452   032E C9          	RET
+0453   032F             ;------------------
+0454   032F             ; INCREMENT ADDRESS
+0455   032F             ;------------------
+0456   032F CD AF 05    INCKEY:      CALL BEEP
+0457   0332 2A DA 3F    INCKY1:      LD HL,(ADRESS)
+0458   0335 23                      INC HL              ;INC ADDRESS
+0459   0336 22 DA 3F                LD (ADRESS),HL
+0460   0339 CD 79 03                CALL UPDATE
+0461   033C 2A DC 3F                LD HL,(KEYDEL)      ;AUTO REPEAT DELAY
+0462   033F CD F0 03    INCKY2:      CALL SCAND
+0463   0342 DB 86                   IN A,(KEYBUF)
+0464   0344~            #IFDEF  TEC-1F
+0465   0344~                        BIT 6,A
+0466   0344             #ELSE
+0467   0344 CB 6F                   BIT 5,A
+0468   0346             #ENDIF                
+0469   0346~            #IFDEF DA_ACTIVE_LOW
+0470   0346~                        JR NZ,INCKY3        ;KEY RELEASED
+0471   0346             #ELSE
+0472   0346 28 0B                   JR Z,INCKY3         ;KEY RELEASED
+0473   0348             #ENDIF              
+0474   0348 11 01 00                LD DE,0001H
+0475   034B ED 52                   SBC HL,DE
+0476   034D D2 3F 03                JP NC,INCKY2
+0477   0350 C3 32 03                JP INCKY1
+0478   0353 C9          INCKY3:      RET
+0479   0354             ;------------------
+0480   0354             ; DECREMENT ADDRESS
+0481   0354             ;------------------
+0482   0354 CD AF 05    DECKEY:      CALL BEEP
+0483   0357 2A DA 3F    DECKY1:      LD HL,(ADRESS)
+0484   035A 2B                      DEC HL              ;DEC ADDRESS
+0485   035B 22 DA 3F                LD (ADRESS),HL
+0486   035E CD 79 03                CALL UPDATE
+0487   0361 2A DC 3F                LD HL,(KEYDEL)      ;AUTO REPEAT DELAY
+0488   0364 CD F0 03    DECKY2:      CALL SCAND
+0489   0367 DB 86                   IN A,(KEYBUF)       ;READ KEYBOARD
+0490   0369~            #IFDEF  TEC-1F
+0491   0369~                        BIT 6,A
+0492   0369             #ELSE
+0493   0369 CB 6F                   BIT 5,A
+0494   036B             #ENDIF            
+0495   036B~            #IFDEF DA_ACTIVE_LOW           
+0496   036B~                        JR NZ,DECKY3         ; - KEY RELEASED
+0497   036B             #ELSE         
+0498   036B 28 0B                   JR Z,DECKY3         ; - KEY RELEASED
+0499   036D             #ENDIF
+0500   036D 11 01 00                LD DE,0001H
+0501   0370 ED 52                   SBC HL,DE
+0502   0372 D2 64 03                JP NC,DECKY2
+0503   0375 C3 57 03                JP DECKY1
+0504   0378 C9          DECKY3:      RET
+0505   0379             ;-----------------------------------------
+0506   0379             ; UPDATE DISPLAY BUFFER TO CURRENT ADDRESS
+0507   0379             ;-----------------------------------------
+0508   0379 2A DA 3F    UPDATE:      LD HL,(ADRESS)
+0509   037C CD A2 03                CALL DISADD         ;AND DATA, PUT IN
+0510   037F 7E                      LD A,(HL)
+0511   0380 CD B7 03                CALL DISBYT         ;DISPLAY BUFFER
+0512   0383             ;
+0513   0383             ; IN ADDRESS OR DATA MODE?
+0514   0383             ;
+0515   0383 21 D8 3F                LD HL,MODE
+0516   0386 CB 7E                   BIT 7,(HL)          ;DATA OR ADDR MODE?
+0517   0388 CA 93 03                JP Z,ADMODE         ;ADDRESS MODE
+0518   038B             ;
+0519   038B             ; SHOW DATA MODE
+0520   038B             ;
+0521   038B 21 D0 3F                LD HL,DISBUF        ;SET THE DP'S 
+0522   038E 06 02                   LD B,2              ;IN THE DATA
+0523   0390 C3 98 03                JP SETDP            ;DISPLAY
+0524   0393             ;
+0525   0393             ; SHOW ADDRESS MODE
+0526   0393             ;
+0527   0393 21 D2 3F    ADMODE:      LD HL,DISBUF+2
+0528   0396 06 04                   LD B,4              ;SET THE DP'S IN THE ADDRESS DISPLAY
+0529   0398             ;
+0530   0398             ; SET DECIMAL POINT
+0531   0398             ;
+0532   0398             ;SET DP IN THE BYTE POINTED TO BY HL
+0533   0398             ;
+0534   0398~            #IFDEF TEC-1F
+0535   0398~            SETDP:       SET 4,(HL)          ;SET BIT 4 FOR DP ON TEC-1F DISPLAY
+0536   0398             #ELSE
+0537   0398 CB FE       SETDP:       SET 7,(HL)          ;SET BIT 7 FOR DP ON SC-1 DISPLAY
+0538   039A             #ENDIF
+0539   039A 23                      INC HL              ;POINT TO NEXT BYTE
+0540   039B 10 FB                   DJNZ SETDP          ;MORE BITS TO SET
+0541   039D C9                      RET
+0542   039E             ;---------------
+0543   039E             ; VERSION NUMBER
+0544   039E             ;---------------
+0545   039E             ;RETURNS THE SOFTWARE VERSION NUMBER
+0546   039E             ;SHOULD FUTURE MONITORS EXHIBIT DIFFERENCES
+0547   039E             ;THE VERSION NUMBER CAN BE USED TO COMPENSATE
+0548   039E             ;
+0549   039E             ;	ENTRY : NONE
+0550   039E             ; EXIT : H = ASCII MINOR VERSION NUMBER
+0551   039E             ;        L = ASCII MAJOR VERSION NUMBER
+0552   039E             ;
+0553   039E 21 36 31    VERS:	LD	HL,3136H
+0554   03A1 C9          	RET
+0555   03A2             ;-------------------------
+0556   03A2             ; ADDRESS > DISPLAY BUFFER
+0557   03A2             ;-------------------------
+0558   03A2             ;CONVERT HL TO SEVEN SEGMENT CODE
+0559   03A2             ;AND PUT IN ADDRESS DISPLAY BUFFER.
+0560   03A2             ;
+0561   03A2             ; ENTRY : HL = ADDRESS TO BE DISPLAYED
+0562   03A2             ;
+0563   03A2             ; EXIT  : NO REGISTERS MODIFIED
+0564   03A2             ;
+0565   03A2 F5          DISADD:	PUSH	AF
+0566   03A3 E5          	PUSH	HL
+0567   03A4 E5          	PUSH	 HL
+0568   03A5 7C          	LD	A,H
+0569   03A6 CD C0 03    	CALL	CONBYT
+0570   03A9 22 D4 3F    	LD	(DISBUF+4),HL
+0571   03AC E1          	POP	HL
+0572   03AD 7D          	LD	A,L
+0573   03AE CD C0 03    	CALL	CONBYT
+0574   03B1 22 D2 3F    	LD	(DISBUF+2),HL
+0575   03B4 E1          	POP	HL
+0576   03B5 F1          	POP	AF
+0577   03B6 C9          	RET
+0578   03B7             ;---------------------------
+0579   03B7             ; DATA BYTE > DISPLAY BUFFER
+0580   03B7             ;---------------------------
+0581   03B7             ;CONVERT THE ACC TO SEVEN SEGMENT CODE
+0582   03B7             ;AND PUT IN DATA DISPLAY BUFFER.
+0583   03B7             ;
+0584   03B7             ; ENTRY :  A = DATA DISPLAY BYTE
+0585   03B7             ;
+0586   03B7             ; EXIT  : NO REGISTERS MODIFIED
+0587   03B7             ;
+0588   03B7 E5          DISBYT:	PUSH	HL
+0589   03B8 CD C0 03    	CALL	CONBYT
+0590   03BB 22 D0 3F    	LD	(DISBUF),HL
+0591   03BE E1          	POP	HL
+0592   03BF C9          	RET
+0593   03C0             ;---------------------------------------
+0594   03C0             ; CONVERT BYTE TO 7 SEGMENT DISPLAY CODE
+0595   03C0             ;---------------------------------------
+0596   03C0             ; CONVERTS BYTE IN ACC TO SEVEN SEGMENT CODE
+0597   03C0             ; FOR DISPLAY
+0598   03C0             ; ENTRY : A = BYTE TO BE CONVERTED
+0599   03C0             ; EXIT  : H = HI NYBBLE SEVEN SEGMENT CODE
+0600   03C0             ;         L = LO NYBBLE SEVEN SEGMENT CODE
+0601   03C0             ;         A = NOT MODIFIED
+0602   03C0 F5          CONBYT:	PUSH	AF
+0603   03C1 F5          	PUSH	AF
+0604   03C2 CD CD 03    	CALL	CONVHI	;CONVERT HI NYBBLE
+0605   03C5 67          	LD	H,A
+0606   03C6 F1          	POP	AF
+0607   03C7 CD D1 03    	CALL	CONVLO	;CONVERT LO NYBBLE
+0608   03CA 6F          	LD	L,A
+0609   03CB F1          	POP	AF
+0610   03CC C9          	RET
+0611   03CD             ;---------------------------------------------
+0612   03CD             ; HEXADECIMAL TO SEVEN SEGMENT CODE CONVERSION
+0613   03CD             ;---------------------------------------------
+0614   03CD             ; CONVERTS NYBBLE IN ACC TO SEVEN SEGMENT CODE
+0615   03CD             ; FOR SEVEN SEGMENT DISPLAYS
+0616   03CD             ; CONVHI = CONVERTS HIGH NYBBLE
+0617   03CD             ; CONVLO = CONVERTS LO NYBBLE
+0618   03CD             ;
+0619   03CD             ; ENTRY : A = NYBBLE TO BE CONVERTED
+0620   03CD             ; EXIT  : A = SEVEN SEGMENT CODE
+0621   03CD             ;
+0622   03CD 07          CONVHI:	RLCA
+0623   03CE 07          	RLCA
+0624   03CF 07          	RLCA	;MOVE TO LO NYBBLE
+0625   03D0 07          	RLCA	;FOR CONVERSION
+0626   03D1 C5          CONVLO:	PUSH	BC
+0627   03D2 E5          	PUSH	HL
+0628   03D3 21 E0 03    	LD	HL,SEGMNT	;USE THE HEX VALUE
+0629   03D6 E6 0F       	AND	0FH	;TO INDEX TO THE
+0630   03D8 4F          	LD	C,A	;THE SEVEN SEGMENT
+0631   03D9 06 00       	LD	B,00H	;CODE FOR THAT VALUE
+0632   03DB 09          	ADD	HL,BC	;AND RETURN WITH
+0633   03DC 7E          	LD	A,(HL)	;CODE IN A
+0634   03DD E1          	POP	HL
+0635   03DE C1          	POP	BC
+0636   03DF C9          	RET
+0637   03E0             ;
+0638   03E0             ; HEXADECIMAL TO 7 SEGMENT DISPLAY CODE TABLE
+0639   03E0~            #IFDEF TEC-1F
+0640   03E0~            SEGMNT:      .DB 0EBH,28H,0CDH,0ADH ;0,1,2,3
+0641   03E0~                        .DB 2EH,0A7H,0E7H,29H ;4,5,6,7
+0642   03E0~                        .DB 0EFH,2FH,6FH,0E6H ;8,9,A,B
+0643   03E0~                        .DB 0C3H,0ECH,0C7H,47H ;C,D,E,F
+0644   03E0             #ELSE
+0645   03E0 3F 06 5B 4F SEGMNT:      .DB 3FH,06H,5BH,4FH ;0,1,2,3
+0646   03E4 66 6D 7D 07             .DB 66H,6DH,7DH,07H ;4,5,6,7
+0647   03E8 7F 6F 77 7C             .DB 7FH,6FH,77H,7CH ;8,9,A,B
+0648   03EC 39 5E 79 71             .DB 39H,5EH,79H,71H ;C,D,E,F
+0649   03F0             #ENDIF
+0650   03F0             ;-------------
+0651   03F0             ; SCAN DISPLAY
+0652   03F0             ;-------------
+0653   03F0             ;AS THE DISPLAYS ARE MULTIPLEXED, THE DATA FOR EACH
+0654   03F0             ;DISPLAY MUST BE LATCHED INTO THE DISPLAY SEGMENT
+0655   03F0             ;LATCH IN TURN AND THE CORRESPONDING BIT IN THE DISPLAY
+0656   03F0             ;SCAN LATCH TURNED ON TO DISPLAY THE DATA.
+0657   03F0             ;TWO SHORT DELAYS ARE USED TO ADJUST THE DUTY
+0658   03F0             ;CYCLE AND HENCE DISPLAY BRIGHTNESS.
+0659   03F0             ;
+0660   03F0             ; ENTRY : NONE
+0661   03F0             ; EXIT  : NO REGISTERS MODIFIED
+0662   03F0             ;
+0663   03F0 F5          SCAND:   PUSH    AF
+0664   03F1 C5          	PUSH	BC
+0665   03F2 E5          	PUSH	HL	;SAVE REGISTERS
+0666   03F3 21 D5 3F    	LD	HL,DISBUF+5
+0667   03F6 0E 20       	LD	C,20H
+0668   03F8 7E          SCAND1:	LD	A,(HL)
+0669   03F9 D3 84       	OUT	(DISPLY),A	;OUTPUT CHARACTER
+0670   03FB 79          	LD	A,C
+0671   03FC D3 85       	OUT	(SCAN),A	;TURN ON DISPLAY
+0672   03FE 3A D6 3F    	LD	A,(ONTIM)	;DO A SHORT DELAY
+0673   0401 47          	LD	B,A	;TO ADJUST ON TIME
+0674   0402 10 FE       SCAND2:	DJNZ	SCAND2	;OF DISPLAY
+0675   0404 78          	LD	A,B	;B IS NOW CLEAR, USE
+0676   0405 D3 85       	OUT	(SCAN),A	;IT TO TURN OFF SCAN
+0677   0407 3A D7 3F    	LD	A,(OFTIM)	;DO A SHORT DELAY
+0678   040A 47          	LD	B,A	;TO ADJUST OFF TIME
+0679   040B 10 FE       SCAND3:	DJNZ	SCAND3	;OF DISPLAY
+0680   040D 2B          	DEC	HL	;POINT TO NEXT
+0681   040E CB 09       	RRC	C	;ELEMENT IN BUFFER
+0682   0410 30 E6       	JR	NC,SCAND1	;DISPLAY NEXT ELEMENT
+0683   0412 78          	LD	A,B	;B IS NOW CLEAR, USE
+0684   0413 D3 85       	OUT	(SCAN),A	;IT TO TURN OFF SCAN
+0685   0415 D3 84       	OUT	(DISPLY),A	;AND CLEAR DISPLAY LATCH
+0686   0417 E1          	POP	HL
+0687   0418 C1          	POP	BC
+0688   0419 F1          	POP	AF	;RESTORE REGISTERS
+0689   041A C9          	RET
+0690   041B             ;---------------------
+0691   041B             ; CLEAR DISPLAY BUFFER
+0692   041B             ;---------------------
+0693   041B E5          CLRBUF:	PUSH	HL
+0694   041C C5          	PUSH	BC
+0695   041D 21 D0 3F    	LD	HL,DISBUF
+0696   0420 06 06       	LD	B,6
+0697   0422 36 00       CLRBF1:	LD	(HL),00H	;PUT ZERO IN 6
+0698   0424 23          	INC	HL	;LOCATIONS POINTED
+0699   0425 10 FB       	DJNZ	CLRBF1	;TO BY HL
+0700   0427 C1          	POP	BC
+0701   0428 E1          	POP	HL
+0702   0429 C9          	RET
+0703   042A             ;--------------
+0704   042A             ; SCAN KEYBOARD
+0705   042A             ;--------------
+0706   042A             ; USE DISPLAY SCAN DRIVERS FOR COLUMNS
+0707   042A             ; AND KEYBOARD BUFFER AS ROWS.
+0708   042A             ; MAKE EACH DATA LINE HIGH IN TURN AND CHECK
+0709   042A             ; IF EACH INDIVIDUAL PUSHBUTTON IS PRESSED.
+0710   042A             ;
+0711   042A             ; NEW ROUTINE VERSION 1.3
+0712   042A             ;
+0713   042A             ; ENTRY : NONE
+0714   042A             ; EXIT  : A = 00H IF NO KEY DETECTED
+0715   042A             ;         A = DETECTED KEY WITH BIT 5 SET
+0716   042A             ;         BIT 5 USED AS DATA AVAILABLE LIKE 74C922 KEYBOARD ENCODER
+0717   042A C5          SCANKEY: PUSH    BC
+0718   042B D5          	PUSH    DE              ;SAVE REGISTERS
+0719   042C E5          	PUSH	HL
+0720   042D 3A B3 3F    	LD	A,(SYSFLG)
+0721   0430 CB 47       	BIT	0,A
+0722   0432 20 06       	JR	NZ,SCANKY1
+0723   0434 DB 86       	IN	A,(KEYBUF)	;READ HARDWARE ENCODER
+0724   0436 E6 3F       	AND	3FH		;STRIP UNUSED BITS
+0725   0438 18 38       	JR	SCANKY7		;EXIT
+0726   043A             ;
+0727   043A             ; SOFTWARE SCAN KEYBOARD
+0728   043A             ;
+0729   043A 3E 00       SCANKY1:	LD      A,00H
+0730   043C D3 84       	OUT     (DISPLY),A      ;CLEAR DISPLAY LATCH
+0731   043E 47          	LD      B,A		;KEY
+0732   043F 57          	LD	D,A		;COUNT
+0733   0440 1E 01       	LD      E,01H           ;MASK
+0734   0442 0E 08       SCANKY2: LD      C,08H           ;SCAN
+0735   0444 79          SCANKY3: LD      A,C
+0736   0445 D3 85       	OUT     (SCAN),A        ;OUTPUT SCAN
+0737   0447 00          	NOP
+0738   0448 00          	NOP
+0739   0449 00          	NOP
+0740   044A DB 86       	IN      A,(KEYBUF)      ;READ KEY BUFFER
+0741   044C A3          	AND     E               ;MASK 
+0742   044D 28 02       	JR      Z,SCANKY4       ;KEY NOT DETECTED
+0743   044F 14          	INC	D
+0744   0450 68          	LD	L,B		;SAVE KEY
+0745   0451             ;
+0746   0451             ; END OF ROWS?
+0747   0451             ;
+0748   0451 04          SCANKY4: INC     B               ;NEXT KEY
+0749   0452 CB 29       	SRA     C               ;SHIFT SCAN RIGHT
+0750   0454 30 EE       	JR      NC,SCANKY3      ;NEXT ROW
+0751   0456             ;
+0752   0456             ; END OF COLUMNS?
+0753   0456             ;
+0754   0456 CB 23       	SLA     E               ;SHIFT MASK LEFT
+0755   0458 CB 6B       	BIT     5,E             ;END OF KEYSCAN?
+0756   045A 28 E6       	JR      Z,SCANKY2	;NEXT COLUMN
+0757   045C             ;
+0758   045C             ; END OF SCAN
+0759   045C             ;
+0760   045C 7A          	LD	A,D
+0761   045D FE 00       	CP	00H
+0762   045F 28 0D       	JR	Z,SCANKY6	;NO KEY PRESSED
+0763   0461 FE 01       	CP	01H
+0764   0463 20 D5       	JR	NZ,SCANKY1	;MORE THAN ONE KEY PRESSED
+0765   0465             ;
+0766   0465             ; ONE KEY DETECTED
+0767   0465             ;
+0768   0465 3E 00       	LD	A,00H
+0769   0467 D3 85       	OUT	(SCAN),A	;CLEAR SCAN REG
+0770   0469 7D          	LD	A,L		;RETURN KEY IN A
+0771   046A CB EF       	SET	5,A		;SET DATA AVAILABLE FLAG
+0772   046C 18 04       	JR	SCANKY7
+0773   046E             ;
+0774   046E             ; NO KEY
+0775   046E             ;	
+0776   046E 3E 00       SCANKY6:	LD	A,00H
+0777   0470 D3 85       	OUT	(SCAN),A	;CLEAR SCAN REG
+0778   0472 E1          SCANKY7: POP	HL
+0779   0473 D1          	POP     DE
+0780   0474 C1          	POP     BC
+0781   0475 C9          	RET
+0782   0476             ;-----------------------------
+0783   0476             ; SCAN DISPLAY UNTIL KEY PRESS
+0784   0476             ;-----------------------------
+0785   0476             ; ENTRY : NONE
+0786   0476             ; EXIT  : A = KEY VALUE 00H TO 1FH
+0787   0476             ;         FLAG REGISTER MODIFIED
+0788   0476             ;
+0789   0476 CD F0 03    SKEYIN:      CALL SCAND          ;SCAN DISPLAY
+0790   0479 DB 86                   IN A,(KEYBUF)       ;READ KEYBOARD
+0791   047B~            #IFDEF  TEC-1F
+0792   047B~                        BIT 6,A
+0793   047B             #ELSE
+0794   047B CB 6F                   BIT 5,A
+0795   047D             #ENDIF       
+0796   047D                         
+0797   047D~            #IFDEF DA_ACTIVE_LOW
+0798   047D~                        JR NZ,SKEYIN         ;NO KEY PRESS
+0799   047D             #ELSE
+0800   047D 28 F7                   JR Z,SKEYIN         ;NO KEY PRESS
+0801   047F             #ENDIF
+0802   047F E6 1F                   AND 1FH             ;STRIP UNUSED BITS
+0803   0481 C9                      RET
+0804   0482             ;-------------------------------
+0805   0482             ; SCAN DISPLAY UNTIL KEY RELEASE
+0806   0482             ;-------------------------------
+0807   0482             ; ENTRY : NONE
+0808   0482             ; EXIT  : NONE
+0809   0482             ;
+0810   0482 F5          SKEYRL:      PUSH AF
+0811   0483 CD F0 03    SKEYL1:      CALL SCAND          ;SCAN DISPLAY
+0812   0486 DB 86                   IN A,(KEYBUF)       ;READ KEYBOARD
+0813   0488~            #IFDEF  TEC-1F
+0814   0488~                        BIT 6,A
+0815   0488             #ELSE
+0816   0488 CB 6F                   BIT 5,A
+0817   048A             #ENDIF       
+0818   048A                         
+0819   048A~            #IFDEF DA_ACTIVE_LOW
+0820   048A~                        JR Z,SKEYL1        ;KEY NOT RELEASED
+0821   048A             #ELSE 
+0822   048A 20 F7                   JR NZ,SKEYL1        ;KEY NOT RELEASED
+0823   048C             #ENDIF
+0824   048C F1                      POP AF
+0825   048D C9                      RET
+0826   048E             ;-------------------
+0827   048E             ; WAIT FOR KEY PRESS
+0828   048E             ;-------------------
+0829   048E             ; ENTRY : NONE
+0830   048E             ; EXIT  : A = KEY VALUE 00H TO 1FH
+0831   048E             ;         FLAG REGISTER MODIFIED
+0832   048E             ;
+0833   048E DB 86       KEYIN:       IN A,(KEYBUF)       ;READ KEYBOARD
+0834   0490~            #IFDEF  TEC-1F
+0835   0490~                        BIT 6,A
+0836   0490             #ELSE
+0837   0490 CB 6F                   BIT 5,A
+0838   0492             #ENDIF       
+0839   0492~            #IFDEF DA_ACTIVE_LOW
+0840   0492~                        JR NZ,KEYIN          ;NO KEY PRESS
+0841   0492             #ELSE
+0842   0492 28 FA                   JR Z,KEYIN          ;NO KEY PRESS
+0843   0494             #ENDIF
+0844   0494 E6 1F                   AND 1FH             ;STRIP UNUSED BITS
+0845   0496 C9                      RET
+0846   0497             ;---------------------
+0847   0497             ; WAIT FOR KEY RELEASE
+0848   0497             ;---------------------
+0849   0497             ; ENTRY : NONE
+0850   0497             ; EXIT  : NONE
+0851   0497             ;
+0852   0497 F5          KEYREL:      PUSH AF
+0853   0498 DB 86       KEYRL1:      IN A,(KEYBUF)
+0854   049A~            #IFDEF  TEC-1F
+0855   049A~                        BIT 6,A
+0856   049A             #ELSE
+0857   049A CB 6F                   BIT 5,A
+0858   049C             #ENDIF       
+0859   049C~            #IFDEF DA_ACTIVE_LOW
+0860   049C~                        JR Z,KEYRL1
+0861   049C             #ELSE           
+0862   049C 20 FA                   JR NZ,KEYRL1
+0863   049E             #ENDIF
+0864   049E F1                      POP AF
+0865   049F C9                      RET
+0866   04A0             ;-----------------
+0867   04A0             ; KEY MENU HANDLER
+0868   04A0             ;-----------------
+0869   04A0             ; COMPARES ACC AGAINST TABLE OF ELEMENTS,
+0870   04A0             ; IF FOUND JUMP TO ADDRESS CORRESPONDING TO
+0871   04A0             ; THAT ELEMENT, RETURNS IF ELEMENT NOT FOUND.
+0872   04A0             ; ENTRY :  A = ELEMENT TO LOOK FOR
+0873   04A0             ;         HL = POINTS TO TABLE
+0874   04A0             ; EXIT  :  ELEMENT NOT FOUND
+0875   04A0             ;           HL HOLDS ADDRESS OF LAST ELEMENT
+0876   04A0             ;          ELEMENT FOUND
+0877   04A0             ;           CONTROL PASSES TO JUMP ADDRESS WITH
+0878   04A0             ;          RETURN ADDRESS OF MENU CALL ON STACK
+0879   04A0             ;
+0880   04A0 F5          MENU:	PUSH	AF
+0881   04A1 C5          	PUSH	BC
+0882   04A2 D5          	PUSH	DE	;SAVE REGISTERS
+0883   04A3 E5          	PUSH	HL	;CALCULATE ADDRESS
+0884   04A4 16 00       	LD	D,00H	;OF THE JUMP TABLE BY
+0885   04A6 5E          	LD	E,(HL)	;ADDING THE INDEX TO
+0886   04A7 23          	INC	HL	;THE ELEMENTS
+0887   04A8 19          	ADD	HL,DE	;TO THE ADDR OF THE
+0888   04A9 54          	LD	D,H	;TABLE
+0889   04AA 5D          	LD	E,L
+0890   04AB E1          	POP	HL
+0891   04AC 46          	LD	B,(HL)	;GET NUMBER OF ENTRIES
+0892   04AD 23          	INC	HL	;POINT TO LIST OF ENTRIES
+0893   04AE BE          MENU1:	CP	(HL)	;COMPARE WITH ENTRY
+0894   04AF 28 09       	JR	Z,MENU2	;FOUND VALUE IN TABLE
+0895   04B1 23          	INC	HL	;NEXT ENTRY IN LIST
+0896   04B2 13          	INC	DE	;NEXT ENTRY IN
+0897   04B3 13          	INC	DE	;JUMP TABLE
+0898   04B4 10 F8       	DJNZ	MENU1	;CHECK MORE ENTRIES
+0899   04B6 D1          	POP	DE
+0900   04B7 C1          	POP	BC
+0901   04B8 F1          	POP	AF
+0902   04B9 C9          	RET	;NOT IN TABLE
+0903   04BA             ;
+0904   04BA             ; FOUND ELEMENT IN THE TABLE
+0905   04BA             ; PASS CONTROL TO THE JUMP HANDLER
+0906   04BA             ;
+0907   04BA 1A          MENU2:	LD	A,(DE)	;GET THE JUMP ADDR
+0908   04BB 6F          	LD	L,A	;FROM THE TABLE
+0909   04BC 13          	INC	DE	;AND JUMP TO
+0910   04BD 1A          	LD	A,(DE)	;THE JUMP ADDRESS
+0911   04BE 67          	LD	H,A	;FOR THAT ENTRY
+0912   04BF D1          	POP	DE
+0913   04C0 C1          	POP	BC
+0914   04C1 F1          	POP	AF	;RESTORE REGISTERS
+0915   04C2 E9          	JP	(HL)
+0916   04C3             ;-------------------
+0917   04C3             ; CALCULATE CHECKSUM
+0918   04C3             ;-------------------
+0919   04C3             ;CALCULATES CHECKSUM BETWEEN START AND END (INCLUSIVE)
+0920   04C3             ;
+0921   04C3             ; ENTRY : HL = START OF BLOCK TO SUM
+0922   04C3             ;         DE = END OF BLOCK TO SUM
+0923   04C3             ; EXIT  : A =  CHECKSUM
+0924   04C3             ;         FLAG REGISTER MODIFIED
+0925   04C3             ;
+0926   04C3 E5          CHKSUM:	PUSH	HL
+0927   04C4 D5          	PUSH	DE
+0928   04C5 13          	INC	DE	;END OF BLOCK+1
+0929   04C6 AF          	XOR	A	;CLEAR CHECKSUM
+0930   04C7 86          CHKSM1:	ADD	A,(HL)	;COMPUTE CHEKSUM
+0931   04C8 23          	INC	HL	;POINT TO NEXT ELEMENT
+0932   04C9 A7          	AND	A	;SET CARRY
+0933   04CA E5          	PUSH	HL
+0934   04CB ED 52       	SBC	HL,DE	;SUBTRACT
+0935   04CD E1          	POP	HL
+0936   04CE 38 F7       	JR	C,CHKSM1	;MORE ELEMENTS
+0937   04D0 D1          	POP	DE
+0938   04D1 E1          	POP	HL
+0939   04D2 C9          	RET
+0940   04D3             ;--------------------------
+0941   04D3             ; ACCESS BYTE LOOK UP TABLE
+0942   04D3             ;--------------------------
+0943   04D3             ; USE 8 BIT INDEX TO ACCESS BYTE LOOK
+0944   04D3             ; UP TABLE
+0945   04D3             ; ENTRY :  A = NUMBER OF ELEMENT IN TABLE
+0946   04D3             ;         HL = ADDRESS OF LOOK UP TABLE
+0947   04D3             ; EXIT : HL = ADDRESS OF ELEMENT A
+0948   04D3             ;
+0949   04D3 D5          INDEXB:	PUSH	DE
+0950   04D4 5F          	LD	E,A	;USE DE AS INDEX
+0951   04D5 16 00       	LD	D,0	;TO ELEMENT IN TABLE
+0952   04D7 19          	ADD	HL,DE	;BY ADDING TO HL
+0953   04D8 D1          	POP	DE
+0954   04D9 C9          	RET
+0955   04DA             ;--------------------------
+0956   04DA             ; ACCESS WORD LOOK UP TABLE
+0957   04DA             ;--------------------------
+0958   04DA             ; USE 8 BIT INDEX TO ACCESS WORD LOOK
+0959   04DA             ; UP TABLE
+0960   04DA             ; ENTRY :  A = NUMBER OF ELEMENT IN TABLE
+0961   04DA             ;         HL = ADDRESS OF LOOK UP TABLE
+0962   04DA             ; EXIT : HL = ADDRESS OF 2 BYTE ELEMENT A
+0963   04DA             ;
+0964   04DA D5          INDEXW:	PUSH	DE
+0965   04DB 5F          	LD	E,A
+0966   04DC CB 23       	SLA	E	;MULTIPLY BY TWO
+0967   04DE 16 00       	LD	D,0
+0968   04E0 19          	ADD	HL,DE
+0969   04E1 D1          	POP	DE
+0970   04E2 C9          	RET
+0971   04E3             ;-------------------------------
+0972   04E3             ; GENERATE A QUASI-RANDOM NUMBER
+0973   04E3             ;-------------------------------
+0974   04E3             ; GENERATE AN 16 BIT RANDOM NUMBER
+0975   04E3             ; USING LINEAR CONGRUENTIAL METHOD.
+0976   04E3             ;     Rn+1 = (aRn+c) MOD m
+0977   04E3             ; REFRESH REGISTER USED FOR Rn AND c
+0978   04E3             ;	ENTRY : NONE
+0979   04E3             ;	EXIT  : HL = RANDOM WORD
+0980   04E3             ;	NO REGISTERS MODIFIED
+0981   04E3             ;
+0982   04E3 F5          RAND:	PUSH	AF
+0983   04E4 C5          	PUSH	BC
+0984   04E5 D5          	PUSH	DE	;SAVE REGISTERS
+0985   04E6             ;
+0986   04E6             ; CALCULATE aRn
+0987   04E6             ;
+0988   04E6 ED 5F       	LD	A,R	;MULTIPLY RANDOM NUMBER
+0989   04E8 5F          	LD	E,A	;(Rn) BY
+0990   04E9 16 00       	LD	D,0
+0991   04EB 21 48 05    	LD	HL,0548H	;CONSTANT (a)
+0992   04EE CD FB 04    	CALL	MUL16
+0993   04F1             ;
+0994   04F1             ; CALCULATE aRn+c
+0995   04F1             ;
+0996   04F1 ED 5F       	LD	A,R	;ADD IT TO ANOTHER
+0997   04F3 06 00       	LD	B,0	;READ OF THE
+0998   04F5 4F          	LD	C,A	;THE REFRESH
+0999   04F6 09          	ADD	HL,BC	;REGISTER (c)
+1000   04F7 D1          	POP	DE
+1001   04F8 C1          	POP	BC
+1002   04F9 F1          	POP	AF	;RESTORE REGISTERS
+1003   04FA C9          	RET
+1004   04FB             ;----------------------
+1005   04FB             ; 16 BIT MULTIPLICATION
+1006   04FB             ;----------------------
+1007   04FB             ;16 BIT MULTIPLY
+1008   04FB             ; ENTRY : HL = MULTIPLICAND (MPD)
+1009   04FB             ;         DE = MULTIPLIER (MPR)
+1010   04FB             ; EXIT : HL = RESULT
+1011   04FB             ;SEE ZAKS 'PROGRAMMING THE Z80'
+1012   04FB             ;
+1013   04FB F5          MUL16:	PUSH	AF
+1014   04FC C5          	PUSH	BC
+1015   04FD 4C          	LD	C,H	;MPR(H)
+1016   04FE 7D          	LD	A,L	;MPR(L)
+1017   04FF 06 10       	LD	B,16	;BIT COUNTER
+1018   0501 21 00 00    	LD	HL,0	;CLEAR RESULT
+1019   0504 CB 39       MULT:	SRL	C	;MPR (H)
+1020   0506 1F          	RRA	;MPR (L)
+1021   0507 30 01       	JR	NC,MULT1	;TEST CARRY
+1022   0509 19          	ADD	HL,DE	;ADD MPD TO RESULT
+1023   050A EB          MULT1:	EX	DE,HL
+1024   050B 29          	ADD	HL,HL	;DOUBLE -SHIFT MPD LEFT
+1025   050C EB          	EX	DE,HL
+1026   050D 10 F5       	DJNZ	MULT	;DONE?
+1027   050F C1          	POP	BC
+1028   0510 F1          	POP	AF
+1029   0511 C9          	RET
+1030   0512             ;----------------
+1031   0512             ; MUSIC SEQUENCER
+1032   0512             ;----------------
+1033   0512             ; SEQUENCES THROUGH A TABLE OF NOTES
+1034   0512             ; 1EH = REPEAT TUNE UNTIL RESET
+1035   0512             ; 1FH = PLAY ONCE AND RETURN
+1036   0512             ; ENTRY : HL = ADDRESS OF NOTE TABLE
+1037   0512             ; EXIT : NO REGISTERS MODIFIED
+1038   0512 F5          MUSIC:	PUSH	AF
+1039   0513 C5          	PUSH	BC
+1040   0514 D5          	PUSH	DE
+1041   0515 E5          	PUSH	HL	;SAVE REGISTERS
+1042   0516 E5          	PUSH	HL
+1043   0517 EB          	EX	DE,HL	;GET ADDRESS OF MUSIC
+1044   0518             ;
+1045   0518             ; PLAY EACH NOTE IN TURN
+1046   0518             ;
+1047   0518 1A          STEP:	LD	A,(DE)	;GET ELEMENT FROM TABLE
+1048   0519 E6 1F       	AND	1FH	;STRIP UNUSED BITS
+1049   051B             ;
+1050   051B             ; IF ELEMENT IS 00H PAUSE FOR A WHILE
+1051   051B             ;
+1052   051B FE 00       	CP	00H
+1053   051D C2 2D 05    	JP	NZ,STEP1
+1054   0520 01 00 10    	LD	BC,1000H
+1055   0523 0B          PAUSE:	DEC	BC
+1056   0524 78          	LD	A,B
+1057   0525 B1          	OR	C
+1058   0526 C2 23 05    	JP	NZ,PAUSE	;LOOP UNTIL DE = 0
+1059   0529 13          	INC	DE	;POINT TO NEXT ELEMENT
+1060   052A C3 18 05    	JP	STEP
+1061   052D             ;
+1062   052D             ; IF ELEMENT IS 1EH REPEAT TUNE
+1063   052D             ;
+1064   052D FE 1E       STEP1:	CP	1EH
+1065   052F C2 37 05    	JP	NZ,STEP2
+1066   0532 D1          	POP	DE	;GET TABLE ADDRESS BACK
+1067   0533 D5          	PUSH	DE	;SAVE IT FOR LATER
+1068   0534 C3 18 05    	JP	STEP
+1069   0537             ;
+1070   0537             ; IF ELEMENT IS 1FH RETURN
+1071   0537             ;
+1072   0537 FE 1F       STEP2:	CP	1FH	;END OF TUNE TABLE?
+1073   0539 C2 42 05    	JP	NZ,STEP3
+1074   053C E1          	POP	HL
+1075   053D E1          	POP	HL
+1076   053E D1          	POP	DE
+1077   053F C1          	POP	BC
+1078   0540 F1          	POP	AF
+1079   0541 C9          	RET
+1080   0542             ;
+1081   0542             ;NOW PLAY THE NOTE
+1082   0542             ;
+1083   0542 47          STEP3:	LD	B,A	;SAVE ELEMENT IN B
+1084   0543 21 5E 05    	LD	HL,PERIOD	;POINT TO PERIOD/2 TABLE
+1085   0546 CD D3 04    	CALL	INDEXB	;GET PERIOD/2
+1086   0549 7E          	LD	A,(HL)	;GET ELEMENT
+1087   054A F5          	PUSH	AF	;SAVE FOR LATER
+1088   054B 78          	LD	A,B	;GET ELEMENT BACK IN A
+1089   054C 21 76 05    	LD	HL,LENGTH	;POINT TO DURATION/2 TABLE
+1090   054F CD D3 04    	CALL	INDEXB	;GET DURATION/2
+1091   0552 7E          	LD	A,(HL)	;GET ELEMENT
+1092   0553 6F          	LD	L,A
+1093   0554 26 00       	LD	H,0	;HL = DURATION/2
+1094   0556 F1          	POP	AF
+1095   0557 CD 8F 05    	CALL	TONE	;DO NOTE ROUTINE
+1096   055A 13          	INC	DE
+1097   055B C3 18 05    	JP	STEP	;STEP TO NEXT ELEMENT
+1098   055E             ;
+1099   055E             ; PERIOD/2 OF NOTE
+1100   055E             ;
+1101   055E 8C 83 7C 75 PERIOD:	.DB	8CH,83H,7CH,75H,70H,67H,62H,5CH
+1101   0562 70 67 62 5C 
+1102   0566 57 52 4E 48 	.DB	57H,52H,4EH,48H,45H,41H,3CH,39H
+1102   056A 45 41 3C 39 
+1103   056E 36 32 2F 2C 	.DB	36H,32H,2FH,2CH,2AH,27H,25H,23H
+1103   0572 2A 27 25 23 
+1104   0576             ;
+1105   0576             ; NOTE DURATION/2
+1106   0576             ;
+1107   0576 19 1A 1C 1D LENGTH:	.DB	19H,1AH,1CH,1DH,1EH,20H,23H,25H
+1107   057A 1E 20 23 25 
+1108   057E 27 29 2C 2E 	.DB	27H,29H,2CH,2EH,31H,33H,37H,3AH
+1108   0582 31 33 37 3A 
+1109   0586 3D 41 45 49 	.DB	3DH,41H,45H,49H,4DH,52H,57H,5CH
+1109   058A 4D 52 57 5C 
+1110   058E 10          	.DB	10H
+1111   058F             ;--------------
+1112   058F             ; OUTPUT A TONE
+1113   058F             ;--------------
+1114   058F             ;
+1115   058F             ; ENTRY : A = PERIOD/2 OF NOTE
+1116   058F             ;         HL = DURATION/2 OF NOTE
+1117   058F             ; EXIT NO REGISTERS MODIFIED
+1118   058F F5          TONE: PUSH	AF
+1119   0590 C5          	 PUSH	BC
+1120   0591 D5          	 PUSH	DE
+1121   0592 E5          	 PUSH	HL
+1122   0593 11 01 00    	 LD	DE,0001H
+1123   0596 4F          	 LD	C,A
+1124   0597 29          	 ADD	HL,HL	;DOUBLE DURATION
+1125   0598 AF          	 XOR	A
+1126   0599 EE 80       TONE1:	XOR	80H	;TOGGLE SPEAKER BIT
+1127   059B D3 85       	OUT	(SCAN),A	;OUTPUT SPEAKER BIT
+1128   059D 41          	LD	B,C
+1129   059E C5          TONE2:	PUSH	BC
+1130   059F 06 02       	LD	B,02H
+1131   05A1 10 FE       TONE3	DJNZ	TONE3	;DELAY FOR PERIOD/2
+1132   05A3 C1          	POP	BC
+1133   05A4 10 F8       	DJNZ	TONE2	; DELAY FOR PERIOD/2
+1134   05A6 ED 52       	SBC	HL,DE	;END OF NOTE?
+1135   05A8 20 EF       	JR	NZ,TONE1	;DO AGAIN
+1136   05AA E1          	POP	HL
+1137   05AB D1          	POP	DE
+1138   05AC C1          	POP	BC
+1139   05AD F1          	POP	AF
+1140   05AE C9          	RET
+1141   05AF             ;---------------
+1142   05AF             ; KEY ENTRY BEEP
+1143   05AF             ;---------------
+1144   05AF E5          BEEP:	PUSH	HL
+1145   05B0 F5          	PUSH	AF
+1146   05B1 21 D8 3F    	LD	HL,MODE
+1147   05B4 CB 76       	BIT	6,(HL)	;BEEP ENABLED?
+1148   05B6 28 0E       	JR	Z,BEEP2	;BEEP IS ENABLED
+1149   05B8             ;
+1150   05B8             ; DO KEYPRESS DELAY
+1151   05B8             ;
+1152   05B8 D5          	PUSH	DE	;DO A SHORT
+1153   05B9 11 01 00    	LD	DE,0001H	;DELAY TO PREVENT
+1154   05BC 2A C2 3F    	LD	HL,(KEYTIM)	;RECOGNITION
+1155   05BF ED 52       BEEP1:	SBC	HL,DE	;OF DOUBLE
+1156   05C1 30 FC       	JR	NC,BEEP1	;KEY STROKES
+1157   05C3 D1          	POP     DE
+1158   05C4 18 10       	JR	BEEP3
+1159   05C6             ;
+1160   05C6             ; OUTPUT KEYPRESS TONES
+1161   05C6             ;
+1162   05C6 3E 24       BEEP2:	LD	A,24H
+1163   05C8 21 30 00    	LD	HL,0030H
+1164   05CB CD 8F 05    	CALL	TONE	;DO FIRST TONE
+1165   05CE 3E 0E       	LD	A,0EH
+1166   05D0 21 50 00    	LD	HL,0050H
+1167   05D3 CD 8F 05    	CALL	TONE	;DO SECOND TONE
+1168   05D6 F1          BEEP3:	POP	AF
+1169   05D7 E1          	POP	HL
+1170   05D8 C9          	RET
+1171   05D9             ;----------------------------------------
+1172   05D9             ; BREAKPOINT AND SINGLE STEPPING ROUTINES
+1173   05D9             ;----------------------------------------
+1174   05D9             ;DISPLAYS AND MODIFIES REGISTERS AFTER BREAKPOINT
+1175   05D9             ; (RST 38H) OR SINGLE STEP INTERRUPT (IF HARDWARE
+1176   05D9             ; ATTACHED).
+1177   05D9             ;INSERT RST 38H (FFH) IN PROGRAM TO EXAMINE
+1178   05D9             ; AND MODIFY REGISTERS.
+1179   05D9             ;
+1180   05D9 E1          SSTEP:	POP	HL	;GET HL BACK
+1181   05DA F5          	PUSH	AF	;SAVE AF FOR LATER
+1182   05DB 22 E8 3F    	LD	(TMPHL),HL
+1183   05DE ED 53 E6 3F 	LD	(TMPDE),DE
+1184   05E2 ED 43 E4 3F 	LD	(TMPBC),BC
+1185   05E6 DD 22 EA 3F 	LD	(TMPIX),IX
+1186   05EA FD 22 EC 3F 	LD	(TMPIY),IY	;SAVE REGISTERS
+1187   05EE E1          	POP	HL	;GET AF BACK
+1188   05EF 22 E2 3F    	LD	(TMPAF),HL	;SAVE AF
+1189   05F2 E1          	POP	HL	;GET PC RETURN ADDRESS
+1190   05F3 22 E0 3F    	LD	(TMPPC),HL	;SAVE PC
+1191   05F6 ED 73 EE 3F 	LD	(TMPSP),SP	;SAVE STACK POINTER
+1192   05FA             ;
+1193   05FA             ; STEP THROUGH,DISPLAY AND EDIT REGISTERS
+1194   05FA             ;
+1195   05FA CD AF 05    	CALL	BEEP
+1196   05FD 3A DE 3F    	LD	A,(REGPNT)	;GET CURRENT REG
+1197   0600 E6 07       	AND	7	;MAKE SURE IN LIMITS
+1198   0602 32 DE 3F    	LD	(REGPNT),A	;SAVE IT
+1199   0605 CD E2 06    DISREG:	CALL	SETREG	;SET UP DISPLAY BUFFER
+1200   0608 CD 82 04    	CALL	SKEYRL	;WAIT FOR A KEY
+1201   060B CD 76 04    	CALL	SKEYIN	;WAIT FOR KEY RELEASE
+1202   060E 21 17 06    	LD	HL,REGTBL	;HANDLE THE KEY
+1203   0611 CD A0 04    	CALL	MENU	;AND UPDATE DISPLAY
+1204   0614 C3 05 06    	JP	DISREG	;BEFORE RETURNING TO LOOP
+1205   0617             ;
+1206   0617             ; REGISTER DISPLAY KEY TABLE
+1207   0617             ;
+1208   0617 14          REGTBL      .DB 14H
+1209   0618 00 01 02 03             .DB 00H,01H,02H,03H,04H,05H,06H,07H
+1209   061C 04 05 06 07 
+1210   0620 08 09 0A 0B             .DB 08H,09H,0AH,0BH,0CH,0DH,0EH,0FH
+1210   0624 0C 0D 0E 0F 
+1211   0628 10 11 12 13             .DB 10H,11H,12H,13H
+1212   062C 64 06 64 06             .DW REGKEY,REGKEY,REGKEY,REGKEY
+1212   0630 64 06 64 06 
+1213   0634 64 06 64 06             .DW REGKEY,REGKEY,REGKEY,REGKEY
+1213   0638 64 06 64 06 
+1214   063C 64 06 64 06             .DW REGKEY,REGKEY,REGKEY,REGKEY
+1214   0640 64 06 64 06 
+1215   0644 64 06 64 06             .DW REGKEY,REGKEY,REGKEY,REGKEY
+1215   0648 64 06 64 06 
+1216   064C~            #IFDEF TEC-1F
+1217   064C~                        .DW INCSTP,DECSTP,RETPGM,RETMON
+1218   064C             #ELSE           
+1219   064C 8B 06 95 06             .DW RETMON,RETPGM,INCSTP,DECSTP
+1219   0650 B7 06 CC 06 
+1220   0654             #ENDIF
+1221   0654             ;
+1222   0654             ; REGISTER NAME CHARACTERS
+1223   0654             ;
+1224   0654~            #IFDEF TEC-1F
+1225   0654~            REGNAM      .DW 4FC3H
+1226   0654~                        .DW 6F47H,0E6C3H,0ECC7H
+1227   0654~                        .DW 66C2H,286EH,28AEH
+1228   0654~                        .DW 0A74FH
+1229   0654             #ELSE
+1230   0654 39 73       REGNAM      .DW 7339H
+1231   0656 71 77 39 7C             .DW 7771H,7C39H,5E79H
+1231   065A 79 5E 
+1232   065C 38 74 76 06             .DW 7438H,0676H,066EH
+1232   0660 6E 06 
+1233   0662 73 6D                   .DW 6D73H
+1234   0664             #ENDIF
+1235   0664             ;--------------
+1236   0664             ; EDIT REGISTER
+1237   0664             ;--------------
+1238   0664 CD AF 05    REGKEY:	CALL	BEEP
+1239   0667 F5          	PUSH	AF	;SAVE KEY FOR LATER
+1240   0668 3A DE 3F    	LD	A,(REGPNT)
+1241   066B             ;
+1242   066B             ; EDIT REGISTER
+1243   066B             ;
+1244   066B 21 E0 3F    	LD	HL,TMPPC
+1245   066E CD DA 04    	CALL	INDEXW
+1246   0671 4E          	LD	C,(HL)
+1247   0672 23          	INC	HL
+1248   0673 46          	LD	B,(HL)	;GET REG CONTENTS
+1249   0674 CB 21       	SLA	C
+1250   0676 CB 10       	RL	B
+1251   0678 CB 21       	SLA	C
+1252   067A CB 10       	RL	B
+1253   067C CB 21       	SLA	C
+1254   067E CB 10       	RL	B	;SHIFT REGISTER
+1255   0680 CB 21       	SLA	C	;FOUR BITS
+1256   0682 CB 10       	RL	B	;LEFT AND
+1257   0684 F1          	POP	AF	;PUT THE KEY
+1258   0685 B1          	OR	C	;INTO THE LSN
+1259   0686 4F          	LD	C,A	;AND PUT THE
+1260   0687 70          	LD	(HL),B	;REGISTER BACK
+1261   0688 2B          	DEC	HL	;WHERE IT BELONGS
+1262   0689 71          	LD	(HL),C
+1263   068A C9          	RET
+1264   068B             ;------------------
+1265   068B             ; RETURN TO MONITOR
+1266   068B             ;------------------
+1267   068B CD AF 05    RETMON:	CALL	BEEP
+1268   068E CD 82 04    	CALL	SKEYRL
+1269   0691 FB          	EI	;ENABLE INTERRUPTS AGAIN
+1270   0692 C3 8E 02    	JP	MAIN
+1271   0695             ;------------------
+1272   0695             ; RETURN TO PROGRAM
+1273   0695             ;------------------
+1274   0695 ED 7B EE 3F RETPGM:	LD	SP,(TMPSP)	;PUT STACK POINTER BACK
+1275   0699 2A E0 3F    	LD	HL,(TMPPC)	;PUT RETURN
+1276   069C E5          	PUSH	HL	;ADDRESS BACK ON STACK
+1277   069D 2A E2 3F    	LD	HL,(TMPAF)
+1278   06A0 E5          	PUSH	HL	;SAVE AF REG FOR LATER
+1279   06A1 FD 2A EC 3F 	LD	IY,(TMPIY)
+1280   06A5 DD 2A EA 3F 	LD	IX,(TMPIX)
+1281   06A9 ED 4B E4 3F 	LD	BC,(TMPBC)
+1282   06AD ED 5B E6 3F 	LD	DE,(TMPDE)	;RESTORE REGISTERS
+1283   06B1 F1          	POP	AF	;RESTORE AF
+1284   06B2 2A E8 3F    	LD	HL,(TMPHL)	;RETORE HL
+1285   06B5 FB          	EI	;ENABLE INTERRUPTS
+1286   06B6 C9          	RET	;AND RETURN TO PROGRAM
+1287   06B7             ;----------------------
+1288   06B7             ; DISPLAY NEXT REGISTER
+1289   06B7             ;----------------------
+1290   06B7 CD AF 05    INCSTP:	CALL	BEEP
+1291   06BA 3A DE 3F    	LD	A,(REGPNT)
+1292   06BD FE 07       	CP	7	;END OF REG TABLE?
+1293   06BF CA C7 06    	JP	Z,INCSP1
+1294   06C2 3C          	INC	A
+1295   06C3 32 DE 3F    	LD	(REGPNT),A
+1296   06C6 C9          	RET
+1297   06C7 AF          INCSP1:	XOR	A
+1298   06C8 32 DE 3F    	LD	(REGPNT),A
+1299   06CB C9          	RET
+1300   06CC             ;--------------------------
+1301   06CC             ; DISPLAY PREVIOUS REGISTER
+1302   06CC             ;--------------------------
+1303   06CC CD AF 05    DECSTP:	CALL	BEEP
+1304   06CF 3A DE 3F    	LD	A,(REGPNT)
+1305   06D2 FE 00       	CP	0	;START OF REG TABLE?
+1306   06D4 CA DC 06    	JP	Z,DECSP1
+1307   06D7 3D          	DEC	A
+1308   06D8 32 DE 3F    	LD	(REGPNT),A
+1309   06DB C9          	RET
+1310   06DC 3E 07       DECSP1:	LD	A,7
+1311   06DE 32 DE 3F    	LD	(REGPNT),A
+1312   06E1 C9          	RET
+1313   06E2             ;-----------------
+1314   06E2             ; DISPLAY REGISTER
+1315   06E2             ;-----------------
+1316   06E2 3A DE 3F    SETREG:	LD	A,(REGPNT)
+1317   06E5 21 E0 3F    	LD	HL,TMPPC	;START OF TABLE
+1318   06E8 CD DA 04    	CALL	INDEXW	;GET ELEMENT ADDRESS
+1319   06EB 5E          	LD	E,(HL)
+1320   06EC 23          	INC	HL
+1321   06ED 56          	LD	D,(HL)
+1322   06EE EB          	EX	DE,HL	;LOAD REGISTER CONTENTS
+1323   06EF CD A2 03    	CALL	DISADD
+1324   06F2             ;
+1325   06F2             ; DISPLAY REGISTER NAME
+1326   06F2             ;
+1327   06F2 21 54 06    	LD	HL,REGNAM
+1328   06F5 CD DA 04    	CALL	INDEXW
+1329   06F8 7E          	LD	A,(HL)
+1330   06F9 32 D0 3F    	LD	(DISBUF+0),A
+1331   06FC 23          	INC	HL
+1332   06FD 7E          	LD	A,(HL)
+1333   06FE 32 D1 3F    	LD	(DISBUF+1),A
+1334   0701 C9          	RET
+1335   0702             ;------------------
+1336   0702             ; FUNCTION KEY MENU
+1337   0702             ;------------------
+1338   0702             ; WHEN THE FN KEY IS PRESSED, Fn IS DISPLAYED IN THE
+1339   0702             ; DATA DISPLAYS, THE CURRENT ADDRESS REMAINS IN THE
+1340   0702             ; ADDRESS DISPLAYS THE PROGRAM THEN WAITS FOR A
+1341   0702             ; KEYPRESS WHICH WILL SELECT 1 OF 16 ROUTINES.
+1342   0702             ;
+1343   0702 E1          FUNKEY:	POP	HL	;REMOVE RETURN ADDRESS
+1344   0703 CD AF 05    	CALL	BEEP
+1345   0706 2A DA 3F    FUNKY1:	LD	HL,(ADRESS)
+1346   0709 CD A2 03    	CALL	DISADD	;DISP ADDR TO REMOVE DP'S
+1347   070C~            #IFDEF TEC-1F
+1348   070C~            ;    LD  HL,4764H  ;FN
+1349   070C~                LD HL,0AF0FH       ;USE THE GO KEY IN THE TEC
+1350   070C             #ELSE
+1351   070C 21 54 71    	LD	HL,7154H  ;FN
+1352   070F             #ENDIF
+1353   070F                 
+1354   070F 22 D0 3F    	LD	(DISBUF),HL	;DISPLAY FN
+1355   0712 CD 82 04    	CALL	SKEYRL	;WAIT FOR KEY RELEASE
+1356   0715 CD 76 04    FUNKY2:	CALL	SKEYIN
+1357   0718 2A B4 3F    	LD	HL,(FUNTBL)	;USE THE MENU HANDLER
+1358   071B CD A0 04    	CALL	MENU	;ROUTINE FOR EACH KEY
+1359   071E C3 15 07    	JP	FUNKY2	;TRY AGAIN
+1360   0721             ;
+1361   0721             ; RETURN TO MAIN
+1362   0721             ;
+1363   0721 CD AF 05    CANCEL:	CALL	BEEP
+1364   0724 CD 79 03    CANCL1:	CALL	UPDATE	;UPDATE DISPLAY BUFFER
+1365   0727 CD 82 04    	CALL	SKEYRL	;WAIT FOR KEY RELEASE
+1366   072A E1          	POP	HL	;REMOVE MENU RETURN
+1367   072B C3 A2 02    	JP	MAIN2
+1368   072E             ;
+1369   072E             ; FUNCTION MENU KEY TABLE
+1370   072E             ;
+1371   072E 11          FUNLST:	.DB	11H
+1372   072F 00 01 02 03 	.DB	00H,01H,02H,03H,04H,05H,06H,07H
+1372   0733 04 05 06 07 
+1373   0737 08 09 0A 0B 	.DB	08H,09H,0AH,0BH,0CH,0DH,0EH,0FH
+1373   073B 0C 0D 0E 0F 
+1374   073F~            #IFDEF TEC-1F
+1375   073F~                .DB 12H
+1376   073F             #ELSE
+1377   073F 10          	.DB	10H
+1378   0740             #ENDIF
+1379   0740 66 07 71 07 	.DW	GOEXEC,INTELFN,ADDRA,ADDRB
+1379   0744 76 08 88 08 
+1380   0748 9A 08 F0 08 	.DW	BLKMVE,BLKSUM,BRANCH,TRACE
+1380   074C 2E 09 65 09 
+1381   0750 73 09 82 09 	.DW	PLAY1,PLAY2,PLAY3,SWBEEP
+1381   0754 91 09 A0 09 
+1382   0758 3A 0A BB 0B 	.DW	SECRET,RELSQR,SCOPE,TIME
+1382   075C 14 0C C9 0C 
+1383   0760 62 07       	.DW	FUNFUN
+1384   0762             ;--------------------------
+1385   0762             ; JUMP TO FUNCTION FUNCTION
+1386   0762             ;--------------------------
+1387   0762 2A CE 3F    FUNFUN:	LD	HL,(FUNJMP)
+1388   0765 E9          	JP	(HL)
+1389   0766             ;------------------------------------------
+1390   0766             ; FUNCTION 0 - EXECUTE FROM CURRENT ADDRESS
+1391   0766             ;------------------------------------------
+1392   0766 CD AF 05    GOEXEC:	CALL	BEEP
+1393   0769 CD 97 04    	CALL	KEYREL
+1394   076C E1          	POP	HL	;REMOVE EXEC RETURN
+1395   076D 2A DA 3F    	LD	HL,(ADRESS)
+1396   0770 E9          	JP	(HL)	;START EXECUCTION
+1397   0771             ;------------------------------------
+1398   0771             ; FUNCTION 1 RECEIVE INTEL HEX FORMAT
+1399   0771             ;------------------------------------
+1400   0771 CD AF 05    INTELFN:	CALL	BEEP
+1401   0774 CD 97 04    	    CALL	KEYREL
+1402   0777 CD 80 07            CALL  INTELH
+1403   077A C2 B9 08            JP    NZ,BLKMV1      ;SHOW THE ERROR 
+1404   077D C3 21 07            JP    CANCEL         ;JUST RETURN IF ALL OK
+1405   0780             ;-----------------------
+1406   0780             ; RECEIVE INTEL HEX FILE
+1407   0780             ;-----------------------
+1408   0780 DD 21 00 3E INTELH:	LD	IX,SYSTEM	;POINT TO SYSTEM VARIABLES
+1409   0784             ;
+1410   0784             ; WAIT FOR RECORD MARK
+1411   0784             ;
+1412   0784 AF          INTEL1:	XOR	A
+1413   0785 DD 77 03    	LD	(IX+3),A	;CLEAR CHECKSUM
+1414   0788 CD 3C 08    	CALL	RXDATA	;WAIT FOR THE RECORD MARK
+1415   078B FE 3A       	CP	':'	;TO BE TRANSMITTED
+1416   078D 20 F5       	JR	NZ,INTEL1	;NOT RECORD MARK
+1417   078F             ;
+1418   078F             ; GET RECORD LENGTH
+1419   078F             ;
+1420   078F CD DC 07    	CALL	GETBYT
+1421   0792 DD 77 00    	LD	(IX+0),A	;NUMBER OF DATA BYTES
+1422   0795             ;
+1423   0795             ; GET ADDRESS FIELD
+1424   0795             ;
+1425   0795 CD DC 07    	CALL	GETBYT
+1426   0798 DD 77 02    	LD	(IX+2),A	;LOAD ADDRESS HIGH BYTE
+1427   079B CD DC 07    	CALL	GETBYT
+1428   079E DD 77 01    	LD	(IX+1),A	;LOAD ADDRESS LOW BYTE
+1429   07A1             ;
+1430   07A1             ; GET RECORD TYPE
+1431   07A1             ;
+1432   07A1 CD DC 07    	CALL	GETBYT
+1433   07A4 20 24       	JR	NZ,INTEL4	;END OF FILE RECORD
+1434   07A6             ;
+1435   07A6             ; READ IN THE DATA
+1436   07A6             ;
+1437   07A6 DD 46 00    	LD	B,(IX+0)	;NUMBER OF DATA BYTES
+1438   07A9 DD 66 02    	LD	H,(IX+2)	;LOAD ADDRESS HIGH BYTE
+1439   07AC DD 6E 01    	LD	L,(IX+1)	;LOAD ADDRESS LOW BYTE
+1440   07AF             
+1441   07AF CD DC 07    INTEL2:	CALL	GETBYT	;GET DATA BYTE
+1442   07B2 77          	LD	(HL),A	;STORE DATA BYTE
+1443   07B3 23          	INC	HL
+1444   07B4 10 F9       	DJNZ	INTEL2	;LOAD MORE BYTES
+1445   07B6             ;
+1446   07B6             ; GET CHECKSUM AND COMPARE
+1447   07B6             ;
+1448   07B6 DD 7E 03    	LD	A,(IX+3)	;CONVERT CHECKSUM TO
+1449   07B9 ED 44       	NEG		;TWO'S COMPLEMENT
+1450   07BB DD 77 04    	LD	(IX+4),A	;SAVE COMPUTED CHECKSUM
+1451   07BE CD DC 07    	CALL	GETBYT
+1452   07C1 DD 77 03    	LD	(IX+3),A	;SAVE RECORD CHECKSUM
+1453   07C4 DD BE 04    	CP	(IX+4)	;COMPARE CHECKSUM
+1454   07C7 28 BB       	JR	Z,INTEL1	;CHECKSUM OK,NEXT RECORD
+1455   07C9 C9              RET             ;NZ=CHECKSUM ERROR
+1456   07CA             ;
+1457   07CA             ; END OF FILE RECORD
+1458   07CA             ;
+1459   07CA DD 7E 03    INTEL4:	LD	A,(IX+3)	;CONVERT CHECKSUM TO
+1460   07CD ED 44       	NEG		;TWO'S COMPLEMENT
+1461   07CF DD 77 04    	LD	(IX+4),A	;SAVE COMPUTED CHECKSUM
+1462   07D2 CD DC 07    	CALL	GETBYT
+1463   07D5 DD 77 03    	LD	(IX+3),A	;SAVE EOF CHECKSUM
+1464   07D8 DD BE 04    	CP	(IX+4)	;COMPARE CHECKSUM
+1465   07DB C9          	RET  	    ;NZ=CHECKSUM ERROR
+1466   07DC             ;--------------------------
+1467   07DC             ; GET BYTE FROM SERIAL PORT
+1468   07DC             ;--------------------------
+1469   07DC C5          GETBYT:	PUSH	BC
+1470   07DD CD 3C 08    	CALL	RXDATA
+1471   07E0 CB 77       	BIT	6,A
+1472   07E2 28 02       	JR	Z,GETBT1
+1473   07E4 C6 09       	ADD	A,09H
+1474   07E6 E6 0F       GETBT1:	AND	0FH
+1475   07E8 CB 27       	SLA 	A
+1476   07EA CB 27       	SLA	A
+1477   07EC CB 27       	SLA	A
+1478   07EE CB 27       	SLA	A
+1479   07F0 4F          	LD	C,A
+1480   07F1             ;
+1481   07F1             ; GET LOW NYBBLE
+1482   07F1             ;
+1483   07F1 CD 3C 08    	CALL	RXDATA
+1484   07F4 CB 77       	BIT	6,A
+1485   07F6 28 02       	JR	Z,GETBT2
+1486   07F8 C6 09       	ADD	A,09H
+1487   07FA E6 0F       GETBT2:	AND	0FH
+1488   07FC B1          	OR	C
+1489   07FD 47          	LD	B,A
+1490   07FE DD 86 03    	ADD	A,(IX+3)
+1491   0801 DD 77 03    	LD	(IX+3),A	;ADD TO CHECKSUM
+1492   0804 78          	LD	A,B
+1493   0805 A7          	AND	A	;CLEAR CARRY
+1494   0806 C1              POP	BC
+1495   0807 C9          	RET
+1496   0808             ;-------------------------------
+1497   0808             ; CONVERT ASCII CHARACTER TO HEX
+1498   0808             ;-------------------------------
+1499   0808             ;CONVERTS ASCII 0-9,A-F INTO HEX LSN
+1500   0808             ;ENTRY : A= ASCII 0-9,A-F
+1501   0808             ;EXIT  : A= HEX 0-F IN LSN
+1502   0808             ; A AND F REGISTERS MODIFIED
+1503   0808             ;
+1504   0808 CB 77       ASCHEX: BIT   6,A
+1505   080A 28 02       	   JR    Z,ACHEX1
+1506   080C C6 09       	   ADD   A,09H
+1507   080E E6 0F       ACHEX1: AND   0FH
+1508   0810 C9                 RET
+1509   0811             ;------------------------
+1510   0811             ; SERIAL TRANSMIT ROUTINE
+1511   0811             ;------------------------
+1512   0811             ;TRANSMIT BYTE SERIALLY ON DOUT
+1513   0811             ;
+1514   0811             ; ENTRY : A = BYTE TO TRANSMIT
+1515   0811             ;  EXIT : NO REGISTERS MODIFIED
+1516   0811             ;
+1517   0811 F5          TXDATA:	PUSH	AF
+1518   0812 C5          	PUSH	BC
+1519   0813 E5          	PUSH	HL
+1520   0814 2A C0 3F    	LD	HL,(BAUD)
+1521   0817 4F          	LD	C,A
+1522   0818             ;
+1523   0818             ; TRANSMIT START BIT
+1524   0818             ;
+1525   0818 AF          	XOR	A
+1526   0819 D3 85       	OUT	(SCAN),A
+1527   081B CD 69 08    	CALL	BITIME
+1528   081E             ;
+1529   081E             ; TRANSMIT DATA
+1530   081E             ;
+1531   081E 06 08       	LD	B,08H
+1532   0820 CB 09       	RRC	C
+1533   0822 CB 09       NXTBIT:	RRC	C	;SHIFT BITS TO D6,
+1534   0824 79          	LD	A,C	;LSB FIRST AND OUTPUT
+1535   0825 E6 40       	AND	40H	;THEM FOR ONE BIT TIME.
+1536   0827 D3 85       	OUT	(SCAN),A
+1537   0829 CD 69 08    	CALL	BITIME
+1538   082C 10 F4       	DJNZ	NXTBIT
+1539   082E             ;
+1540   082E             ; SEND STOP BITS
+1541   082E             ;
+1542   082E 3E 40       	LD	A,40H
+1543   0830 D3 85       	OUT	(SCAN),A
+1544   0832 CD 69 08    	CALL	BITIME
+1545   0835 CD 69 08    	CALL	BITIME
+1546   0838 E1          	POP	HL
+1547   0839 C1          	POP	BC
+1548   083A F1          	POP	AF
+1549   083B C9          	RET
+1550   083C             ;-----------------------
+1551   083C             ; SERIAL RECEIVE ROUTINE
+1552   083C             ;-----------------------
+1553   083C             ;RECEIVE SERIAL BYTE FROM DIN
+1554   083C             ;
+1555   083C             ; ENTRY : NONE
+1556   083C             ;  EXIT : A= RECEIVED BYTE IF CARRY CLEAR
+1557   083C             ;
+1558   083C             ; REGISTERS MODIFIED A AND F
+1559   083C             ;
+1560   083C C5          RXDATA:	PUSH	BC
+1561   083D E5          	PUSH	HL
+1562   083E             ;
+1563   083E             ; WAIT FOR START BIT 
+1564   083E             ;
+1565   083E DB 86       RXDAT1: IN	A,(KEYBUF)
+1566   0840             ;        IN	A,(KEYBUF)
+1567   0840 CB 7F       	    BIT	7,A
+1568   0842 20 FA       	    JR	NZ,RXDAT1	;NO START BIT
+1569   0844             ;
+1570   0844             ; DETECTED START BIT
+1571   0844             ;
+1572   0844 2A C0 3F    	LD	HL,(BAUD)
+1573   0847 CB 3C       	SRL	H
+1574   0849 CB 1D       	RR	L 	;DELAY FOR HALF BIT TIME
+1575   084B CD 69 08    	CALL 	BITIME
+1576   084E DB 86       	IN	A,(KEYBUF)
+1577   0850             ;    IN	A,(KEYBUF)
+1578   0850 CB 7F       	BIT	7,A
+1579   0852 20 EA       	JR	NZ,RXDAT1	;START BIT NOT VALID
+1580   0854             ;
+1581   0854             ; DETECTED VALID START BIT,READ IN DATA
+1582   0854             ;
+1583   0854 06 08       	LD	B,08H
+1584   0856 2A C0 3F    RXDAT2:	LD	HL,(BAUD)
+1585   0859 CD 69 08    	CALL	BITIME	;DELAY ONE BIT TIME
+1586   085C DB 86       	IN	A,(KEYBUF)
+1587   085E             ;    IN	A,(KEYBUF)
+1588   085E CB 17       	RL	A
+1589   0860 CB 19       	RR	C	;SHIFT BIT INTO DATA REG
+1590   0862 10 F2       	DJNZ	RXDAT2
+1591   0864 79          	LD	A,C
+1592   0865 B7          	OR	A	;CLEAR CARRY FLAG
+1593   0866 E1              POP	HL
+1594   0867 C1          	POP	BC
+1595   0868 C9          	RET
+1596   0869             ;---------------
+1597   0869             ; BIT TIME DELAY
+1598   0869             ;---------------
+1599   0869             ;DELAY FOR ONE SERIAL BIT TIME
+1600   0869             ;ENTRY : HL = DELAY TIME
+1601   0869             ; NO REGISTERS MODIFIED
+1602   0869             ;
+1603   0869 E5          BITIME:	PUSH	HL
+1604   086A D5          	PUSH	DE
+1605   086B 11 01 00    	LD	DE,0001H
+1606   086E ED 52       BITIM1:	SBC	HL,DE
+1607   0870 D2 6E 08    	JP	NC,BITIM1
+1608   0873 D1          	POP	DE
+1609   0874 E1          	POP	HL
+1610   0875 C9          	RET
+1611   0876             ;-----------------------------
+1612   0876             ; FUNCTION 2 - ENTER ADDRESS 1
+1613   0876             ;-----------------------------
+1614   0876 CD AF 05    ADDRA:	CALL	BEEP
+1615   0879 2A DA 3F    	LD	HL,(ADRESS)	;COPY CURRENT
+1616   087C 22 C8 3F    	LD	(BLKSRT),HL	;ADDRESS AS START
+1617   087F~            #IFDEF TEC-1F
+1618   087F~            	LD	HL,0C300H	;ADDRESS [
+1619   087F             #ELSE
+1620   087F 21 00 39    	LD	HL,3900H	;ADDRESS [
+1621   0882             #ENDIF
+1622   0882 CD E2 08    	CALL	SDELAY
+1623   0885 C3 24 07    	JP	CANCL1
+1624   0888             ;-----------------------------
+1625   0888             ; FUNCTION 3 - ENTER ADDRESS 2
+1626   0888             ;-----------------------------
+1627   0888 CD AF 05    ADDRB:	CALL	BEEP
+1628   088B 2A DA 3F    	LD	HL,(ADRESS)	;COPY CURRENT
+1629   088E 22 CA 3F    	LD	(BLKEND),HL	;ADDRESS AS END
+1630   0891~            #IFDEF TEC-1F
+1631   0891~            	LD	HL,00A9H	;ADDRESS ]
+1632   0891             #ELSE
+1633   0891 21 0F 00    	LD	HL,000FH	;ADDRESS ]
+1634   0894             #ENDIF
+1635   0894 CD E2 08    	CALL	SDELAY
+1636   0897 C3 24 07    	JP	CANCL1
+1637   089A             ;------------------------
+1638   089A             ; FUNCTION 4 - BLOCK MOVE
+1639   089A             ;------------------------
+1640   089A CD AF 05    BLKMVE:	CALL	BEEP
+1641   089D 2A DA 3F    	LD	HL,(ADRESS)	;COPY CURRENT
+1642   08A0 22 CC 3F    	LD	(BLKDST),HL	;ADDRESS AS
+1643   08A3~            #IFDEF TEC-1F
+1644   08A3~            	LD	HL,0C3A9H	;DESTINATION
+1645   08A3             #ELSE
+1646   08A3 21 0F 39    	LD	HL,390FH	;DESTINATION
+1647   08A6             #ENDIF
+1648   08A6 CD E2 08    	CALL	SDELAY
+1649   08A9             ;
+1650   08A9             ; CALCULATE NUMBER OF BYTES TO MOVE
+1651   08A9             ;
+1652   08A9 2A CA 3F    	LD	HL,(BLKEND)
+1653   08AC ED 5B C8 3F 	LD	DE,(BLKSRT)
+1654   08B0 A7          	AND	A
+1655   08B1 ED 52       	SBC	HL,DE
+1656   08B3 23          	INC	HL	;MAKE MOVE INCLUSIVE
+1657   08B4 22 C6 3F    	LD	(COUNT),HL
+1658   08B7 30 15       	JR	NC,BLKMV3	;IF OK MOVE BLOCK
+1659   08B9             ;
+1660   08B9             ; SHOW ERROR
+1661   08B9             ;
+1662   08B9~            #IFDEF TEC-1F
+1663   08B9~            BLKMV1:	LD	HL,00C7H	;SHOW ERROR E
+1664   08B9             #ELSE
+1665   08B9 21 79 00    BLKMV1:	LD	HL,0079H	;SHOW ERROR E
+1666   08BC             #ENDIF
+1667   08BC CD AF 05    BLKMV2:	CALL	BEEP
+1668   08BF 22 D0 3F    	LD	(DISBUF),HL	;AND WAIT
+1669   08C2 CD 76 04    	CALL	SKEYIN	;FOR KEYPRESS
+1670   08C5 CD AF 05    	CALL	BEEP
+1671   08C8 CD 82 04    	CALL	SKEYRL
+1672   08CB C3 24 07    	JP	CANCL1
+1673   08CE             ;
+1674   08CE             ; MOVE BLOCK
+1675   08CE             ;
+1676   08CE CD D4 08    BLKMV3:	CALL	MOVE
+1677   08D1 C3 24 07    	JP	CANCL1
+1678   08D4             ;-----------
+1679   08D4             ; BLOCK MOVE
+1680   08D4             ;-----------
+1681   08D4 ED 4B C6 3F MOVE:	LD	BC,(COUNT)
+1682   08D8 2A C8 3F    	LD	HL,(BLKSRT)	;START ADDR
+1683   08DB ED 5B CC 3F 	LD	DE,(BLKDST)	;DESTINATION ADDR
+1684   08DF ED B0       	LDIR
+1685   08E1 C9          	RET
+1686   08E2             ;-------------------------------
+1687   08E2             ; SCAN DISPLAY UNTIL KEY RELEASE
+1688   08E2             ;-------------------------------
+1689   08E2 22 D0 3F    SDELAY:	LD	(DISBUF),HL	;SHOW HL
+1690   08E5 06 FF       	LD	B,255	;IN DATA DISPLAYS
+1691   08E7 CD F0 03    SDELY1:	CALL	SCAND	;UNTIL KEY
+1692   08EA 10 FB       	DJNZ SDELY1	;IS RELEASED
+1693   08EC CD 82 04    	CALL	SKEYRL
+1694   08EF C9          	RET
+1695   08F0             ;---------------------------
+1696   08F0             ;FUNCTION 5 - BLOCK CHECKSUM
+1697   08F0             ;---------------------------
+1698   08F0 CD AF 05    BLKSUM:	CALL	BEEP
+1699   08F3~            #IFDEF TEC-1F
+1700   08F3~            	LD	HL,0C3A7H	;CS
+1701   08F3             #ELSE
+1702   08F3 21 6D 39    	LD	HL,396DH    ;CS
+1703   08F6             #ENDIF
+1704   08F6 CD E2 08    	CALL	SDELAY	;SHOW PROMPT
+1705   08F9 ED 5B C8 3F 	LD	DE,(BLKSRT)
+1706   08FD 2A CA 3F    	LD	HL,(BLKEND)
+1707   0900 A7          	AND	A
+1708   0901 ED 52       	SBC	HL,DE
+1709   0903 23          	INC	HL	;MAKE CHECKSUM INCLUSIVE
+1710   0904 22 C6 3F    	LD	(COUNT),HL
+1711   0907 30 03       	JR	NC,BLKSM1	;IF OK SUM BLOCK
+1712   0909             ;
+1713   0909             ; SHOW ERROR
+1714   0909             ;
+1715   0909 C3 B9 08    	JP	BLKMV1
+1716   090C             ;
+1717   090C             ; CALCULATE CHECKSUM
+1718   090C             ;
+1719   090C 2A C8 3F    BLKSM1:	LD	HL,(BLKSRT)
+1720   090F ED 5B CA 3F 	LD	DE,(BLKEND)
+1721   0913 CD C3 04    	CALL	CHKSUM	;DO THE CHECKSUM,
+1722   0916 CD B7 03    	CALL	DISBYT	;DISPLAY
+1723   0919 2A C6 3F    	LD	HL,(COUNT)	;NUMBER OF BYTES
+1724   091C CD A2 03    	CALL	DISADD	;SUMMED AND
+1725   091F CD AF 05    	CALL	BEEP
+1726   0922 CD 76 04    	CALL	SKEYIN	;CHECKSUM UNTIL
+1727   0925 CD AF 05    	CALL	BEEP	;A KEY IS PRESSED
+1728   0928 CD 82 04    	CALL	SKEYRL
+1729   092B C3 24 07    	JP	CANCL1
+1730   092E             ;----------------------------------------
+1731   092E             ; FUNCTION 6 - RELATIVE BRANCH CALCULATOR
+1732   092E             ;----------------------------------------
+1733   092E CD AF 05    BRANCH:	CALL	BEEP
+1734   0931~            #IFDEF TEC-1F
+1735   0931~            	LD	HL,44E6H  ;RB
+1736   0931             #ELSE
+1737   0931 21 7C 50    	LD	HL,507CH  ;RB
+1738   0934             #ENDIF
+1739   0934 CD E2 08    	CALL	SDELAY
+1740   0937 2A DA 3F    	LD	HL,(ADRESS)	;GET CURRENT ADDRESS
+1741   093A ED 5B C8 3F 	LD	DE,(BLKSRT)
+1742   093E 13          	INC	DE	;POINT TO PC+2
+1743   093F A7          	AND	A
+1744   0940 ED 52       	SBC	HL,DE	;SUBTRACT
+1745   0942             ;
+1746   0942             ;TEST HIGH BYTE OF RESULT TO
+1747   0942             ;DETERMINE IF BACKWARD BRANCH
+1748   0942             ;
+1749   0942 7C          	LD	A,H
+1750   0943 FE FF       	CP	255	;BACKWARD BRANCH?
+1751   0945 C2 50 09    	JP	NZ,BRNCH1	;CHECK IF FORWARD
+1752   0948             ;
+1753   0948             ;CHECK IF WE HAVE BRANCHED BEYOND -128
+1754   0948             ;
+1755   0948 7D          	LD	A,L
+1756   0949 CB 7F       	BIT	7,A
+1757   094B 20 0E       	JR	NZ,BRNCH2	;BRANCH IS WITHIN LIMITS
+1758   094D C3 B9 08    	JP	BLKMV1	;TOO FAR BACK
+1759   0950             ;
+1760   0950             ;TEST HIGH BYTE OF RESULT TO
+1761   0950             ;DETERMINE IF FORWARD BRANCH
+1762   0950             ;
+1763   0950 FE 00       BRNCH1:	CP	0	;FORWARD BRANCH?
+1764   0952 C2 B9 08    	JP	NZ,BLKMV1	;TOO FAR IN ANY DIRECTION
+1765   0955             ;
+1766   0955             ; CHECK IF WE HAVE BRANCHED BEYOND +128
+1767   0955             ;
+1768   0955 7D          	LD	A,L
+1769   0956 CB 7F       	BIT	7,A
+1770   0958 C2 B9 08    	JP	NZ,BLKMV1	;TOO FAR FORWARD
+1771   095B             ;
+1772   095B             ; WITHIN LIMITS PUT IN RAM
+1773   095B             ; AND SHOW AS CURRENT ADDRESS
+1774   095B             ;
+1775   095B 2A C8 3F    BRNCH2:	LD	HL,(BLKSRT)
+1776   095E 22 DA 3F    	LD	(ADRESS),HL
+1777   0961 77          	LD	(HL),A
+1778   0962 C3 24 07    	JP	CANCL1
+1779   0965             ;-----------------------------------------
+1780   0965             ; FUNCTION 7 - TOGGLE HARDWARE SINGLE STEP
+1781   0965             ;-----------------------------------------
+1782   0965 CD AF 05    TRACE:	CALL	BEEP
+1783   0968~            #IFDEF TEC-1F
+1784   0968~                    OUT	(PORT7),A	    ;TOGGLE HARDWARE LATCH
+1785   0968~                    LD HL,0046H         ;SHOW T
+1786   0968             #ELSE
+1787   0968 D3 87               OUT	(IO7),A	        ;TOGGLE HARDWARE LATCH
+1788   096A 21 70 00            LD	HL,0070H	    ;SHOW T
+1789   096D             #ENDIF
+1790   096D CD E2 08    	CALL	SDELAY
+1791   0970 C3 24 07    	JP	CANCL1
+1792   0973             ;-------------------------
+1793   0973             ; FUNCTION 8 - PLAY TUNE 1
+1794   0973             ;-------------------------
+1795   0973 CD AF 05    PLAY1:	CALL	BEEP
+1796   0976 CD 97 04    	CALL	KEYREL
+1797   0979 21 AE 09    	LD	HL,TUNE1
+1798   097C CD 12 05    	CALL	MUSIC
+1799   097F C3 24 07    	JP	CANCL1
+1800   0982             ;-------------------------
+1801   0982             ; FUNCTION 9 - PLAY TUNE 2
+1802   0982             ;-------------------------
+1803   0982 CD AF 05    PLAY2:	CALL	BEEP
+1804   0985 CD 97 04    	CALL	KEYREL
+1805   0988 21 EE 09    	LD	HL,TUNE2
+1806   098B CD 12 05    	CALL	MUSIC
+1807   098E C3 24 07    	JP	CANCL1
+1808   0991             ;------------------------------
+1809   0991             ; FUNCTION A - PLAY TUNE IN RAM
+1810   0991             ;------------------------------
+1811   0991 CD AF 05    PLAY3:	CALL	BEEP
+1812   0994 CD 97 04    	CALL	KEYREL
+1813   0997 2A DA 3F    	LD	HL,(ADRESS)
+1814   099A CD 12 05    	CALL	MUSIC
+1815   099D C3 24 07    	JP	CANCL1
+1816   09A0             ;-----------------------------
+1817   09A0             ; FUNCTION B - TOGGLE KEY BEEP
+1818   09A0             ;-----------------------------
+1819   09A0 CD AF 05    SWBEEP:	CALL	BEEP
+1820   09A3 3A D8 3F    	LD	A,(MODE)
+1821   09A6 EE 40       	XOR	40H
+1822   09A8 32 D8 3F    	LD	(MODE),A
+1823   09AB C3 24 07    	JP	CANCL1
+1824   09AE             ;
+1825   09AE             ; TUNE 1
+1826   09AE             ;
+1827   09AE 06 06 0A 0D TUNE1:	.DB	06H,06H,0AH,0DH,06H,0DH,0AH,0DH
+1827   09B2 06 0D 0A 0D 
+1828   09B6 12 16 14 12 	.DB	12H,16H,14H,12H,0FH,11H,12H,0FH
+1828   09BA 0F 11 12 0F 
+1829   09BE 0D 0D 0D 0A 	.DB	0DH,0DH,0DH,0AH,12H,0FH,0DH,0AH
+1829   09C2 12 0F 0D 0A 
+1830   09C6 08 06 08 0A 	.DB	08H,06H,08H,0AH,0FH,0AH,0DH,0FH
+1830   09CA 0F 0A 0D 0F 
+1831   09CE 06 06 0A 0D 	.DB	06H,06H,0AH,0DH,06H,0DH,0AH,0DH
+1831   09D2 06 0D 0A 0D 
+1832   09D6 12 16 14 12 	.DB	12H,16H,14H,12H,0FH,11H,12H,0FH
+1832   09DA 0F 11 12 0F 
+1833   09DE 0D 0D 0D 0A 	.DB	0DH,0DH,0DH,0AH,12H,0FH,0DH,0AH
+1833   09E2 12 0F 0D 0A 
+1834   09E6 08 06 08 0A 	.DB	08H,06H,08H,0AH,06H,12H,00H,1EH
+1834   09EA 06 12 00 1E 
+1835   09EE             ;
+1836   09EE             ; TUNE 2
+1837   09EE             ;
+1838   09EE 0B 0A 08 0A TUNE2:	.DB	0BH,0AH,08H,0AH,0AH,0AH,06H,06H
+1838   09F2 0A 0A 06 06 
+1839   09F6 06 0B 0A 08 	.DB	06H,0BH,0AH,08H,0AH,0AH,0AH,0AH
+1839   09FA 0A 0A 0A 0A 
+1840   09FE 0A 0A 0B 0A 	.DB	0AH,0AH,0BH,0AH,08H,0AH,0AH,0AH
+1840   0A02 08 0A 0A 0A 
+1841   0A06 06 06 06 0A 	.DB	06H,06H,06H,0AH,08H,0AH,0DH,0DH
+1841   0A0A 08 0A 0D 0D 
+1842   0A0E 0D 0D 0D 00 	.DB	0DH,0DH,0DH,00H,0DH,05H,08H,0BH
+1842   0A12 0D 05 08 0B 
+1843   0A16 0B 0B 06 06 	.DB	0BH,0BH,06H,06H,06H,0BH,0AH,08H
+1843   0A1A 06 0B 0A 08 
+1844   0A1E 0A 0A 0A 06 	.DB	0AH,0AH,0AH,06H,06H,06H,0BH,0AH
+1844   0A22 06 06 0B 0A 
+1845   0A26 06 08 08 08 	.DB	06H,08H,08H,08H,08H,08H,0AH,0BH
+1845   0A2A 08 08 0A 0B 
+1846   0A2E 0A 08 06 06 	.DB	0AH,08H,06H,06H,06H,06H,06H,06H
+1846   0A32 06 06 06 06 
+1847   0A36 00 00 00 1E 	.DB	00H,00H,00H,1EH
+1848   0A3A             ;---------------------------
+1849   0A3A             ; FUNCTION C - SECRET NUMBER
+1850   0A3A             ;---------------------------
+1851   0A3A CD AF 05    SECRET:	CALL	BEEP	;WAIT FOR KEY RELEASE
+1852   0A3D CD 97 04    	CALL	KEYREL	;AND CLEAR DISPLAY
+1853   0A40 CD 1B 04    	CALL	CLRBUF	;BUFFER
+1854   0A43 DD 21 00 3E 	LD	IX,SYSTEM	;USE IX FOR LOCAL VARIABLES
+1855   0A47             ;
+1856   0A47             ; SEPARATE NYBBLES IN RANDOM NUMBER
+1857   0A47             ;
+1858   0A47 CD E3 04    	CALL	RAND
+1859   0A4A DD 75 0B    	LD	(IX+11),L
+1860   0A4D DD 74 0C    	LD	(IX+12),H	;RANDOM NUMBER
+1861   0A50 DD 7E 0B    	LD	A,(IX+11)	;SEPARATE THE RANDOM
+1862   0A53 CD A8 0B    	CALL	SPLIT	;NUMBER INTO
+1863   0A56 DD 75 04    	LD	(IX+4),L	;FOUR NYBBLES
+1864   0A59 DD 74 05    	LD	(IX+5),H	;TO MAKE CHECKING
+1865   0A5C DD 7E 0C    	LD	A,(IX+12)	;AGAINST THE
+1866   0A5F CD A8 0B    	CALL	SPLIT	;GUESS EASIER
+1867   0A62 DD 75 06    	LD	(IX+6),L
+1868   0A65 DD 74 07    	LD	(IX+7),H
+1869   0A68 AF          	XOR	A
+1870   0A69 ED 47       	LD	I,A	;CLEAR NUMBER OF TRIES
+1871   0A6B 21 00 00    	LD	HL,0
+1872   0A6E DD 75 08    	LD	(IX+8),L
+1873   0A71 DD 74 09    	LD	(IX+9),H
+1874   0A74 CD A2 03    	CALL	DISADD	;AND DISPLAY GUESS
+1875   0A77             ;
+1876   0A77             ; SCAN THE KEYBOARD
+1877   0A77             ;
+1878   0A77 CD 76 04    SECRT1:	CALL	SKEYIN	;WAIT FOR KEY
+1879   0A7A 21 86 0A    	LD	HL,SECNUM
+1880   0A7D CD A0 04    	CALL	MENU	;EXECUTE KEY HANDLER
+1881   0A80 CD 82 04    	CALL	SKEYRL	;WAIT FOR KEY RELEASE
+1882   0A83 C3 77 0A    	JP	SECRT1
+1883   0A86             ;
+1884   0A86             ; SECRET NUMBER KEY TABLE
+1885   0A86             ;
+1886   0A86 12          SECNUM:	.DB	12H
+1887   0A87 00 01 02 03 	.DB	00H,01H,02H,03H,04H,05H,06H,07H
+1887   0A8B 04 05 06 07 
+1888   0A8F 08 09 0A 0B 	.DB	08H,09H,0AH,0BH,0CH,0DH,0EH,0FH
+1888   0A93 0C 0D 0E 0F 
+1889   0A97 10 11       	.DB	10H,11H
+1890   0A99 BD 0A BD 0A 	.DW	EDTKEY,EDTKEY,EDTKEY,EDTKEY
+1890   0A9D BD 0A BD 0A 
+1891   0AA1 BD 0A BD 0A 	.DW	EDTKEY,EDTKEY,EDTKEY,EDTKEY
+1891   0AA5 BD 0A BD 0A 
+1892   0AA9 BD 0A BD 0A 	.DW	EDTKEY,EDTKEY,EDTKEY,EDTKEY
+1892   0AAD BD 0A BD 0A 
+1893   0AB1 BD 0A BD 0A 	.DW	EDTKEY,EDTKEY,EDTKEY,EDTKEY
+1893   0AB5 BD 0A BD 0A 
+1894   0AB9 E4 0A ED 0A 	.DW	ENDKEY,CHKKEY
+1895   0ABD             ;---------------
+1896   0ABD             ; EDIT GUESS KEY
+1897   0ABD             ;---------------
+1898   0ABD F5          EDTKEY:	PUSH	AF
+1899   0ABE DD 6E 08    	LD	L,(IX+8)
+1900   0AC1 DD 66 09    	LD	H,(IX+9)	;GET CURRENT GUESS
+1901   0AC4 CB 25       	SLA	L
+1902   0AC6 CB 14       	RL	H	;AND DO A 16 BIT
+1903   0AC8 CB 25       	SLA	L	;LEFT SHIFT 4 TIMES
+1904   0ACA CB 14       	RL	H	;TO MAKE  ROOM
+1905   0ACC CB 25       	SLA	L	;FOR THE NEW KEY
+1906   0ACE CB 14       	RL	H
+1907   0AD0 CB 25       	SLA	L
+1908   0AD2 CB 14       	RL	H
+1909   0AD4 F1          	POP	AF
+1910   0AD5 B5          	OR	L	;IT IN THE LEAST
+1911   0AD6 6F          	LD	L,A	;SIGNIFICANT NYBBLE
+1912   0AD7 DD 75 08    	LD	(IX+8),L
+1913   0ADA DD 74 09    	LD	(IX+9),H	;SAVE GUESS
+1914   0ADD CD A2 03    	CALL	DISADD
+1915   0AE0 CD AF 05    	CALL	BEEP
+1916   0AE3 C9          	RET
+1917   0AE4             ;----------
+1918   0AE4             ; QUIT GAME
+1919   0AE4             ;----------
+1920   0AE4 CD AF 05    ENDKEY:	CALL	BEEP	;WAIT FOR KEY RELEASE
+1921   0AE7 CD 97 04    	CALL	KEYREL	;AND RETURN TO
+1922   0AEA C3 8E 02    	JP	MAIN	;MONITOR
+1923   0AED             ;---------------------------
+1924   0AED             ; SEE IF ITS THE RIGHT GUESS
+1925   0AED             ;---------------------------
+1926   0AED CD AF 05    CHKKEY:	CALL	BEEP
+1927   0AF0 ED 57       	LD	A,I
+1928   0AF2 3C          	INC	A
+1929   0AF3 27          	DAA	;INC BCD NO. OF TRIES
+1930   0AF4             ;
+1931   0AF4             ; BRIEFLY SHOW GUESS NO.
+1932   0AF4             ;
+1933   0AF4 ED 47       	LD	I,A
+1934   0AF6 CD B7 03    	CALL	DISBYT
+1935   0AF9 06 FF       	LD	B,255
+1936   0AFB CD F0 03    CHKKY1:	CALL	SCAND
+1937   0AFE 10 FB       	DJNZ	CHKKY1
+1938   0B00             ;
+1939   0B00             ; SEPARATE GUESS INTO NYBBLES
+1940   0B00             ;
+1941   0B00 DD 7E 08    	LD	A,(IX+8)	;GET CURRENT GUESS
+1942   0B03 CD A8 0B    	CALL	SPLIT	;NUMBER INTO
+1943   0B06 DD 75 00    	LD	(IX+0),L	;FOUR NYBBLES
+1944   0B09 DD 74 01    	LD	(IX+1),H	;TO MAKE CHECKING
+1945   0B0C DD 7E 09    	LD	A,(IX+9)	;AGAINST THE
+1946   0B0F CD A8 0B    	CALL	SPLIT	;GUESS EASIER
+1947   0B12 DD 75 02    	LD	(IX+2),L
+1948   0B15 DD 74 03    	LD	(IX+3),H
+1949   0B18             ;
+1950   0B18             ; CHECK FOR CORRECT NUMBER,CORRECT SPOT
+1951   0B18             ;
+1952   0B18 AF          	XOR	A
+1953   0B19 DD 77 0A    	LD	(IX+10),A	;CLEAR RESULT
+1954   0B1C 21 04 3E    	LD	HL,SYSTEM+4	;POINT TO RANDOM
+1955   0B1F 11 00 3E    	LD	DE,SYSTEM	;POINT TO GUESS
+1956   0B22 06 04       	LD	B,4	;NUMBER OF DIGITS
+1957   0B24 7E          CHKKY2:	LD	A,(HL)	;GET RANDOM
+1958   0B25 EB          	EX	DE,HL
+1959   0B26 BE          	CP	(HL)	;SAME AS GUESS?
+1960   0B27 20 10       	JR	NZ,CHKKY4	;NOT SAME
+1961   0B29 DD 7E 0A    	LD	A,(IX+10)
+1962   0B2C C6 10       	ADD	A,10H	;RIGHT POSITION
+1963   0B2E DD 77 0A    	LD	(IX+10),A
+1964   0B31 23          CHKKY3:	INC	HL	;POINT TO NEXT
+1965   0B32 EB          	EX	DE,HL	;DIGIT POSITION
+1966   0B33 23          	INC	HL	;AND GO
+1967   0B34 10 EE       	DJNZ	CHKKY2	;CHECK OTHER POSITIONS
+1968   0B36 C3 55 0B    	JP	CHKKY8
+1969   0B39             ;
+1970   0B39             ; CHECK IF NUMBER IS THERE
+1971   0B39             ;
+1972   0B39 C5          CHKKY4:	PUSH	BC
+1973   0B3A E5          	PUSH	HL
+1974   0B3B 06 04       	LD	B,4	;CHECK EACH DIGIT
+1975   0B3D 21 00 3E    	LD	HL,SYSTEM	;TO SEE IF THIS
+1976   0B40 BE          CHKKY5:	CP	(HL)	;NUMBER IS IN
+1977   0B41 23          	INC	HL	;THE WRONG
+1978   0B42 20 0A       	JR	NZ,CHKKY6	;POSITION
+1979   0B44 DD 7E 0A    	LD	A,(IX+10)	;AND UPDATE
+1980   0B47 3C          	INC	A	;THE RESULT
+1981   0B48 DD 77 0A    	LD	(IX+10),A
+1982   0B4B C3 50 0B    	JP	CHKKY7
+1983   0B4E 10 F0       CHKKY6:	DJNZ	CHKKY5
+1984   0B50 E1          CHKKY7:	POP	HL
+1985   0B51 C1          	POP	BC
+1986   0B52 C3 31 0B    	JP	CHKKY3	;CHECK NEXT DIGIT
+1987   0B55             ;
+1988   0B55             ; CHECK IF CORRECT
+1989   0B55             ;
+1990   0B55 DD 7E 0A    CHKKY8:	LD	A,(IX+10)
+1991   0B58 FE 40       	CP	40H	;IS IT CORRECT?
+1992   0B5A CA 7A 0B    	JP	Z,CHKKY9	;YES!
+1993   0B5D DD 7E 0A    	LD	A,(IX+10)	;NOT CORRECT
+1994   0B60 CD B7 03    	CALL	DISBYT	;IN DATA DISPLAYS
+1995   0B63 ED 57       	LD	A,I	;WAS THAT THE
+1996   0B65 FE 20       	CP	20H	;LAST GUESS?
+1997   0B67 C0          	RET	NZ	;NO TRY AGAIN
+1998   0B68             ;
+1999   0B68             ; RAN OUT OF TRYS
+2000   0B68             ;
+2001   0B68 CD 1B 04    	CALL	CLRBUF	;DISPLAY
+2002   0B6B DD 6E 0B    	LD	L,(IX+11)
+2003   0B6E DD 66 0C    	LD	H,(IX+12)	;THE RANDOM NUMBER
+2004   0B71 CD A2 03    	CALL	DISADD	;AND PLAY
+2005   0B74 21 A1 0B    	LD	HL,LOSE	;THE LOSE
+2006   0B77 C3 88 0B    	JP	CHKKYA	;MUSIC
+2007   0B7A             ;
+2008   0B7A             ; GOT THE RIGHT ANSWER
+2009   0B7A             ;
+2010   0B7A ED 57       CHKKY9:	LD	A,I	;DISPLAY HOW MANY
+2011   0B7C CD B7 03    	CALL	DISBYT	;AND PLAY THE WIN
+2012   0B7F DD 6E 0B    	LD	L,(IX+11)
+2013   0B82 DD 66 0C    	LD	H,(IX+12)
+2014   0B85 21 98 0B    	LD	HL,WIN	;MUSIC
+2015   0B88             ;
+2016   0B88             ; PLAY MUSIC AND WAIT FOR ANY KEY TO RESTART
+2017   0B88             ;
+2018   0B88 CD 12 05    CHKKYA:	CALL	MUSIC	;PLAY THE MUSIC
+2019   0B8B CD 76 04    	CALL	SKEYIN	;WAIT FOR A KEY
+2020   0B8E CD AF 05    	CALL	BEEP
+2021   0B91 CD 82 04    	CALL	SKEYRL	;WAIT FOR KEY RELEASE
+2022   0B94 E1          	POP	HL	;AND RESTART THE GAME
+2023   0B95 C3 3A 0A    	JP	SECRET
+2024   0B98             ;
+2025   0B98             ; WIN AND LOSE MUSIC
+2026   0B98             ;
+2027   0B98 14 12 14 17 WIN:	.DB	14H,12H,14H,17H,17H,12H,14H,10H,1FH
+2027   0B9C 17 12 14 10 
+2027   0BA0 1F 
+2028   0BA1 01 11 01 11 LOSE:	.DB	01H,11H,01H,11H,01H,11H,1FH
+2028   0BA5 01 11 1F 
+2029   0BA8             ;-------------------------------
+2030   0BA8             ; SEPARATE BYTE INTO TWO NYBBLES
+2031   0BA8             ;-------------------------------
+2032   0BA8             ;SEPARATES A BYTE INTO TWO
+2033   0BA8             ;RIGHT JUSTIFIED NYBBLES
+2034   0BA8             ; ENTRY : A = BYTE TO BE SEPARATED
+2035   0BA8             ; EXIT  : H = MSN
+2036   0BA8             ;         L = LSN
+2037   0BA8             ;
+2038   0BA8 F5          SPLIT:	PUSH	AF
+2039   0BA9 C5          	PUSH	BC
+2040   0BAA 47          	LD	B,A	;SAVE BYTE
+2041   0BAB E6 0F       	AND	0FH	;STRIP BITS LSN
+2042   0BAD 6F          	LD	L,A	;RETURN LSN IN L
+2043   0BAE 78          	LD	A,B
+2044   0BAF CB 3F       	SRL	A
+2045   0BB1 CB 3F       	SRL	A
+2046   0BB3 CB 3F       	SRL	A	;MOVE MSN
+2047   0BB5 CB 3F       	SRL	A	;INTO LSN
+2048   0BB7 67          	LD	H,A	;RETURN MSN IN H
+2049   0BB8 C1          	POP	BC
+2050   0BB9 F1          	POP	AF
+2051   0BBA C9          	RET
+2052   0BBB             ;-----------------------------------
+2053   0BBB             ; FUNCTION D - RELAY BOARD SEQUENCER
+2054   0BBB             ;-----------------------------------
+2055   0BBB CD AF 05    RELSQR:	CALL	BEEP
+2056   0BBE CD 97 04    	CALL	KEYREL
+2057   0BC1 21 CA 0B    	LD	HL,RLTEST	;POINT TO TEST SEQUENCE
+2058   0BC4 CD D0 0B    	CALL	RLSTEP
+2059   0BC7 C3 24 07    	JP	CANCL1
+2060   0BCA             ;--------------
+2061   0BCA             ; TEST SEQUENCE
+2062   0BCA             ;--------------
+2063   0BCA 55 01 AA 01 RLTEST:	.DB	55H,01H,0AAH,01H,00H,0FFH
+2063   0BCE 00 FF 
+2064   0BD0             ;----------------
+2065   0BD0             ; RELAY SEQUENCER
+2066   0BD0             ;----------------
+2067   0BD0             ; SEQUENCES RELAYS ON RELAY BOARD
+2068   0BD0             ; USES TWO BYTES TO SPECIFY OUTPUT DATA AND DELAY TIME
+2069   0BD0             ; DELAY TIME BYTE ALSO DETERMINES IF SEQUENCE IS TO STOP
+2070   0BD0             ; OR REPEAT.
+2071   0BD0             ;  TABLE:
+2072   0BD0             ;  <BYTE1>,<BYTE2>
+2073   0BD0             ;  BYTE1 = DATA TO GO TO OUTPUT LATCH (USES PORT IO1)
+2074   0BD0             ;  BYTE2 = FF - REPEAT
+2075   0BD0             ;          00 - FINISHED
+2076   0BD0             ;  ENTRY : HL POINTS TO TABLE OF OUTPUT DATA
+2077   0BD0             ;  EXIT : NONE MODIFIED
+2078   0BD0             ;
+2079   0BD0 F5          RLSTEP:	PUSH	AF
+2080   0BD1 C5          	PUSH	BC
+2081   0BD2 D5          	PUSH	DE
+2082   0BD3 E5          	PUSH	HL	;SAVE REGISTERS
+2083   0BD4 E5          	PUSH	HL
+2084   0BD5 EB          	EX	DE,HL	;GET ADDRESS OF DATA
+2085   0BD6 1A          RELSR1:	LD	A,(DE)
+2086   0BD7 4F          	LD	C,A	;GET OUTPUT DATA
+2087   0BD8 13          	INC	DE
+2088   0BD9 1A          	LD	A,(DE)	;GET TIME DELAY
+2089   0BDA FE 00       	CP	0
+2090   0BDC 28 16       	JR	Z,RELSR4	;END OF SEQUENCE
+2091   0BDE FE FF       	CP	255
+2092   0BE0 28 0D       	JR	Z,RELSR3	;REPEAT SEQUENCE
+2093   0BE2 47          	LD	B,A
+2094   0BE3 79          	LD	A,C
+2095   0BE4~            #IFDEF TEC-1F
+2096   0BE4~            	OUT	(PORT3),A   ;STROBE
+2097   0BE4             #ELSE
+2098   0BE4 D3 81       	OUT	(IO1),A
+2099   0BE6             #ENDIF    
+2100   0BE6 13          	INC	DE
+2101   0BE7 CD FE 0B    RELSR2:	CALL	DELONE	;1 SEC DELAY
+2102   0BEA 10 FB       	DJNZ	RELSR2	;MORE SECONDS TO GO
+2103   0BEC C3 D6 0B    	JP	RELSR1
+2104   0BEF             ;
+2105   0BEF             ; REPEAT
+2106   0BEF             ;
+2107   0BEF D1          RELSR3:	POP	DE	;GET START ADDRESS
+2108   0BF0 D5          	PUSH	DE	;SAVE FOR LATER
+2109   0BF1 C3 D6 0B    	JP	RELSR1
+2110   0BF4             ;
+2111   0BF4             ; FINISHED
+2112   0BF4             ;
+2113   0BF4 3E 00       RELSR4:	LD	A,00H
+2114   0BF6~            #IFDEF TEC-1F
+2115   0BF6~            	OUT	(PORT3),A   ;STROBE
+2116   0BF6             #ELSE
+2117   0BF6 D3 81       	OUT	(IO1),A	;CLEAR OUTPUT REG
+2118   0BF8             #ENDIF
+2119   0BF8 E1          	POP	HL
+2120   0BF9 E1          	POP	HL
+2121   0BFA D1          	POP	DE
+2122   0BFB C1          	POP	BC
+2123   0BFC F1          	POP	AF
+2124   0BFD C9          	RET
+2125   0BFE             ;-----------------
+2126   0BFE             ; ONE SECOND DELAY
+2127   0BFE             ;-----------------
+2128   0BFE             ;
+2129   0BFE             ; ENTRY : NONE
+2130   0BFE             ; EXIT : FLAG REGISTER MODIFIED
+2131   0BFE             ;
+2132   0BFE C5          DELONE:	PUSH	BC
+2133   0BFF D5          	PUSH	DE
+2134   0C00 E5          	PUSH	HL
+2135   0C01 11 01 00    	LD	DE,0001H
+2136   0C04 21 70 08    	LD	HL,0870H
+2137   0C07 06 92       DELON1:	LD	B,92H
+2138   0C09 10 FE       DELON2:	DJNZ	DELON2	;INNER LOOP
+2139   0C0B ED 52       	SBC	HL,DE
+2140   0C0D D2 07 0C    	JP	NC,DELON1	;OUTER LOOP
+2141   0C10 E1          	POP	HL
+2142   0C11 D1          	POP	DE
+2143   0C12 C1          	POP	BC
+2144   0C13 C9          	RET
+2145   0C14             ;--------------------------
+2146   0C14             ; FUNCTION E - KALEIDOSCOPE
+2147   0C14             ;--------------------------
+2148   0C14 CD AF 05    SCOPE:	CALL	BEEP
+2149   0C17 CD 97 04    	CALL	KEYREL
+2150   0C1A CD E3 04    	CALL	RAND	;GENERATE RANDOM
+2151   0C1D EB          	EX	DE,HL
+2152   0C1E 21 00 3E    	LD	HL,SYSTEM	;NUMBER AND SET UP
+2153   0C21 7B          	LD	A,E	;THE FIRST QUADRANT
+2154   0C22 CD 99 0C    	CALL	SEED	;WITH A RANDOM BIT
+2155   0C25 7A          	LD	A,D	;PATTERN
+2156   0C26 CD 99 0C    	CALL	SEED
+2157   0C29             ;
+2158   0C29             ; GENERATE MIRROR IMAGES
+2159   0C29             ;
+2160   0C29 06 04       SCOPE2:	LD	B,04H
+2161   0C2B 21 00 3E    	LD	HL,SYSTEM
+2162   0C2E 11 07 3E    	LD	DE,SYSTEM+7
+2163   0C31 7E          SCOPE3:	LD	A,(HL)	;MIRROR THE FIRST
+2164   0C32 12          	LD	(DE),A	;QUADRANT INTO
+2165   0C33 23          	INC	HL	;THE FOURTH
+2166   0C34 1B          	DEC	DE	;QUADRANT
+2167   0C35 10 FA       	DJNZ	SCOPE3
+2168   0C37             ;
+2169   0C37             ; MIRROR ACROSS CENTRE OF DISPLAY
+2170   0C37             ;
+2171   0C37 06 08       	LD	B,8	;MIRROR THE FIRST
+2172   0C39 21 00 3E    	LD	HL,SYSTEM	;AND FOURTH QUADRANT
+2173   0C3C 7E          	LD	A,(HL)	;ACROSS THE CENTRE
+2174   0C3D E6 0F       	AND	0FH	;OF THE DISPLAY
+2175   0C3F 77          	LD	(HL),A	;INTO THE SECOND
+2176   0C40 CB 46       SCOPE4:	BIT	0,(HL)	;AND THIRD QUADRANTS.
+2177   0C42 CA 47 0C    	JP	Z,SCOPE5	;CHECKING IF THE
+2178   0C45 CB FE       	SET	7,(HL)	;BITS IN THE LSN ARE
+2179   0C47 CB 4E       SCOPE5:	BIT	1,(HL)	;SET, AND SETTING THE
+2180   0C49 CA 4E 0C    	JP	Z,SCOPE6	;CORRESPONDING
+2181   0C4C CB F6       	SET	6,(HL)	;MIRROR IMAGE
+2182   0C4E CB 56       SCOPE6:	BIT	2,(HL)	;BIT IN THE MSN
+2183   0C50 CA 55 0C    	JP	Z,SCOPE7	;IF THEY ARE.
+2184   0C53 CB EE       	SET	5,(HL)	;DO THIS FOR
+2185   0C55 CB 5E       SCOPE7:	BIT	3,(HL)	;THE EIGHT ROWS
+2186   0C57 CA 5C 0C    	JP	Z,SCOPE8	;OF DATA BYTES
+2187   0C5A CB E6       	SET	4,(HL)	;IN THE DISPLAY
+2188   0C5C 23          SCOPE8:	INC	HL
+2189   0C5D 10 E1       	DJNZ	SCOPE4	;MORE ROWS TO DO
+2190   0C5F             ;
+2191   0C5F             ; DISPLAY RANDOM BIT PATTERN
+2192   0C5F             ;
+2193   0C5F 11 01 00    	LD	DE,0001H	;SCAN THE DISPLAY
+2194   0C62 CD E3 04    	CALL	RAND	;A RANDOM
+2195   0C65 7C          	LD	A,H	;TIME
+2196   0C66 E6 07       	AND	7	;NOT GREATER THAN
+2197   0C68 F6 01       	OR	1	;NOT LESS THAN
+2198   0C6A 67          	LD	H,A
+2199   0C6B E5          SCOPE9:	PUSH	HL
+2200   0C6C 21 00 3E    	LD	HL,SYSTEM
+2201   0C6F CD A8 0C    	CALL	SKATE	;SCAN 8X8
+2202   0C72 E1          	POP	HL
+2203   0C73 ED 52       	SBC	HL,DE
+2204   0C75 C2 6B 0C    	JP	NZ,SCOPE9
+2205   0C78             ;
+2206   0C78             ; MANIPULATE BITS FOR NEXT IMAGE
+2207   0C78             ;
+2208   0C78 21 00 3E    SCOPEA:	LD	HL,SYSTEM
+2209   0C7B 3E 05       	LD	A,5
+2210   0C7D 86          	ADD	A,(HL)
+2211   0C7E E6 0F       	AND	0FH
+2212   0C80 77          	LD	(HL),A	;ADD 5 TO FIRST LSN
+2213   0C81 23          	INC	HL
+2214   0C82 3E 03       	LD	A,03H
+2215   0C84 86          	ADD	A,(HL)
+2216   0C85 E6 0F       	AND	0FH
+2217   0C87 77          	LD	(HL),A	;ADD 3 TO SECOND LSN
+2218   0C88 23          	INC	HL
+2219   0C89 3E 01       	LD	A,01H
+2220   0C8B 86          	ADD	A,(HL)
+2221   0C8C E6 0F       	AND	0FH
+2222   0C8E 77          	LD	(HL),A	;ADD 1 TO THIRD LSN
+2223   0C8F 23          	INC	HL
+2224   0C90 3E 07       	LD	A,07H
+2225   0C92 86          	ADD	A,(HL)
+2226   0C93 E6 0F       	AND	0FH
+2227   0C95 77          	LD	(HL),A	;ADD 15 TO FOURTH LSN
+2228   0C96 C3 29 0C    	JP	SCOPE2	;MIRROR BIT PATTERN
+2229   0C99             ;
+2230   0C99             ; SEED THE FIRST QUADRANT WITH RANDOM BITS
+2231   0C99             ;
+2232   0C99 47          SEED:	LD	B,A	;PUT THE
+2233   0C9A E6 0F       	AND	0FH	;RANDOM NUMBER
+2234   0C9C 77          	LD	(HL),A	;INTO THE
+2235   0C9D 23          	INC	HL	;FIRST QUADRANT
+2236   0C9E 78          	LD	A,B	;OF THE
+2237   0C9F E6 F0       	AND	240	;DISPLAY
+2238   0CA1 1F          	RRA
+2239   0CA2 1F          	RRA
+2240   0CA3 1F          	RRA
+2241   0CA4 1F          	RRA
+2242   0CA5 77          	LD	(HL),A
+2243   0CA6 23          	INC	HL
+2244   0CA7 C9          	RET
+2245   0CA8             ;-----------------
+2246   0CA8             ; SCAN 8X8 DISPLAY
+2247   0CA8             ;-----------------
+2248   0CA8             ;PUT THE 8 RAM LOCATIONS POINTED TO
+2249   0CA8             ;BY HL ON THE 8X8 DISPLAY,LOW BYTE
+2250   0CA8             ;ON TOP ROW.
+2251   0CA8             ;  ROUTINE PERIOD IS 500uS
+2252   0CA8             ;  PULSE WIDTH 15uS  GIVES 3% DUTY
+2253   0CA8             ;
+2254   0CA8             ; ENTRY : HL = ADDRESS OF 8X8 BUFFER
+2255   0CA8             ;	EXIT : NO REGISTERS MODIFIED
+2256   0CA8             ;
+2257   0CA8 F5          SKATE:	PUSH	AF
+2258   0CA9 C5          	PUSH	BC
+2259   0CAA E5          	PUSH	HL	;SAVE REGISTERS
+2260   0CAB 0E 80       	LD	C,80H
+2261   0CAD 7E          SKATE1:	LD	A,(HL)
+2262   0CAE             
+2263   0CAE~            #IFDEF TEC-1F
+2264   0CAE~            	OUT	(PORT3),A	;OUTPUT X
+2265   0CAE             #ELSE
+2266   0CAE D3 80       	OUT	(IO0),A	;OUTPUT X
+2267   0CB0             #ENDIF
+2268   0CB0             
+2269   0CB0 79          	LD	A,C
+2270   0CB1                 
+2271   0CB1~            #IFDEF TEC-1F
+2272   0CB1~            	OUT	(PORT4),A	;OUTPUT X
+2273   0CB1             #ELSE
+2274   0CB1 D3 82       	OUT	(IO2),A	;OUTPUT Y
+2275   0CB3             #ENDIF
+2276   0CB3             
+2277   0CB3 06 02       	LD	B,02H
+2278   0CB5 10 FE       SKATE2:	DJNZ	SKATE2	;ON TIME DELAY
+2279   0CB7 AF          	XOR	A
+2280   0CB8                 
+2281   0CB8~            #IFDEF TEC-1F
+2282   0CB8~            	OUT	(PORT3),A
+2283   0CB8~            	OUT	(PORT4),A	;CLEAR DISPLAY LATCHES
+2284   0CB8             #ELSE
+2285   0CB8 D3 80       	OUT	(IO0),A
+2286   0CBA D3 82       	OUT	(IO2),A	;CLEAR DISPLAY LATCHES
+2287   0CBC             #ENDIF
+2288   0CBC 06 08       	LD	B,08H
+2289   0CBE 10 FE       SKATE3:	DJNZ	SKATE3	;OFF TIME DELAY
+2290   0CC0 23          	INC	HL
+2291   0CC1 CB 09       	RRC	C
+2292   0CC3 30 E8       	JR	NC,SKATE1	;MORE TO OUTPUT
+2293   0CC5 E1          	POP	HL
+2294   0CC6 C1          	POP	BC
+2295   0CC7 F1          	POP	AF
+2296   0CC8 C9          	RET
+2297   0CC9             ;----------------------------
+2298   0CC9             ; FUNCTION F - CLOCK CALENDAR
+2299   0CC9             ;----------------------------
+2300   0CC9 CD AF 05    TIME:	CALL	BEEP
+2301   0CCC CD 97 04    	CALL	KEYREL	;WAIT FOR KEY RELEASE
+2302   0CCF DD 21 00 3E 	LD	IX,SYSTEM	;USE IX FOR TEMP VARIABLES
+2303   0CD3 3A D6 3F    	LD	A,(ONTIM)
+2304   0CD6 DD 77 00    	LD	(IX+0),A	;SAVE DISPLAY SCAN DELAY
+2305   0CD9 3E 60       	LD	A,60H
+2306   0CDB 32 D6 3F    	LD	(ONTIM),A	;USE NEW DELAY
+2307   0CDE DD 77 01    	LD	(IX+1),A	;START IN TIME MODE
+2308   0CE1             ;
+2309   0CE1             ; DISPLAY TIME,CHECK FOR KEY
+2310   0CE1             ;
+2311   0CE1 CD 37 0E    TIME1:	CALL	RWATCH	;READ THE CLOCK/CALENDAR
+2312   0CE4 CD 21 0D    	CALL	UPDBUF	;UPDATE THE DISPLAY BUFFER
+2313   0CE7 CD F0 03    	CALL	SCAND
+2314   0CEA CD 2A 04    	CALL	SCANKEY
+2315   0CED CB 6F       	BIT	5,A
+2316   0CEF 28 F0       	JR	Z,TIME1	;NO KEY KEEP LOOKING
+2317   0CF1 E6 1F       	AND	1FH
+2318   0CF3 21 FB 0C    	LD	HL,TIMKEY
+2319   0CF6 CD A0 04    	CALL	MENU
+2320   0CF9 18 E6       	JR	TIME1
+2321   0CFB             
+2322   0CFB 04          TIMKEY:	.DB	4
+2323   0CFC 10 11 12 13 	.DB	10H,11H,12H,13H
+2324   0D00 08 0D 99 0D 	.DW	CLKEXT,SETCLK,CALKEY,CALKEY
+2324   0D04 12 0D 12 0D 
+2325   0D08             ;--------------------
+2326   0D08             ; EXIT CLOCK CALENDAR
+2327   0D08             ;--------------------
+2328   0D08 E1          CLKEXT:	POP	HL	;REMOVE RETURN
+2329   0D09 DD 7E 00    	LD	A,(IX+0)
+2330   0D0C 32 D6 3F    	LD	(ONTIM),A	;RESTORE DELAY TIME
+2331   0D0F C3 21 07    	JP	CANCEL
+2332   0D12             ;--------------------
+2333   0D12             ; TOGGLE DISPLAY MODE
+2334   0D12             ;--------------------
+2335   0D12 CD AF 05    CALKEY:	CALL	BEEP
+2336   0D15 CD 97 04    	CALL	KEYREL
+2337   0D18 DD 7E 01    	LD	A,(IX+1)
+2338   0D1B EE 80       	XOR	80H	;TOGGLE DISPLAY
+2339   0D1D DD 77 01    	LD	(IX+1),A
+2340   0D20 C9          	RET
+2341   0D21             ;----------------------
+2342   0D21             ; UPDATE DISPLAY BUFFER
+2343   0D21             ;----------------------
+2344   0D21 DD CB 01 7E UPDBUF:	BIT	7,(IX+1)	;WHICH DISPLAY MODE?
+2345   0D25 20 22       	JR	NZ,UPDBF2	;CALENDAR DISPLAY
+2346   0D27             ;
+2347   0D27             ; TIME DISPLAY
+2348   0D27             ;
+2349   0D27 3A B9 3F    UPDBF1:	LD	A,(SWREG1)
+2350   0D2A CD C0 03    	CALL	CONBYT
+2351   0D2D CB FD       	SET	7,L	;SET DECIMAL POINT
+2352   0D2F 22 D0 3F    	LD	(DISBUF),HL	;SHOW SECONDS (0-59)
+2353   0D32 3A BA 3F    	LD	A,(SWREG2)
+2354   0D35 CD C0 03    	CALL	CONBYT
+2355   0D38 CB FD       	SET	7,L	;SET DECIMAL POINT
+2356   0D3A 22 D2 3F    	LD	(DISBUF+2),HL	;SHOW MINUTES (0-59)
+2357   0D3D 3A BB 3F    	LD	A,(SWREG3)
+2358   0D40 CD C0 03    	CALL	CONBYT
+2359   0D43 CB FD       	SET	7,L	;SET DECIMAL POINT
+2360   0D45 22 D4 3F    	LD	(DISBUF+4),HL	;SHOW HOURS (0-23)
+2361   0D48 C9          	RET
+2362   0D49             ;
+2363   0D49             ; CALENDAR DISPLAY
+2364   0D49             ;
+2365   0D49 3A BF 3F    UPDBF2:	LD	A,(SWREG7)
+2366   0D4C CD C0 03    	CALL	CONBYT
+2367   0D4F 22 D0 3F    	LD	(DISBUF),HL	;SHOW YEAR (0-99)
+2368   0D52             ;
+2369   0D52             ; CHECK MODE FOR DD/MM/YY OR MM/DD/YY
+2370   0D52             ;
+2371   0D52 21 B6 3F    	LD	HL,CALMDE
+2372   0D55 CB 7E       	BIT	7,(HL)
+2373   0D57 20 14       	JR	NZ,UPDBF3	;MM/DD/YY MODE
+2374   0D59             ;
+2375   0D59             ; DD/MM/YY MODE
+2376   0D59             ;
+2377   0D59 3A BE 3F    	LD	A,(SWREG6)
+2378   0D5C CD C0 03    	CALL	CONBYT
+2379   0D5F 22 D2 3F    	LD	(DISBUF+2),HL	;SHOW MONTH (1-12)
+2380   0D62 3A BD 3F    	LD	A,(SWREG5)
+2381   0D65 CD C0 03    	CALL	CONBYT
+2382   0D68 22 D4 3F    	LD	(DISBUF+4),HL	;SHOW DATE (1-31)
+2383   0D6B 18 12       	JR	UPDBF4
+2384   0D6D             ;
+2385   0D6D             ; MM/DD/YY MODE
+2386   0D6D             ;
+2387   0D6D 3A BE 3F    UPDBF3:	LD	A,(SWREG6)
+2388   0D70 CD C0 03    	CALL	CONBYT
+2389   0D73 22 D4 3F    	LD	(DISBUF+4),HL	;SHOW MONTH (1-12)
+2390   0D76 3A BD 3F    	LD	A,(SWREG5)
+2391   0D79 CD C0 03    	CALL	CONBYT
+2392   0D7C 22 D2 3F    	LD	(DISBUF+2),HL	;SHOW DATE (1-31)
+2393   0D7F             ;
+2394   0D7F             ; SHOW DAY
+2395   0D7F             ;
+2396   0D7F 3A BC 3F    UPDBF4:	LD	A,(SWREG4)	;GET DAY REG
+2397   0D82 E6 07       	AND	07H
+2398   0D84 28 12       	JR	Z,UPDBF5	;ZERO IS ILLEGAL
+2399   0D86 FE 07       	CP	07H
+2400   0D88 28 0E       	JR	Z,UPDBF5	;DON'T SHOW SATURDAY
+2401   0D8A 2F          	CPL	;WORK OUT
+2402   0D8B D6 01       	SUB	01H	;WHICH DECIMAL POINT
+2403   0D8D E6 07       	AND	07H	;TO LIGHT
+2404   0D8F 21 D0 3F    	LD	HL,DISBUF	;ADDING THE DAY
+2405   0D92 06 00       	LD	B,00H	;TO A DISPLAY
+2406   0D94 4F          	LD	C,A	;BUFFER INDEX
+2407   0D95 09          	ADD	HL,BC	;AND SETTING THE
+2408   0D96 CB FE       	SET	7,(HL)	;DECIMAL POINT
+2409   0D98 C9          UPDBF5	RET	;IN THAT DISPLAY
+2410   0D99             ;--------------
+2411   0D99             ; SET TIME/DATE
+2412   0D99             ;--------------
+2413   0D99 CD AF 05    SETCLK:	CALL	BEEP
+2414   0D9C CD 97 04    	CALL	KEYREL
+2415   0D9F             ;
+2416   0D9F             ; EDIT THE DISPLAY BUFFER
+2417   0D9F             ;
+2418   0D9F CD 21 0D    SETCK1:	CALL	UPDBUF  ;UPDATE DISPLAY BUFFER
+2419   0DA2 CD 76 04    	CALL	SKEYIN
+2420   0DA5 CD 97 04    	CALL	KEYREL
+2421   0DA8 FE 10       	CP	10H	;FN KEY EXITS (NO CHANGE)
+2422   0DAA C8          	RET	Z
+2423   0DAB FE 11       	CP	11H	;AD KEY SETS CLOCK/CALENDAR
+2424   0DAD 28 6E       	JR	Z,SETCK8
+2425   0DAF FE 12       	CP	12H
+2426   0DB1 28 3D       	JR	Z,SETCK4	;PLUS KEY
+2427   0DB3 FE 13       	CP	13H
+2428   0DB5 28 4F       	JR	Z,SETCK6	;MINUS KEY
+2429   0DB7 FE 0A       	CP	0AH	;NO A-F KEYS
+2430   0DB9 30 E4       	JR	NC,SETCK1
+2431   0DBB             ;
+2432   0DBB             ; IS IT SET CLOCK OR SET CALENDAR?
+2433   0DBB             ;
+2434   0DBB DD CB 01 7E 	BIT	7,(IX+1)
+2435   0DBF 20 0D       	JR	NZ,SETCK2
+2436   0DC1             ;
+2437   0DC1             ; SET CLOCK DISPLAY
+2438   0DC1             ;
+2439   0DC1 21 B9 3F    	LD	HL,SWREG1
+2440   0DC4 ED 6F       	RLD	;MOVE THE NEW KEY
+2441   0DC6 23          	INC	HL	;INTO THE CLOCK BUFFER
+2442   0DC7 ED 6F       	RLD
+2443   0DC9 23          	INC	HL
+2444   0DCA ED 6F       	RLD
+2445   0DCC 18 D1       	JR	SETCK1
+2446   0DCE             ;
+2447   0DCE             ; SET CALENDAR DISPLAY
+2448   0DCE             ;
+2449   0DCE 21 B6 3F    SETCK2:	LD	HL,CALMDE
+2450   0DD1 CB 7E       	BIT	7,(HL)
+2451   0DD3 20 0D       	JR	NZ,SETCK3	;MM/DD/YY MODE
+2452   0DD5             ;
+2453   0DD5             ; SET CALENDAR AS DD/MM/YY
+2454   0DD5             ;
+2455   0DD5 21 BF 3F    	LD	HL,SWREG7
+2456   0DD8 ED 6F       	RLD	;MOVE THE NEW KEY
+2457   0DDA 2B          	DEC	HL	;INTO THE CAL BUFFER
+2458   0DDB ED 6F       	RLD
+2459   0DDD 2B          	DEC	HL
+2460   0DDE ED 6F       	RLD
+2461   0DE0 18 BD       	JR	SETCK1
+2462   0DE2             ;
+2463   0DE2             ; SET CALENDAR AS MM/DD/YY
+2464   0DE2             ;
+2465   0DE2 21 BF 3F    SETCK3:	LD	HL,SWREG7
+2466   0DE5 ED 6F       	RLD	;MOVE THE NEW KEY
+2467   0DE7 2B          	DEC	HL	;INTO THE CAL BUFFER
+2468   0DE8 2B          	DEC	HL
+2469   0DE9 ED 6F       	RLD
+2470   0DEB 23          	INC	HL
+2471   0DEC ED 6F       	RLD
+2472   0DEE 18 AF       	JR	SETCK1
+2473   0DF0             ;
+2474   0DF0             ; INC DAY
+2475   0DF0             ;
+2476   0DF0 DD CB 01 7E SETCK4:	BIT	7,(IX+1)
+2477   0DF4 28 A9       	JR	Z,SETCK1
+2478   0DF6 3A BC 3F    	LD	A,(SWREG4)
+2479   0DF9 FE 07       	CP	07H	;IS THE DAY SUNDAY?
+2480   0DFB 20 02       	JR	NZ,SETCK5
+2481   0DFD 3E 00       	LD	A,00H	;SET MONDAY
+2482   0DFF 3C          SETCK5:	INC	A	;DAY=DAY+1
+2483   0E00 32 BC 3F    	LD	(SWREG4),A
+2484   0E03 C3 9F 0D    	JP	SETCK1
+2485   0E06             ;
+2486   0E06             ; DEC DAY
+2487   0E06             ;
+2488   0E06 DD CB 01 7E SETCK6:	BIT	7,(IX+1)
+2489   0E0A CA 9F 0D    	JP	Z,SETCK1
+2490   0E0D 3A BC 3F    	LD	A,(SWREG4)
+2491   0E10 FE 01       	CP	01H	;IS THE DAY MONDAY?
+2492   0E12 20 02       	JR	NZ,SETCK7
+2493   0E14 3E 08       	LD	A,08H	;SET SUNDAY
+2494   0E16 3D          SETCK7:	DEC	A	;DAY=DAY-1
+2495   0E17 32 BC 3F    	LD	(SWREG4),A
+2496   0E1A C3 9F 0D    	JP	SETCK1
+2497   0E1D             ;
+2498   0E1D             ; SET THE CLOCK/CALENDAR WITH NEW DATA
+2499   0E1D             ;
+2500   0E1D CD AF 05    SETCK8:	CALL	BEEP
+2501   0E20 CD 97 04    	CALL	KEYREL
+2502   0E23 3A BB 3F    	LD	A,(SWREG3)
+2503   0E26 E6 3F       	AND	3FH	;24 HOUR MODE
+2504   0E28 32 BB 3F    	LD	(SWREG3),A
+2505   0E2B 3A BC 3F    	LD	A,(SWREG4)
+2506   0E2E E6 07       	AND	07H	;OSC ON,RST ENABLED
+2507   0E30 32 BC 3F    	LD	(SWREG4),A
+2508   0E33 CD C1 0E    	CALL	WWATCH	;WRITE CHANGES
+2509   0E36 C9          	RET
+2510   0E37             ;---------------------
+2511   0E37             ; READ FROM SMARTWATCH
+2512   0E37             ;---------------------
+2513   0E37             ; READS DATA FROM SMARTWATCH, USES LOOKUP TABLE TO
+2514   0E37             ; WRITE 64 BIT ACCESS CODE TO ENABLE THE SMARTWATCH.
+2515   0E37             ; READS ALL DATA INTO REGISTERS AS RAM CANNOT BE READ
+2516   0E37             ; OR WRITTEN TO WHILE WATCH IS ENABLED.
+2517   0E37             ;
+2518   0E37             ;  ENTRY : NONE
+2519   0E37             ;  EXIT  : NO WORKING REGISTERS MODIFIED
+2520   0E37             ;          (ALTERNATE SET MODIFIED)
+2521   0E37             ;  CONTENTS OF SMARTWATCH WRITTEN TO SWREG0 - SWREG7
+2522   0E37             ;
+2523   0E37             ;
+2524   0E37             ; ENABLE SMARTWATCH
+2525   0E37             ;
+2526   0E37 F5          RWATCH:	PUSH	AF
+2527   0E38 C5          	PUSH	BC
+2528   0E39 D5          	PUSH	DE
+2529   0E3A E5          	PUSH	HL
+2530   0E3B 3A FF 3F    	LD	A,(DALLAS)	;INITIATE PATTERN
+2531   0E3E 21 81 0E    	LD	HL,PATERN	;WRITE D0 OF ALL THE BYTES
+2532   0E41 06 40       	LD	B,64	;IN THE TABLE TO THE RAM TO
+2533   0E43 7E          RWACH1:	LD	A,(HL)	;ENABLE THE SMARTWATCH
+2534   0E44 32 FF 3F    	LD	(DALLAS),A
+2535   0E47 23          	INC	HL
+2536   0E48 10 F9       	DJNZ	RWACH1
+2537   0E4A             ;
+2538   0E4A             ; READ DATA FROM WATCH
+2539   0E4A             ;
+2540   0E4A 06 20       	LD	B,32
+2541   0E4C 3A FF 3F    RWACH2:	LD	A,(DALLAS)	;SHIFT THE FIRST 32 BITS
+2542   0E4F CB 3F       	SRL	A	;INTO THE 16 BIT REGISTERS
+2543   0E51 CB 1A       	RR	D	;DE AND HL
+2544   0E53 CB 1B       	RR	E	;THEN EXCHANGE THEM WITH
+2545   0E55 CB 1C       	RR	H	;THE ALTERNATE PAIR
+2546   0E57 CB 1D       	RR	L
+2547   0E59 10 F1       	DJNZ	RWACH2
+2548   0E5B D9          	EXX
+2549   0E5C 06 20       	LD	B,32
+2550   0E5E 3A FF 3F    RWACH3:	LD	A,(DALLAS)	;NOW SHIFT THE LAST 32 BITS
+2551   0E61 CB 3F       	SRL	A	;INTO THE SAME 16 BIT REGISTERS
+2552   0E63 CB 1A       	RR	D
+2553   0E65 CB 1B       	RR	E
+2554   0E67 CB 1C       	RR	H
+2555   0E69 CB 1D       	RR	L
+2556   0E6B 10 F1       	DJNZ	RWACH3
+2557   0E6D             ;
+2558   0E6D             ; SAVE IN WATCH REGISTERS
+2559   0E6D             ;
+2560   0E6D 22 BC 3F    	LD	(SWREG4),HL	;SMARTWATCH READ IS COMPLETE
+2561   0E70 ED 53 BE 3F 	LD	(SWREG6),DE	;GET THE DATA
+2562   0E74 D9          	EXX
+2563   0E75 22 B8 3F    	LD	(SWREG0),HL
+2564   0E78 ED 53 BA 3F 	LD	(SWREG2),DE
+2565   0E7C E1          	POP	HL
+2566   0E7D D1          	POP	DE
+2567   0E7E C1          	POP	BC
+2568   0E7F F1          	POP	AF
+2569   0E80 C9          	RET
+2570   0E81             ;
+2571   0E81             ; SMARTWATCH ACCESS PATTERN
+2572   0E81             ;
+2573   0E81 C5 E2 71 B8 PATERN:	.DB	0C5H,0E2H,71H,0B8H,5CH,2EH,17H,8BH
+2573   0E85 5C 2E 17 8B 
+2574   0E89 3A 1D 8E 47 	.DB	3AH,1DH,8EH,47H,0A3H,0D1H,0E8H,74H
+2574   0E8D A3 D1 E8 74 
+2575   0E91 A3 D1 E8 74 	.DB	0A3H,0D1H,0E8H,74H,3AH,1DH,8EH,47H
+2575   0E95 3A 1D 8E 47 
+2576   0E99 5C 2E 17 8B 	.DB	5CH,2EH,17H,8BH,0C5H,0E2H,71H,0B8H
+2576   0E9D C5 E2 71 B8 
+2577   0EA1 C5 E2 71 B8 	.DB	0C5H,0E2H,71H,0B8H,5CH,2EH,17H,8BH
+2577   0EA5 5C 2E 17 8B 
+2578   0EA9 3A 1D 8E 47 	.DB	3AH,1DH,8EH,47H,0A3H,0D1H,0E8H,74H
+2578   0EAD A3 D1 E8 74 
+2579   0EB1 A3 D1 E8 74 	.DB	0A3H,0D1H,0E8H,74H,3AH,1DH,8EH,47H
+2579   0EB5 3A 1D 8E 47 
+2580   0EB9 5C 2E 17 8B 	.DB	5CH,2EH,17H,8BH,0C5H,0E2H,71H,0B8H
+2580   0EBD C5 E2 71 B8 
+2581   0EC1             ;--------------------
+2582   0EC1             ; WRITE TO SMARTWATCH
+2583   0EC1             ;--------------------
+2584   0EC1             ;
+2585   0EC1             ; WRITE DATA TO SMARTWATCH BY FIRST ACCESSING
+2586   0EC1             ; IT USING BIT MANIPULATION.
+2587   0EC1             ; DATA IS WRITTEN BY FIRSTLY PUTTING ALL 64 BITS
+2588   0EC1             ; INTO REGISTERS AS RAM CANNOT BE ACCESSED ONCE THE
+2589   0EC1             ; SMARTWATCH IS ENABLED.
+2590   0EC1             ;
+2591   0EC1             ; ENTRY : NONE
+2592   0EC1             ; THE DATA TO WRITE TO THE SMARTWATCH
+2593   0EC1             ; MUST BE IN SWREG0 - SWREG7
+2594   0EC1             ;  EXIT : NO WORKING REGISTERS MODIFIED
+2595   0EC1             ;  (ALTERNATE SET MODIFIED)
+2596   0EC1             ; GET DATA TO WRITE TO WATCH
+2597   0EC1             ;
+2598   0EC1 F5          WWATCH:	PUSH	AF
+2599   0EC2 C5          	PUSH	BC
+2600   0EC3 D5          	PUSH	DE
+2601   0EC4 E5          	PUSH	HL
+2602   0EC5 2A BC 3F    	LD	HL,(SWREG4)	;SET UP THE
+2603   0EC8 ED 5B BE 3F 	LD	DE,(SWREG6)	;16 BIT REGISTERS
+2604   0ECC D9          	EXX
+2605   0ECD 2A B8 3F    	LD	HL,(SWREG0)	;WITH THE DATA TO BE
+2606   0ED0 ED 5B BA 3F 	LD	DE,(SWREG2)	;WRITTEN TO THE SMARTWATCH
+2607   0ED4             ;
+2608   0ED4             ; WRITE 64 BIT ACCESS CODE TO ENABLE SMARTWATCH
+2609   0ED4             ;
+2610   0ED4 3A FF 3F    	LD	A,(DALLAS)	;INITIATE PATTERN
+2611   0ED7 3E C5       	LD	A,0C5H
+2612   0ED9 0E 80       	LD	C,80H	;NUMBER OF BYTES
+2613   0EDB 06 80       WWACH1:	LD	B,80H	;NUMBER OF BITS
+2614   0EDD 32 FF 3F    WWACH2:	LD	(DALLAS),A	;WRITE TO RAM
+2615   0EE0 CB 0F       	RRC	A
+2616   0EE2 CB 38       	SRL	B
+2617   0EE4 30 F7       	JR	NC,WWACH2	;MORE BITS
+2618   0EE6 CB 39       	SRL	C
+2619   0EE8 38 11       	JR	C,WWACH4	;NO MORE BYTES
+2620   0EEA CB 47       	BIT	0,A
+2621   0EEC 20 0A       	JR	NZ,WWACH3
+2622   0EEE CB 0F       	RRC	A
+2623   0EF0 CB 0F       	RRC	A
+2624   0EF2 CB 0F       	RRC	A
+2625   0EF4 CB 0F       	RRC	A
+2626   0EF6 18 E3       	JR	WWACH1
+2627   0EF8 2F          WWACH3:	CPL
+2628   0EF9 18 E0       	JR	WWACH1
+2629   0EFB             ;
+2630   0EFB             ; WRITE DATA TO WATCH
+2631   0EFB             ;
+2632   0EFB 06 20       WWACH4:	LD	B,32	;SHIFT THE FIRST 32 BITS
+2633   0EFD CB 3A       WWACH5:	SRL	D	;OUT OF THE 16 BIT REGISTERS
+2634   0EFF CB 1B       	RR	E	;ONTO D0 AND INTO
+2635   0F01 CB 1C       	RR	H	;THE SMARTWATCH
+2636   0F03 CB 1D       	RR	L
+2637   0F05 17          	RLA
+2638   0F06 32 FF 3F    	LD	(DALLAS),A
+2639   0F09 10 F2       	DJNZ	WWACH5
+2640   0F0B D9          	EXX	;RESTORE REGISTERS
+2641   0F0C 06 20       	LD	B,32	;GET THE OTHER 32 BITS FROM
+2642   0F0E CB 3A       WWACH6:	SRL	D	;THE ALTERNATE REGISTER SET
+2643   0F10 CB 1B       	RR	E	;AND SHIFT THEM ONTO D0
+2644   0F12 CB 1C       	RR	H	;AND INTO THE SMARTWATCH
+2645   0F14 CB 1D       	RR	L
+2646   0F16 17          	RLA
+2647   0F17 32 FF 3F    	LD	(DALLAS),A
+2648   0F1A 10 F2       	DJNZ	WWACH6
+2649   0F1C E1          	POP	HL
+2650   0F1D D1          	POP	DE
+2651   0F1E C1          	POP	BC
+2652   0F1F F1          	POP	AF
+2653   0F20 C9          	RET
+2654   0F21             ;-----------------
+2655   0F21             ; ONE SECOND DELAY
+2656   0F21             ;-----------------
+2657   0F21             ; USES SMARTWATCH TO DELAY FOR 1 SECOND
+2658   0F21             ; BY WAITING FOR SECONDS REGISTER TO ROLLOVER
+2659   0F21             ;
+2660   0F21             ; FIRST READ GETS A REFERENCE, SUBSEQUENT READS
+2661   0F21             ; WAIT UNTIL THE SECONDS COUNTER NO LONGER
+2662   0F21             ; READS THE SAME AS THE REFERENCE VALUE,
+2663   0F21             ; THEN THE ROUTINE RETURNS
+2664   0F21             ;
+2665   0F21             ; ENTRY : NONE
+2666   0F21             ; EXIT : NONE MODIFIED
+2667   0F21             ;
+2668   0F21 F5          ONESEC:	PUSH	AF
+2669   0F22 C5          	PUSH	BC
+2670   0F23 CD 37 0E    	CALL	RWATCH	;READ WATCH
+2671   0F26 3A B9 3F    	LD	A,(SWREG1)
+2672   0F29 47          	LD	B,A	;SAVE REF COUNT
+2673   0F2A CD 37 0E    ONESC1:	CALL	RWATCH
+2674   0F2D 3A B9 3F    	LD	A,(SWREG1)
+2675   0F30 B8          	CP	B	;SAME AS REF?
+2676   0F31 CA 2A 0F    	JP	Z,ONESC1	;YES SO WAIT AGAIN
+2677   0F34 C1          	POP	BC
+2678   0F35 F1          	POP	AF
+2679   0F36 C9          	RET
+2680   0F37                 
+2681   0F37             ;---------------
+2682   0F37             ; SERIAL MONITOR
+2683   0F37             ;---------------
+2684   0F37             
+2685   0F37             ;------------
+2686   0F37             ; ASCII CODES
+2687   0F37             ;------------
+2688   0F37             ESC:    .EQU   1BH
+2689   0F37             CR:     .EQU   0DH
+2690   0F37             LF:     .EQU   0AH
+2691   0F37             
+2692   0F37                        
+2693   0F37 3E 40       SCBUG:  LD    A,40H
+2694   0F39 D3 85              OUT   (SCAN),A    ;TURN OFF THE DISPLAY MAKE SERIAL TX HIGH
+2695   0F3B             ;
+2696   0F3B             ; START UP THE MONITOR
+2697   0F3B             ;          
+2698   0F3B ED 73 AE 3F COLD:   LD    (ISTACK),SP ;SAVE STACK POINTER
+2699   0F3F 21 7A 11           LD    HL,SSSTEP
+2700   0F42 22 FA 3F           LD    (RST38),HL ;HIJACK THE SINGLE STEPPER
+2701   0F45 CD FE 0B           CALL  DELONE     ;WAIT A SEC SO THE HOST SEES TX HIGH  
+2702   0F48 21 11 08           LD    HL,TXDATA
+2703   0F4B 22 AA 3F           LD    (PUTCH),HL ;USE THE BITBANG SERIAL TRANSMIT
+2704   0F4E 21 3C 08           LD    HL,RXDATA
+2705   0F51 22 AC 3F           LD    (GETCH),HL  ;USE THE BITBANG SERIAL RECEIVE
+2706   0F54 21 BA 13           LD    HL,INITSZ  ;VT100 TERMINAL COMMANDS FOR CLEAR SCREEN,CURSOR HOME
+2707   0F57 CD 6C 11           CALL  SNDMSG     ;INITIALISE THE TERMINAL
+2708   0F5A 21 0C 12           LD    HL,SIGNON
+2709   0F5D CD 6C 11           CALL  SNDMSG     ;SEND THE SIGNON
+2710   0F60             ;
+2711   0F60             ; DISPLAY THE PROMPT AND WAIT FOR COMMANDS
+2712   0F60             ;
+2713   0F60 3E 3E       START2: LD    A,'>'
+2714   0F62 CD D7 0F           CALL  OUTCH       ;DISPLAY THE PROMPT
+2715   0F65 CD DD 0F    START3: CALL  INCH        ;GET A CHARACTER FROM THE CONSOLE
+2716   0F68             ;
+2717   0F68             ; IF THE COMMAND IS NOT IN THE COMMAND LIST REJECT IT
+2718   0F68             ;
+2719   0F68 21 84 0F           LD    HL,MONMENU 
+2720   0F6B 46                 LD    B,(HL) ;NUMBER OF COMMANDS
+2721   0F6C 23                 INC   HL
+2722   0F6D BE          START4: CP   (HL)      ;IN THE LIST?
+2723   0F6E 28 05              JR    Z,START5    ;OK DO IT
+2724   0F70 23                 INC   HL
+2725   0F71 10 FA              DJNZ  START4      ;KEEP LOOKING
+2726   0F73 18 F0              JR    START3
+2727   0F75 CD D7 0F    START5: CALL  OUTCH       ;ECHO 
+2728   0F78 21 84 0F           LD    HL,MONMENU  ;USE THE MENU HANDLER 
+2729   0F7B CD A0 04           CALL  MENU        ;KEY IN A, EXECUTE MENU
+2730   0F7E             ;      
+2731   0F7E             ; THE MENU FUNCTION CALL LEAVES THE RETURN ADDRESS OF THE MENU CALL
+2732   0F7E             ; ON THE STACK SO ANY CALLED SUBROUTINES CAN COME BACK HERE WITH A RET.
+2733   0F7E             ;           
+2734   0F7E CD D0 0F    WARM:   CALL  TXCRLF     ;START ON A NEW LINE
+2735   0F81 C3 60 0F           JP    START2
+2736   0F84             ;
+2737   0F84             ; SCBUG MONITOR COMMANDS
+2738   0F84             ;
+2739   0F84 07          MONMENU:    .DB 7
+2740   0F85 44 48 54 4D             .DB 'D','H','T','M','G','I','X'
+2740   0F89 47 49 58 
+2741   0F8C             
+2742   0F8C AC 10 06 10             .DW DSPLAY,HELP,SSTOGL,MODIFY
+2742   0F90 13 10 1C 10 
+2743   0F94 E3 0F 6F 10             .DW GOJUMP,INTHEX,EXIT
+2743   0F98 88 10 
+2744   0F9A             ;-----------------------------
+2745   0F9A             ; GET A BYTE FROM THE TERMINAL
+2746   0F9A             ;-----------------------------
+2747   0F9A CD DD 0F    GETCHR: CALL  INCH
+2748   0F9D FE 1B              CP    ESC
+2749   0F9F 28 27              JR    Z,GETOUT
+2750   0FA1 47                 LD    B,A                ;SAVE TO ECHO      
+2751   0FA2 CD 91 10           CALL  ASC2HEX
+2752   0FA5 30 F3              JR    NC,GETCHR          ;REJECT NON HEX CHARS    
+2753   0FA7 21 B2 3F           LD    HL,DATA
+2754   0FAA 77                 LD    (HL),A 
+2755   0FAB 78                 LD    A,B         
+2756   0FAC CD D7 0F           CALL  OUTCH             ;ECHO VALID HEX
+2757   0FAF                    
+2758   0FAF CD DD 0F    GETNYB: CALL  INCH
+2759   0FB2 FE 1B              CP    ESC
+2760   0FB4 28 12              JR    Z,GETOUT
+2761   0FB6 47                 LD    B,A               ;SAVE TO ECHO
+2762   0FB7 CD 91 10           CALL  ASC2HEX
+2763   0FBA 30 F3              JR    NC,GETNYB         ;REJECT NON HEX CHARS
+2764   0FBC ED 6F              RLD
+2765   0FBE 78                 LD    A,B
+2766   0FBF CD D7 0F           CALL  OUTCH             ;ECHO VALID HEX
+2767   0FC2 7E                 LD    A,(HL)
+2768   0FC3 CD C8 0F           CALL  GETOUT            ;MAKE SURE WE CLEAR THE CARRY BY SETTING IT,
+2769   0FC6 3F                 CCF                    ;AND THEN COMPLEMENTING IT
+2770   0FC7 C9                 RET   
+2771   0FC8 37          GETOUT: SCF                    ;SET THE CARRY FLAG TO EXIT BACK TO MENU
+2772   0FC9 C9                 RET
+2773   0FCA             ;---------------
+2774   0FCA             ; OUTPUT A SPACE
+2775   0FCA             ;---------------
+2776   0FCA 3E 20       OUTSP:  LD    A,20H
+2777   0FCC CD D7 0F           CALL  OUTCH
+2778   0FCF C9                 RET
+2779   0FD0             ;-------------      
+2780   0FD0             ; OUTPUT CRLF
+2781   0FD0             ;------------
+2782   0FD0 3E 0D       TXCRLF: LD   A,CR
+2783   0FD2 CD D7 0F           CALL OUTCH   
+2784   0FD5 3E 0A              LD   A,LF
+2785   0FD7             ;-----------------------------------
+2786   0FD7             ; OUTPUT A CHARACTER TO THE TERMINAL
+2787   0FD7             ;-----------------------------------       
+2788   0FD7 DD 2A AA 3F OUTCH:  LD   IX,(PUTCH)
+2789   0FDB DD E9              JP   (IX)
+2790   0FDD             ;------------------------------------
+2791   0FDD             ; INPUT A CHARACTER FROM THE TERMINAL
+2792   0FDD             ;------------------------------------
+2793   0FDD DD 2A AC 3F INCH:  LD   IX,(GETCH)
+2794   0FE1 DD E9             JP   (IX)
+2795   0FE3             ;------------------------------
+2796   0FE3             ; GO <ADDR>
+2797   0FE3             ; TRANSFERS EXECUTION TO <ADDR>
+2798   0FE3             ;------------------------------
+2799   0FE3 CD CA 0F    GOJUMP: CALL  OUTSP       
+2800   0FE6 CD 9A 0F           CALL  GETCHR      ;GET ADDRESS HIGH BYTE
+2801   0FE9 D8                 RET   C
+2802   0FEA 32 B1 3F           LD    (ADDR+1),A  ;SAVE ADDRESS HIGH
+2803   0FED CD 9A 0F           CALL  GETCHR      ;GET ADDRESS LOW BYTE
+2804   0FF0 D8                 RET   C
+2805   0FF1 32 B0 3F           LD    (ADDR),A    ;SAVE ADDRESS LOW 
+2806   0FF4             ;
+2807   0FF4             ; WAIT FOR A CR OR ESC
+2808   0FF4             ;       
+2809   0FF4 CD DD 0F    GOJMP1: CALL  INCH
+2810   0FF7 FE 1B              CP    ESC         ;ESC KEY?
+2811   0FF9 C8                 RET   Z
+2812   0FFA FE 0D              CP    CR
+2813   0FFC 20 F6              JR    NZ,GOJMP1
+2814   0FFE CD D0 0F           CALL  TXCRLF
+2815   1001 E1                 POP   HL          ;POP THE UNUSED MENU RETURN ADDRESS FROM THE STACK
+2816   1002 2A B0 3F           LD    HL,(ADDR)
+2817   1005 E9                 JP    (HL)        ;GOOD LUCK WITH THAT!
+2818   1006             ;---------------------
+2819   1006             ; DISPLAY COMMAND HELP
+2820   1006             ;---------------------
+2821   1006 21 EB 12    HELP:   LD   HL,COMANDS
+2822   1009 CD 6C 11           CALL SNDMSG
+2823   100C 21 54 13           LD   HL,COMANDS1
+2824   100F CD 6C 11           CALL SNDMSG
+2825   1012 C9                 RET
+2826   1013             ;-----------------------------------------------
+2827   1013             ; T COMMAND TOGGLE SINGLE STEPPER (IF INSTALLED)
+2828   1013             ;-----------------------------------------------
+2829   1013             ; CAN'T TELL IF THE SINGLE STEPPER IS ON OR OFF
+2830   1013             ; SO WE WILL JUST TOGGLE THE FLIP FLOP.
+2831   1013             ;
+2832   1013 21 88 12    SSTOGL: LD   HL,TOGGLE
+2833   1016 CD 6C 11           CALL  SNDMSG
+2834   1019~            #IFDEF TEC-1F
+2835   1019~                    OUT	(PORT7),A	    ;TOGGLE HARDWARE LATCH
+2836   1019             #ELSE
+2837   1019 D3 87               OUT	(IO7),A	        ;TOGGLE HARDWARE LATCH
+2838   101B             #ENDIF
+2839   101B C9                 RET
+2840   101C             ;----------------------------
+2841   101C             ; M DISPLAY AND MODIFY MEMORY
+2842   101C             ;----------------------------
+2843   101C CD CA 0F    MODIFY: CALL  OUTSP
+2844   101F             ;
+2845   101F             ;GET THE ADDRESS        
+2846   101F             ;
+2847   101F CD 9A 0F           CALL  GETCHR 
+2848   1022 D8                 RET   C        
+2849   1023 32 B1 3F           LD    (ADDR+1),A  ;SAVE ADDRESS HIGH
+2850   1026 CD 9A 0F           CALL  GETCHR
+2851   1029 D8                 RET   C
+2852   102A 32 B0 3F           LD    (ADDR),A    ;SAVE ADDRESS LOW 
+2853   102D             ;
+2854   102D             ; DISPLAY ON A NEW LINE
+2855   102D             ;       
+2856   102D CD D0 0F    MDIFY1: CALL  TXCRLF       
+2857   1030 ED 5B B0 3F        LD    DE,(ADDR)    
+2858   1034 21 00 3E           LD    HL,MSGBUF   
+2859   1037 CD 3E 11           CALL  WRDASC      ;CONVERT ADDRESS IN DE TO ASCII
+2860   103A 21 00 3E           LD    HL,MSGBUF
+2861   103D CD 32 11           CALL  WRDOUT      ;OUTPUT THE ADDRESS
+2862   1040 CD CA 0F           CALL  OUTSP    
+2863   1043             ;      
+2864   1043             ;GET THE DATA AT THE ADDRESS        
+2865   1043             ;
+2866   1043 2A B0 3F            LD   HL,(ADDR)       
+2867   1046 7E                  LD   A,(HL)
+2868   1047             ;
+2869   1047             ; DISPLAY THE DATA
+2870   1047             ;        
+2871   1047 21 00 3E           LD    HL,MSGBUF
+2872   104A CD 43 11           CALL  BYTASC     ;CONVERT THE DATA BYTE IN A TO ASCII
+2873   104D 21 00 3E           LD    HL,MSGBUF
+2874   1050 CD 35 11           CALL  BYTOUT      ;OUTPUT THE BYTE
+2875   1053 CD CA 0F           CALL  OUTSP
+2876   1056             ;
+2877   1056             ; GET NEW DATA,EXIT OR CONTINUE
+2878   1056             ;
+2879   1056 CD 9A 0F           CALL  GETCHR
+2880   1059 D8                 RET   C
+2881   105A 47                 LD    B,A         ;SAVE IT FOR LATER
+2882   105B 2A B0 3F           LD    HL,(ADDR)
+2883   105E 77                 LD    (HL),A      ;PUT THE BYTE AT THE CURRENT ADDRESS
+2884   105F 78                 LD    A,B
+2885   1060 BE                 CP    (HL)
+2886   1061 28 05              JR    Z,MDIFY2
+2887   1063 3E 3F              LD    A,'?'
+2888   1065 CD D7 0F           CALL  OUTCH       ;NOT THE SAME DATA, PROBABLY NO RAM THERE      
+2889   1068             ;
+2890   1068             ; INCREMENT THE ADDRESS
+2891   1068             ;
+2892   1068 23          MDIFY2: INC   HL
+2893   1069 22 B0 3F           LD    (ADDR),HL
+2894   106C C3 2D 10           JP    MDIFY1      
+2895   106F             ;-----------------------
+2896   106F             ; RECEIVE INTEL HEX FILE
+2897   106F             ;-----------------------       
+2898   106F 21 9F 12    INTHEX: LD    HL,TXFILE
+2899   1072 CD 6C 11           CALL  SNDMSG      ;SEND FILE
+2900   1075 CD 80 07           CALL  INTELH
+2901   1078 20 07              JR    NZ,ITHEX1      
+2902   107A 21 B8 12           LD    HL,FILEOK
+2903   107D CD 6C 11           CALL  SNDMSG      ;GOT FILE OK
+2904   1080 C9                 RET
+2905   1081 21 CD 12    ITHEX1: LD    HL,CSUMERR
+2906   1084 CD 6C 11           CALL  SNDMSG      ;CHECKSUM ERROR
+2907   1087 C9                 RET    
+2908   1088             ;------------------------
+2909   1088             ; EXIT BACK TO SC MONITOR
+2910   1088             ;------------------------       
+2911   1088 21 E0 12    EXIT:   LD    HL,BYE
+2912   108B CD 6C 11           CALL  SNDMSG       
+2913   108E C3 8E 02           JP    MAIN      ;STACK IS RESET TO TOP OF RAM IN MAIN
+2914   1091             ;----------------------------------------
+2915   1091             ; CONVERT ASCII CHARACTER INTO HEX NYBBLE
+2916   1091             ;----------------------------------------
+2917   1091             ; THIS ROUTINE IS FOR MASKING OUT KEYBOARD
+2918   1091             ; ENTRY OTHER THAN HEXADECIMAL KEYS
+2919   1091             ;
+2920   1091             ;CONVERTS ASCII 0-9,A-F INTO HEX LSN
+2921   1091             ;ENTRY : A= ASCII 0-9,A-F
+2922   1091             ;EXIT  : CARRY =  1
+2923   1091             ;          A= HEX 0-F IN LSN    
+2924   1091             ;      : CARRY = 0
+2925   1091             ;          A= OUT OF RANGE CHARACTER & 7FH
+2926   1091             ; A AND F REGISTERS MODIFIED
+2927   1091             ;
+2928   1091 E6 7F       ASC2HEX: AND   7FH        ;STRIP OUT PARITY
+2929   1093 FE 30              CP    30H
+2930   1095 38 12              JR    C,AC2HEX3    ;LESS THAN 0
+2931   1097 FE 3A              CP    3AH
+2932   1099 30 02              JR    NC,AC2HEX2   ;MORE THAN 9
+2933   109B 37          AC2HEX1: SCF               ;SET THE CARRY - IS HEX
+2934   109C C9                 RET
+2935   109D             ;     
+2936   109D FE 41       AC2HEX2: CP    41H
+2937   109F 38 08              JR    C,AC2HEX3    ;LESS THAN A
+2938   10A1 FE 47              CP    47H
+2939   10A3 30 04              JR    NC,AC2HEX3   ;MORE THAN F
+2940   10A5 D6 07              SUB   07H        ;CONVERT TO NYBBLE
+2941   10A7 18 F2              JR    AC2HEX1  
+2942   10A9 E6 FF       AC2HEX3: AND   0FFH        ;RESET THE CARRY - NOT HEX
+2943   10AB C9                 RET
+2944   10AC             ;--------------------------
+2945   10AC             ; D DISPLAY MEMORY LOCATION
+2946   10AC             ;--------------------------
+2947   10AC CD CA 0F    DSPLAY: CALL  OUTSP       ;A SPACE
+2948   10AF CD 9A 0F           CALL  GETCHR
+2949   10B2 D8                 RET   C         
+2950   10B3 32 B1 3F           LD    (ADDR+1),A  ;SAVE ADDRESS HIGH
+2951   10B6 CD 9A 0F           CALL  GETCHR
+2952   10B9 D8                 RET   C
+2953   10BA 32 B0 3F           LD    (ADDR),A    ;SAVE ADDRESS LOW 
+2954   10BD             ;
+2955   10BD             ; WAIT FOR CR OR ESC
+2956   10BD             ;
+2957   10BD CD DD 0F    DPLAY1: CALL  INCH
+2958   10C0 FE 1B              CP    ESC
+2959   10C2 C8                 RET   Z
+2960   10C3 FE 0D              CP    CR
+2961   10C5 20 F6              JR    NZ,DPLAY1          
+2962   10C7 CD D0 0F           CALL  TXCRLF      ;NEWLINE
+2963   10CA             ;
+2964   10CA             ; DISPLAY THE LINE
+2965   10CA             ;
+2966   10CA CD DF 10    DPLAY2: CALL  DPLINE
+2967   10CD ED 53 B0 3F        LD    (ADDR),DE   ;SAVE THE NEW ADDRESS
+2968   10D1             ;
+2969   10D1             ; DISPLAY MORE LINES OR EXIT
+2970   10D1             ;       
+2971   10D1 CD DD 0F    DPLAY3: CALL  INCH
+2972   10D4 38 FB              JR    C,DPLAY3   
+2973   10D6 FE 20              CP    20H        ;SPACE DISPLAYS THE NEXT LINE
+2974   10D8 28 F0              JR    Z,DPLAY2
+2975   10DA FE 1B              CP    ESC         ;ESC EXITS
+2976   10DC 20 F3              JR    NZ,DPLAY3     
+2977   10DE C9                 RET   
+2978   10DF             ;-------------------------
+2979   10DF             ; DISPLAY A LINE OF MEMORY
+2980   10DF             ;-------------------------      
+2981   10DF ED 5B B0 3F DPLINE: LD    DE,(ADDR)   ;ADDRESS TO BE DISPLAYED
+2982   10E3 21 00 3E           LD    HL,MSGBUF   ;HL POINTS TO WHERE THE OUTPUT STRING GOES
+2983   10E6             ;
+2984   10E6             ; DISPLAY THE ADDRESS
+2985   10E6             ;         
+2986   10E6 CD 3E 11           CALL  WRDASC     ;CONVERT ADDRESS IN DE TO ASCII
+2987   10E9 CD 22 11           CALL  SPCBUF        
+2988   10EC             ;
+2989   10EC             ; DISPLAY 16 BYTES
+2990   10EC             ;
+2991   10EC 06 10              LD    B,16
+2992   10EE 1A          DLINE1: LD    A,(DE)
+2993   10EF CD 43 11           CALL  BYTASC
+2994   10F2 CD 22 11           CALL  SPCBUF
+2995   10F5 13                 INC   DE        
+2996   10F6 10 F6              DJNZ  DLINE1
+2997   10F8 CD 22 11           CALL  SPCBUF
+2998   10FB             ;
+2999   10FB             ; NOW DISPLAY THE ASCII CHARACTER
+3000   10FB             ; IF YOU ARE DISPLAYING NON-MEMORY AREAS THE BYTES READ AND THE ASCII COULD
+3001   10FB             ; BE DIFFERENT BETWEEN THE TWO PASSES!
+3002   10FB             ;
+3003   10FB ED 5B B0 3F        LD    DE,(ADDR)    
+3004   10FF 06 10              LD    B,16
+3005   1101 1A          DLINE2: LD    A,(DE)   
+3006   1102 FE 20              CP    20H
+3007   1104 38 07              JR    C,DOT
+3008   1106 FE 7F              CP    7FH
+3009   1108 30 03              JR    NC,DOT
+3010   110A C3 0F 11           JP    NDOT
+3011   110D 3E 2E       DOT:    LD    A,'.'
+3012   110F CD 24 11    NDOT:   CALL  INBUF
+3013   1112 13                 INC   DE       
+3014   1113 10 EC              DJNZ  DLINE2
+3015   1115             ;         
+3016   1115             ;TERMINATE AND DISPLAY STRING
+3017   1115             ;       
+3018   1115 CD 27 11           CALL  BCRLF
+3019   1118 3E 00              LD    A,00H
+3020   111A 77                 LD    (HL),A
+3021   111B 21 00 3E           LD    HL,MSGBUF
+3022   111E CD 6C 11           CALL  SNDMSG
+3023   1121 C9                 RET
+3024   1122             ;
+3025   1122             ; PUT A SPACE IN THE BUFFER
+3026   1122             ;
+3027   1122 3E 20       SPCBUF: LD    A,20H
+3028   1124 77          INBUF:  LD    (HL),A
+3029   1125 23                 INC   HL
+3030   1126 C9                 RET
+3031   1127             ;
+3032   1127             ; PUT A CR LF IN THE BUFFER
+3033   1127             ;        
+3034   1127 3E 0D       BCRLF:  LD    A,CR  
+3035   1129 CD 24 11           CALL  INBUF
+3036   112C 3E 0A              LD    A,LF
+3037   112E CD 24 11           CALL  INBUF
+3038   1131 C9                 RET
+3039   1132             ;----------------------     
+3040   1132             ; SEND ASCII HEX VALUES        
+3041   1132             ;----------------------
+3042   1132             ;
+3043   1132             ; OUTPUT THE 4 BYTE, WRDOUT
+3044   1132             ; THE 2 BYTE, BYTOUT
+3045   1132             ; OR THE SINGLE BYTE, NYBOUT
+3046   1132             ; ASCII STRING AT HL TO THE SERIAL PORT
+3047   1132             ;
+3048   1132 CD 35 11    WRDOUT: CALL  BYTOUT
+3049   1135 CD 38 11    BYTOUT: CALL  NYBOUT
+3050   1138 7E          NYBOUT: LD    A,(HL)
+3051   1139 CD D7 0F           CALL  OUTCH
+3052   113C 23                 INC   HL
+3053   113D C9                 RET       
+3054   113E             ;----------------
+3055   113E             ;CONVERT TO ASCII 
+3056   113E             ;----------------
+3057   113E             ;
+3058   113E             ; CONVERT A WORD,A BYTE OR A NYBBLE TO ASCII
+3059   113E             ;
+3060   113E             ;         ENTRY :  A = BINARY TO CONVERT
+3061   113E             ;                  HL = CHARACTER BUFFER ADDRESS   
+3062   113E             ;        EXIT   :  HL = POINTS TO LAST CHARACTER+1
+3063   113E             ;   
+3064   113E             ;        MODIFIES : DE
+3065   113E             
+3066   113E 7A          WRDASC: LD    A,D         ;CONVERT AND
+3067   113F CD 43 11           CALL  BYTASC      ;OUTPUT D
+3068   1142 7B                 LD    A,E         ;THEN E
+3069   1143             ;
+3070   1143             ;CONVERT A BYTE TO ASCII 
+3071   1143             ;
+3072   1143 F5          BYTASC: PUSH  AF          ;SAVE A FOR SECOND NYBBLE 
+3073   1144 0F                 RRCA              ;SHIFT HIGH NYBBLE ACROSS
+3074   1145 0F                 RRCA
+3075   1146 0F                 RRCA
+3076   1147 0F                 RRCA
+3077   1148 CD 4C 11           CALL NYBASC       ;CALL NYBBLE CONVERTER 
+3078   114B F1                 POP AF            ;RESTORE LOW NYBBLE
+3079   114C             ;           
+3080   114C             ; CONVERT A NYBBLE TO ASCII
+3081   114C             ;
+3082   114C E6 0F       NYBASC: AND   0FH         ;MASK OFF HIGH NYBBLE 
+3083   114E C6 90              ADD   A,90H       ;CONVERT TO
+3084   1150 27                 DAA               ;ASCII
+3085   1151 CE 40              ADC   A,40H
+3086   1153 27                 DAA
+3087   1154             ;            
+3088   1154             ; SAVE IN STRING
+3089   1154             ;
+3090   1154 77          INSBUF: LD    (HL),A
+3091   1155 23                 INC   HL 
+3092   1156 C9                 RET 
+3093   1157             ;------------------------------------------------------
+3094   1157             ; CONVERT A BYTE INTO A STRING OF ASCII ONES AND ZEROES
+3095   1157             ;------------------------------------------------------
+3096   1157             ;       
+3097   1157             ;        DESCRIPTION : CONVERTS A BYTE, STARTING AT BIT 7,
+3098   1157             ;                      INTO A STRING OF ASCII
+3099   1157             ;                      ONES AND ZEROES.
+3100   1157             ;
+3101   1157             ;           ENTRY :  A = BINARY TO CONVERT
+3102   1157             ;                   HL = CHARACTER BUFFER ADDRESS   
+3103   1157             ;           EXIT :  HL = POINTS TO LAST CHARACTER+1
+3104   1157             ;   
+3105   1157             ;        MODIFIES : NONE
+3106   1157             ;
+3107   1157             ;
+3108   1157 C5          BITASC: PUSH  BC
+3109   1158 06 08              LD    B,08H       ;LOOK AT ALL 8 BITS
+3110   115A CB 7F       BTASC1: BIT   7,A         ;A 1 OR A 0?
+3111   115C 20 05              JR    NZ,BTASC3
+3112   115E 0E 30              LD    C,30H       ;IT'S A ZERO
+3113   1160 71          BTASC2: LD    (HL),C
+3114   1161 18 03              JR    BTASC4
+3115   1163                         
+3116   1163 0E 31       BTASC3: LD    C,31H       ;IT'S A ONE
+3117   1165 71                 LD    (HL),C
+3118   1166                         
+3119   1166 23          BTASC4: INC   HL
+3120   1167 17                 RLA
+3121   1168 10 F0              DJNZ  BTASC1      ;NEXT BIT
+3122   116A C1                 POP   BC
+3123   116B C9                 RET
+3124   116C             ;-----------------------------------------
+3125   116C             ; SEND AN ASCII STRING OUT THE SERIAL PORT
+3126   116C             ;-----------------------------------------
+3127   116C             ; 
+3128   116C             ; SENDS A ZERO TERMINATED STRING OR 
+3129   116C             ; 128 CHARACTERS MAX. OUT THE SERIAL PORT
+3130   116C             ;
+3131   116C             ;      ENTRY : HL = POINTER TO 00H TERMINATED STRING
+3132   116C             ;      EXIT  : NONE
+3133   116C             ;
+3134   116C             ;       MODIFIES : A,B,C
+3135   116C             ;          
+3136   116C 06 80       SNDMSG: LD    B,128         ;128 CHARS MAX
+3137   116E 7E          SDMSG1: LD    A,(HL)        ;GET THE CHAR
+3138   116F FE 00              CP    00H          ;ZERO TERMINATOR?
+3139   1171 28 06              JR    Z,SDMSG2      ;FOUND A ZERO TERMINATOR, EXIT  
+3140   1173 CD D7 0F           CALL  OUTCH         ;TRANSMIT THE CHAR
+3141   1176 23                 INC   HL
+3142   1177 10 F5              DJNZ  SDMSG1        ;128 CHARS MAX!    
+3143   1179 C9          SDMSG2: RET
+3144   117A             ;----------------------
+3145   117A             ; SERIAL SINGLE STEPPER
+3146   117A             ;----------------------
+3147   117A E1          SSSTEP: POP   HL          ;GET HL BACK
+3148   117B F5                 PUSH  AF          ;SAVE AF FOR LATER  
+3149   117C 22 E8 3F           LD    (TMPHL),HL
+3150   117F ED 53 E6 3F        LD    (TMPDE),DE
+3151   1183 ED 43 E4 3F        LD    (TMPBC),BC
+3152   1187 DD 22 EA 3F        LD    (TMPIX),IX
+3153   118B FD 22 EC 3F        LD    (TMPIY),IY ;SAVE REGISTERS
+3154   118F E1                 POP   HL          ;GET AF BACK
+3155   1190 22 E2 3F           LD    (TMPAF),HL ;SAVE AF
+3156   1193 E1                 POP   HL          ;GET PC RETURN ADDRESS
+3157   1194 22 E0 3F           LD    (TMPPC),HL ;SAVE PC
+3158   1197 ED 73 EE 3F        LD    (TMPSP),SP ;SAVE STACK POINTER
+3159   119B             ;            
+3160   119B             ;DISPLAY THE REGISTERS HEADING          
+3161   119B             ;          
+3162   119B 21 53 12           LD    HL,REGS
+3163   119E CD 6C 11           CALL  SNDMSG
+3164   11A1             ;
+3165   11A1             ; DISPLAY THE REGISTERS
+3166   11A1             ;            
+3167   11A1 06 08              LD	 B,08H
+3168   11A3 21 00 3E           LD    HL,MSGBUF
+3169   11A6 DD 21 E0 3F        LD    IX,TMPPC
+3170   11AA DD 7E 01    SSTEP1: LD    A,(IX+1)
+3171   11AD CD 43 11           CALL  BYTASC
+3172   11B0 DD 7E 00           LD    A,(IX+0)
+3173   11B3 CD 43 11           CALL  BYTASC
+3174   11B6 DD 23              INC   IX
+3175   11B8 DD 23              INC   IX
+3176   11BA 3E 20              LD    A,' '
+3177   11BC 77                 LD    (HL),A
+3178   11BD 23                 INC   HL
+3179   11BE 10 EA              DJNZ  SSTEP1       
+3180   11C0             ;
+3181   11C0             ; DISPLAY THE FLAGS 
+3182   11C0             ;          
+3183   11C0 3A E2 3F           LD    A,(TMPAF)  ;GET THE FLAGS AND      
+3184   11C3 CD 57 11           CALL  BITASC      ;SHOW THEM AS BITS 
+3185   11C6             
+3186   11C6 CD 27 11    SZCRLF: CALL  BCRLF
+3187   11C9 3E 00              LD    A,00H
+3188   11CB 77                 LD    (HL),A      ;TERMINATE THE STRING
+3189   11CC             ;        
+3190   11CC             ; DISPLAY THE REGISTERS
+3191   11CC             ;        
+3192   11CC 21 00 3E           LD    HL,MSGBUF
+3193   11CF CD 6C 11           CALL  SNDMSG
+3194   11D2             ;
+3195   11D2             ; SPACE KEY CONTINUES
+3196   11D2             ;
+3197   11D2 CD DD 0F    SSTEP3: CALL  INCH
+3198   11D5 38 FB              JR    C,SSTEP3      
+3199   11D7 FE 20              CP    20H        ;IS IT SPACE
+3200   11D9 28 0C              JR    Z,SSTEP4
+3201   11DB FE 1B              CP    ESC         ;ESC QUITS
+3202   11DD 20 F3              JR    NZ,SSTEP3
+3203   11DF             ;       
+3204   11DF             ; RETURN TO MONITOR
+3205   11DF             ; 
+3206   11DF ED 7B AE 3F        LD    SP,(ISTACK) ;RESTORE THE STACK POINTER
+3207   11E3 FB                 EI                ;RE-ENABLE INTERRUPTS      
+3208   11E4 C3 7E 0F           JP    WARM        ;EXIT THE INTERRUPT ROUTINE
+3209   11E7             ;
+3210   11E7             ; RETURN TO PROGRAM
+3211   11E7             ;
+3212   11E7 ED 7B EE 3F SSTEP4: LD    SP,(TMPSP) ;PUT STACK POINTER BACK
+3213   11EB 2A E0 3F           LD    HL,(TMPPC) ;PUT RETURN
+3214   11EE E5                 PUSH  HL          ;ADDRESS BACK ON STACK
+3215   11EF 2A E2 3F           LD    HL,(TMPAF)
+3216   11F2 E5                 PUSH  HL          ;SAVE AF REG FOR LATER
+3217   11F3 FD 2A EC 3F        LD    IY,(TMPIY)
+3218   11F7 DD 2A EA 3F        LD    IX,(TMPIX)
+3219   11FB ED 4B E4 3F        LD    BC,(TMPBC)
+3220   11FF ED 5B E6 3F        LD    DE,(TMPDE) ;RESTORE REGISTERS
+3221   1203 F1                 POP   AF          ;RESTORE AF
+3222   1204 2A E8 3F           LD    HL,(TMPHL) ;RESTORE HL
+3223   1207 FB                 EI                ;RE-ENABLE INTERRUPTS
+3224   1208 C9                 RET               ;AND RETURN TO PROGRAM  
+3225   1209             ;
+3226   1209             ; STRING CONSTANTS
+3227   1209             ;
+3228   1209 0D 0A 00    CRLF:        .DB     CR,LF,00H
+3229   120C 53 43 4D 20 SIGNON:      .DB     "SCM 1.5 SERIAL MONITOR",CR,LF,"ACCEPTS ONLY UPPER CASE - H FOR COMMAND LIST",CR,LF,00H
+3229   1210 31 2E 35 20 
+3229   1214 53 45 52 49 
+3229   1218 41 4C 20 4D 
+3229   121C 4F 4E 49 54 
+3229   1220 4F 52 0D 0A 
+3229   1224 41 43 43 45 
+3229   1228 50 54 53 20 
+3229   122C 4F 4E 4C 59 
+3229   1230 20 55 50 50 
+3229   1234 45 52 20 43 
+3229   1238 41 53 45 20 
+3229   123C 2D 20 48 20 
+3229   1240 46 4F 52 20 
+3229   1244 43 4F 4D 4D 
+3229   1248 41 4E 44 20 
+3229   124C 4C 49 53 54 
+3229   1250 0D 0A 00 
+3230   1253 0D 0A 50 43 REGS:        .DB     CR,LF,"PC   AF   BC   DE   HL   IX   IY   SP   SZ-H-VNC",CR,LF,00H
+3230   1257 20 20 20 41 
+3230   125B 46 20 20 20 
+3230   125F 42 43 20 20 
+3230   1263 20 44 45 20 
+3230   1267 20 20 48 4C 
+3230   126B 20 20 20 49 
+3230   126F 58 20 20 20 
+3230   1273 49 59 20 20 
+3230   1277 20 53 50 20 
+3230   127B 20 20 53 5A 
+3230   127F 2D 48 2D 56 
+3230   1283 4E 43 0D 0A 
+3230   1287 00 
+3231   1288 0D 0A 53 49 TOGGLE:      .DB     CR,LF,"SINGLE STEP TOGGLE",CR,LF,00H
+3231   128C 4E 47 4C 45 
+3231   1290 20 53 54 45 
+3231   1294 50 20 54 4F 
+3231   1298 47 47 4C 45 
+3231   129C 0D 0A 00 
+3232   129F 0D 0A 53 45 TXFILE:      .DB     CR,LF,"SEND INTEL HEX FILE...",00H
+3232   12A3 4E 44 20 49 
+3232   12A7 4E 54 45 4C 
+3232   12AB 20 48 45 58 
+3232   12AF 20 46 49 4C 
+3232   12B3 45 2E 2E 2E 
+3232   12B7 00 
+3233   12B8 0D 0A 46 49 FILEOK:      .DB     CR,LF,"FILE RECEIVED OK",CR,LF,00H
+3233   12BC 4C 45 20 52 
+3233   12C0 45 43 45 49 
+3233   12C4 56 45 44 20 
+3233   12C8 4F 4B 0D 0A 
+3233   12CC 00 
+3234   12CD 0D 0A 43 48 CSUMERR:     .DB     CR,LF,"CHECKSUM ERROR",CR,LF,00H
+3234   12D1 45 43 4B 53 
+3234   12D5 55 4D 20 45 
+3234   12D9 52 52 4F 52 
+3234   12DD 0D 0A 00 
+3235   12E0 0D 0A 42 59 BYE:         .DB     CR,LF,"BYE...",CR,LF,00H
+3235   12E4 45 2E 2E 2E 
+3235   12E8 0D 0A 00 
+3236   12EB             
+3237   12EB 0D 0A 44 20 COMANDS:     .DB     CR,LF,"D AAAA    DISPLAY DATA AT ADDRESS AAAA"
+3237   12EF 41 41 41 41 
+3237   12F3 20 20 20 20 
+3237   12F7 44 49 53 50 
+3237   12FB 4C 41 59 20 
+3237   12FF 44 41 54 41 
+3237   1303 20 41 54 20 
+3237   1307 41 44 44 52 
+3237   130B 45 53 53 20 
+3237   130F 41 41 41 41 
+3238   1313 0D 0A 54 20             .DB     CR,LF,"T         TOGGLE SINGLE STEPPER"           
+3238   1317 20 20 20 20 
+3238   131B 20 20 20 20 
+3238   131F 54 4F 47 47 
+3238   1323 4C 45 20 53 
+3238   1327 49 4E 47 4C 
+3238   132B 45 20 53 54 
+3238   132F 45 50 50 45 
+3238   1333 52 
+3239   1334 0D 0A 4D 20             .DB     CR,LF,"M AAAA    MODIFY ADDRESS AAAA",00H
+3239   1338 41 41 41 41 
+3239   133C 20 20 20 20 
+3239   1340 4D 4F 44 49 
+3239   1344 46 59 20 41 
+3239   1348 44 44 52 45 
+3239   134C 53 53 20 41 
+3239   1350 41 41 41 00 
+3240   1354                         
+3241   1354 0D 0A 47 20 COMANDS1:    .DB     CR,LF,"G AAAA    GO FROM AAAA"     
+3241   1358 41 41 41 41 
+3241   135C 20 20 20 20 
+3241   1360 47 4F 20 46 
+3241   1364 52 4F 4D 20 
+3241   1368 41 41 41 41 
+3242   136C 0D 0A 49 20             .DB     CR,LF,"I         DOWNLOAD INTEL HEX"
+3242   1370 20 20 20 20 
+3242   1374 20 20 20 20 
+3242   1378 44 4F 57 4E 
+3242   137C 4C 4F 41 44 
+3242   1380 20 49 4E 54 
+3242   1384 45 4C 20 48 
+3242   1388 45 58 
+3243   138A 0D 0A 58 20             .DB     CR,LF,"X         EXIT"
+3243   138E 20 20 20 20 
+3243   1392 20 20 20 20 
+3243   1396 45 58 49 54 
+3244   139A 0D 0A 48 20             .DB     CR,LF,"H         THIS HELP MESSAGE",CR,LF,00H
+3244   139E 20 20 20 20 
+3244   13A2 20 20 20 20 
+3244   13A6 54 48 49 53 
+3244   13AA 20 48 45 4C 
+3244   13AE 50 20 4D 45 
+3244   13B2 53 53 41 47 
+3244   13B6 45 0D 0A 00 
+3245   13BA             ;
+3246   13BA             ;VT100 TERMINAL COMMANDS FOR CLEAR SCREEN,CURSOR HOME
+3247   13BA             ;
+3248   13BA 1B 5B 48 1B INITSZ:      .DB     27,"[H",27,"[2J",00H
+3248   13BE 5B 32 4A 00 
+3249   13C2             	   .END
+tasm: Number of errors = 0
