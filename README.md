@@ -32,12 +32,7 @@ Details on how to modify the PCB for software scanned keyboard are in the Docs f
 SouthernCrossSBC_Monitor\SCMonitorV17
 
 74C923 version:    \SCM17-SC\SCM17-SC.bin
+
 Software scanned version: \SCM17-SC-SS\SCM17-SC-SS.bin
-
-
-
-
-
-
 
 
