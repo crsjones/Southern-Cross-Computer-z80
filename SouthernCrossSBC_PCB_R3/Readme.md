@@ -1,8 +1,6 @@
 
 #Southern Cross Version 3.0 PCB
 
-This is the latest revision of the Southern Cross SBC PCB.
-
 Changes to Version 3.0 
 
 1. Added extra holes for 6mm sq. tactile switches.
