@@ -28,8 +28,8 @@ An add-on card for the AM9511A  Arithmetic Processor Unit.
 The current version of the PCB is 3.2, Gerbers are available in the SouthernCrossSBC_PCB_R32 folder.
 It is also available as a shared design on PCBWay.com
 
-The current version of the monitor is 1.8 
-Source code, listing,binary and INTEL hex files can be found in the SCMonitorV18 folder under the SouthernCrossSBC_Monitor folder.
+The current version of the monitor is 1.8.
+ Source code, listing,binary and INTEL hex files can be found in the SCMonitorV18 folder under the SouthernCrossSBC_Monitor folder.
 
 
 
