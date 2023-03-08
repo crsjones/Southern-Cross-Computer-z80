@@ -19,3 +19,7 @@ This is the version for the TEC-1F with software scanned keyboards mods.
 The source file was assembled using TASM32. There is an include (SCM18_Include.asm) file that defines all the Monitor variables 
 that can be used in your own programs, an short example of its use is also included in the folder (SCMTest.asm)
 
+### SCMonitorV18_ACIA
+A version of the 1.8 Monitor has been patched with the ACIA code from the SC-6850_Serial\Code folder to work with the 6850 ACIA
+instead of the Bit Bang Serial Port, only the Source file is provided.
+
