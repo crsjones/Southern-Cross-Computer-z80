@@ -9,10 +9,8 @@ Kitsrus distributed the kit into the US and the UK and was sold online from Hong
 The Southern Cross Computer appeared in Australia's Silicon Chip Magazine in the August 1993 edition.
 A follow up article appeared in Silicon Chip in December 1993 describing the 8x8 LED Matrix and 8 Channel Relay add-on board.
 
-Since 2021 I have been a member of the Facebook TEC-1 Z80 Computer Group and have developed several add-on boards for the 
-Southern Cross Computer along with a new version of the TEC-1 computer, the TEC-1F.
-
-https://www.facebook.com/groups/tec1z80
+A facebook group for the Southern Cross has been established 
+[https://www.facebook.com/groups/1553416258519631)
 
 ### SC-8x8   8 x 8 LED Matrix
 The original 8 x8 LED Matrix design plus a couple of revisions.
