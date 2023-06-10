@@ -1,0 +1,2730 @@
+0001   0000             ;--------------------
+0002   0000             ; SC-APU Demo Program
+0003   0000             ;--------------------
+0004   0000             ; 
+0005   0000             #include "SCM18_Include.asm"
+0001+  0000             ;--------------------------------------------
+0002+  0000             ; S O U T H E R N   C R O S S   M O N I T O R
+0003+  0000             ;--------------------------------------------
+0004+  0000             ;
+0005+  0000             ;  MONITOR DEFINITIONS FILE 
+0006+  0000             ;  Version 1.8
+0007+  0000             ;
+0008+  0000             ; WRITTEN BY CRAIG R. S. JONES
+0009+  0000             ; MELBOURNE, AUSTRALIA.
+0010+  0000             ;
+0011+  0000             ;---------------
+0012+  0000             ; RAM MEMORY MAP
+0013+  0000             ;---------------
+0014+  0000             BOTRAM	.EQU	2000H	;BOTTOM OF SRAM
+0015+  0000             TOPRAM	.EQU	3FFFH	;TOP OF SRAM
+0016+  0000             ;
+0017+  0000             VARBLS	.EQU	TOPRAM-0FFH	;MONITOR VARIABLES
+0018+  0000             BUFFER	.EQU	VARBLS-0100H	;GENERAL PURPOSE BUFFER AREA
+0019+  0000             ISTACK	.EQU	BUFFER - 0200H	;INITIAL MONITOR STACK
+0020+  0000             ;
+0021+  0000             RAMEND	.EQU	ISTACK-0400H	;END OF USER RAM
+0022+  0000             RAMSRT	.EQU	BOTRAM	;START OF USER RAM
+0023+  0000             ;
+0024+  0000             ; BIT BANG BAUD RATE CONSTANTS
+0025+  0000             ;
+0026+  0000             B300	.EQU	0220H	;300 BAUD
+0027+  0000             B1200	.EQU	0080H	;1200 BAUD
+0028+  0000             B2400	.EQU	003FH	;2400 BAUD
+0029+  0000             B4800	.EQU	001BH	;4800 BAUD
+0030+  0000             B9600	.EQU	000BH	;9600 BAUD
+0031+  0000             ;
+0032+  0000             ; KEY CODES
+0033+  0000             ;
+0034+  0000             KEYFN	.EQU	10H	;FN OR GO KEY
+0035+  0000             KEYAD	.EQU	11H	;ADDRESS KEY
+0036+  0000             KEYINC	.EQU	12H	;PLUS KEY
+0037+  0000             KEYDEC	.EQU	13H	;MINUS KEY
+0038+  0000             ;-------------------------
+0039+  0000             ; MONITOR GLOBAL VARIABLES
+0040+  0000             ;-------------------------
+0041+  0000             ;
+0042+  3F00             	.ORG	VARBLS
+0043+  3F00             ;
+0044+  3F00             ;SERIAL MONITOR VARIABLES
+0045+  3F00             ;
+0046+  3F00             VARIDX	.BLOCK	16	;RESERVE SOME SPACE FOR INDEXED VARIABLES (SEE INTELH)
+0047+  3F10             SPSAVE	.BLOCK	2	;SAVE THE STACK POINTER
+0048+  3F12             ADDR	.BLOCK	2	;THE ADDRESS
+0049+  3F14             DATA	.BLOCK	1	;THE DATA
+0050+  3F15             ;
+0051+  3F15             FUNTBL	.BLOCK	 2	;FN TABLE ADDRESS
+0052+  3F17             ;
+0053+  3F17             ; DALLAS SMARTWATCH REGISTERS
+0054+  3F17             ;
+0055+  3F17             CALMDE	.BLOCK	2	;CALENDAR MODE
+0056+  3F19             SWREG0	.BLOCK	1	;10THS, 100THS
+0057+  3F1A             SWREG1	.BLOCK	1	;SECONDS
+0058+  3F1B             SWREG2	.BLOCK	1	;MINUTES
+0059+  3F1C             SWREG3	.BLOCK	1	;HOURS
+0060+  3F1D             SWREG4	.BLOCK	1	;DAY
+0061+  3F1E             SWREG5	.BLOCK	1	;DATE
+0062+  3F1F             SWREG6	.BLOCK	1	;MONTH
+0063+  3F20             SWREG7	.BLOCK	1	;YEAR
+0064+  3F21             ;
+0065+  3F21             BAUD	.BLOCK	2	;BIT BANG BAUD RATE
+0066+  3F23             KEYTIM	.BLOCK	2	;BEEP DELAY
+0067+  3F25             SPTEMP	.BLOCK	2	;TEMP SYSTEM CALL SP
+0068+  3F27             ;
+0069+  3F27             ; BLOCK FUNCTIONS
+0070+  3F27             ;
+0071+  3F27             COUNT	.BLOCK	2	;NUMBER OF BYTES TO MOVE
+0072+  3F29             BLKSRT	.BLOCK	2	;BLOCK START ADDRESS
+0073+  3F2B             BLKEND	.BLOCK	2	;BLOCK END ADDRESS
+0074+  3F2D             BLKDST	.BLOCK	2	;DESTINATION ADDRESS
+0075+  3F2F             ;
+0076+  3F2F             FUNJMP	.BLOCK	2	;FN FN KEY JUMP ADDRESS
+0077+  3F31             ;
+0078+  3F31             ; DISPLAY SCAN REGISTERS
+0079+  3F31             ;
+0080+  3F31             DISBUF	.BLOCK	6	;DISPLAY BUFFER
+0081+  3F37             ONTIM	.BLOCK	1	;DISPLAY SCAN ON TIME
+0082+  3F38             OFTIM	.BLOCK	1	;DISPLAY SCAN OFF TIME
+0083+  3F39             ;
+0084+  3F39             ; MONITOR VARIABLES
+0085+  3F39             ;
+0086+  3F39             MODE	.BLOCK	2	;DISPLAY MODE
+0087+  3F3B             ADRESS	.BLOCK	2	;USER ADDRESS
+0088+  3F3D             KEYDEL	.BLOCK	2	;AUTO INCREMENT DELAY
+0089+  3F3F             ;
+0090+  3F3F             ; TEMPORARY REGISTER STORAGE
+0091+  3F3F             ;
+0092+  3F3F             REGPNT	.BLOCK	2	;REGISTER POINTER
+0093+  3F41             TMPPC	.BLOCK	2	;PROGRAM COUNTER
+0094+  3F43             TMPAF	.BLOCK	2	;ACCUMULATOR,FLAG
+0095+  3F45             TMPBC	.BLOCK	2	;BC REGISTER PAIR
+0096+  3F47             TMPDE	.BLOCK	2	;DE REGISTER PAIR
+0097+  3F49             TMPHL	.BLOCK	2	;HL REGISTER PAIR
+0098+  3F4B             TMPIX	.BLOCK	2	;INDEX REGISTER X
+0099+  3F4D             TMPIY	.BLOCK	2	;INDEX REGISTER Y
+0100+  3F4F             TMPSP	.BLOCK	2	;STACK POINTER
+0101+  3F51             ;
+0102+  3F51             ; RESTART JUMP TABLE AND HARWARE TEST
+0103+  3F51             ;
+0104+  3F51             RST08	.BLOCK	2	;RESTART 08H JUMP
+0105+  3F53             RST10	.BLOCK	2	;RESTART 10H JUMP
+0106+  3F55             RST18	.BLOCK	2	;RESTART 18H JUMP
+0107+  3F57             RST20	.BLOCK	2	;RESTART 20H JUMP
+0108+  3F59             RST28	.BLOCK	2	;RESTART 28H JUMP
+0109+  3F5B             RST38	.BLOCK	2	;INT INTERRUPT JUMP
+0110+  3F5D             RST66	.BLOCK	2	;NMI INTERRUPT JUMP
+0111+  3F5F             RAMSUM	.BLOCK	1	;USER RAM CHECKSUM
+0112+  3F60             DALLAS	.BLOCK	1	;RAM TEST LOCATION
+0113+  3F61             SYSERR	.BLOCK	2	;SYSTEM CALL ERROR JUMP
+0114+  3F63             ;--------------------
+0115+  3F63             ; SYSTEM CALL NUMBERS
+0116+  3F63             ;--------------------
+0117+  3F63             ;
+0118+  3F63             ;  LD   C,SYSTEM CALL NUMBER
+0119+  3F63             ;  RST  30H
+0120+  3F63             ;
+0121+  3F63             MAIN	.EQU	0	;RESTART MONITOR
+0122+  3F63             VERS	.EQU	1	;RETURNS MONITOR VERSION
+0123+  3F63             DISADD	.EQU	2	;ADDRESS -> DISPLAY BUFFER
+0124+  3F63             DISBYT	.EQU	3	;DATA -> DISPLAY BUFFER
+0125+  3F63             CLRBUF	.EQU	4	;CLEAR DISPLAY BUFFER
+0126+  3F63             SCAND	.EQU	5	;SCAN DISPLAY
+0127+  3F63             CONBYT	.EQU	6	;BYTE -> DISPLAY CODE
+0128+  3F63             CONVHI	.EQU	7	;HI NYBBLE -> DISPLAY CODE
+0129+  3F63             CONVLO	.EQU	8	;LO NYBBLE - > DISPLAY CODE
+0130+  3F63             SKEYIN	.EQU	9	;SCAN DISPLAY UNTIL KEY PRESS
+0131+  3F63             SKEYRL	.EQU	10	;SCAN DISPLAY UNTIL KEY RELEASE
+0132+  3F63             KEYIN	.EQU	11	;WAIT FOR KEY PRESS
+0133+  3F63             KEYREL	.EQU	12	;WAIT FOR KEY RELEASE
+0134+  3F63             MENU	.EQU	13	;SELECT ENTRY FROM MENU
+0135+  3F63             CHKSUM	.EQU	14	;CALCULATE CHECKSUM
+0136+  3F63             MUL16	.EQU	15	;16 BIT MULTIPLY
+0137+  3F63             RAND	.EQU	16	;GENERATE RANDOM NUMBER
+0138+  3F63             INDEXB	.EQU	17	;INDEX INTO BYTE TABLE
+0139+  3F63             INDEXW	.EQU	18	;INDEX INTO WORD TABLE
+0140+  3F63             MUSIC	.EQU	19	;PLAY MUSIC TABLE
+0141+  3F63             TONE	.EQU	20	;PLAY A NOTE
+0142+  3F63             BEEP	.EQU	21	;KEY ENTRY BEEP
+0143+  3F63             SKATE	.EQU	22	;SCAN 8X8 DISPLAY
+0144+  3F63             TXDATA	.EQU	23	;TRANSMIT SERIAL BYTE
+0145+  3F63             RXDATA	.EQU	24	;RECEIVE SERIAL BYTE
+0146+  3F63             ASCHEX	.EQU	25	;ASCII CODE -> HEX
+0147+  3F63             WWATCH	.EQU	26	;WRITE TO SMART WATCH
+0148+  3F63             RWATCH	.EQU	27	;READ FROM SMART WATCH
+0149+  3F63             ONESEC	.EQU	28	;ONE SECOND DELAY USING SMARTWATCH
+0150+  3F63             RLSTEP	.EQU	29	;RELAY S.EQUENCER
+0151+  3F63             DELONE	.EQU	30	;ONE SECOND DELAY LOOP
+0152+  3F63             SCANKEY .EQU	31	;SCAN THE KEYBOARD
+0153+  3F63             INTELH	.EQU	32	;RECEIVE INTEL HEX FILE
+0154+  3F63             SPLIT	.EQU	33	;SEPARATE A BYTE INTO NYBBLES
+0155+  3F63             SNDMSG	.EQU	34	;SND ZERO TERMINATED STRING TO SERIAL PORT
+0156+  3F63             BITASC	.EQU	35	;CONVERT A BYTE INTO AN ASCII STRING OF ONES AND ZEROES
+0157+  3F63             WRDASC	.EQU	36	;CONVERT A WORD TO ASCII
+0158+  3F63             BYTASC	.EQU	37	;CONVERT A BYTE TO ASCII
+0159+  3F63             NYBASC	.EQU	38	;CONVERT A NYBBLE TO ASCII
+0160+  3F63             PCBTYP	.EQU	39	;RETURNS BOARD TYPE, SC OR TEC-1F
+0161+  3F63             PRNTSZ	.EQU	40	;INLINE SERIAL PRINT STRING
+0162+  3F63             KBDTYP	.EQU	41	;RETURNS KEYBOARD TYPE
+0163+  3F63             UPDATE	.EQU	42  ;UPDATE DISPLAY AND MODE DECIMAL POINT SEGMENTS
+0164+  3F63             VARRAM	.EQU	43	;RETURN BASE VARIABLE ADDRESS
+0165+  3F63             SERINI	.EQU	44	;INITIALISE BIT BANG SERIAL PORT
+0166+  3F63             SCBUG	.EQU	45	;SCBUG SERIAL MONITOR
+0167+  3F63             
+0168+  3F63             ;END OF INCLUDE FILE
+0006   3F63             ;
+0007   3F63             ; a simple demo of the AM9511A APU arithmetic functions and square root
+0008   3F63             ; uses the Lawrence Livermore Laboratories Flaoting point library to do
+0009   3F63             ; the input and output.
+0010   3F63             ; 
+0011   3F63             ; Craig Jones 2023-06-10
+0012   3F63             ;
+0013   3F63             ;AM9511A APU port address
+0014   3F63             ;
+0015   3F63             APUSTATUS	.EQU	0FFH	;read status
+0016   3F63             APUCOMAND	.EQU	0FFH	;write commands
+0017   3F63             APUDATA	.EQU	0FEH	;read and write Top of Stack
+0018   3F63             ;
+0019   3F63             ; APU status register
+0020   3F63             ;
+0021   3F63             BUSY	.EQU	80H	;currently executing a command
+0022   3F63             SGN	.EQU	40H	;the value on the top of the stack is negative
+0023   3F63             ZERO	.EQU	20H	;the value on the top of the stack is zero
+0024   3F63             ERRORCODE	.EQU	1EH	;indicates the validity of the previous operation
+0025   3F63             CARRY	.EQU	01H	;the previous operation resulted in a carry/borrow
+0026   3F63             ;
+0027   3F63             ;APU Commands
+0028   3F63             ;
+0029   3F63             FADD	.equ	90H
+0030   3F63             FSUB	.equ	91H
+0031   3F63             FMUL	.equ	92H
+0032   3F63             FDIV	.equ	93H
+0033   3F63             FSQRT	.equ	81H
+0034   3F63             ;------------
+0035   3F63             ; ASCII CODES
+0036   3F63             ;------------
+0037   3F63             ESC	.EQU	1BH
+0038   3F63             CR	.EQU	0DH
+0039   3F63             LF	.EQU	0AH
+0040   3F63             
+0041   2000             	.org	2000H
+0042   2000             main
+0043   2000 0E 28       	ld	c,PRNTSZ
+0044   2002 F7          	rst	30h
+0045   2003 41 4D 39 35 	.db  "AM9511A Example Code",CR,LF,0
+0045   2007 31 31 41 20 
+0045   200B 45 78 61 6D 
+0045   200F 70 6C 65 20 
+0045   2013 43 6F 64 65 
+0045   2017 0D 0A 00 
+0046   201A             
+0047   201A             main1
+0048   201A             ; display the message
+0049   201A 0E 28       	ld	c,PRNTSZ
+0050   201C F7          	rst	30h
+0051   201D 0D 0A 73 2C 	.db	CR,LF,"s,r,+,-,/,x,t,c,h for help"
+0051   2021 72 2C 2B 2C 
+0051   2025 2D 2C 2F 2C 
+0051   2029 78 2C 74 2C 
+0051   202D 63 2C 68 20 
+0051   2031 66 6F 72 20 
+0051   2035 68 65 6C 70 
+0052   2039 0D 0A 00    	.db	CR,LF,0
+0053   203C             ;display the prompt
+0054   203C 3E 3F       	ld	a,'?'
+0055   203E 0E 17       	ld	c,TXDATA
+0056   2040 F7          	rst	30h
+0057   2041             
+0058   2041             main2
+0059   2041 0E 18       	ld	c,RXDATA	;wait for a serial character
+0060   2043 F7          	rst	30h
+0061   2044 21 4D 20    	ld	hl,cmds
+0062   2047 0E 0D       	ld	c,MENU	;execute the selected subroutine
+0063   2049 F7          	rst	30h
+0064   204A C3 1A 20    	jp	main1
+0065   204D             
+0066   204D             cmds
+0067   204D 09          	.db	9
+0068   204E 72 73 2B 2D 	.DB	'r','s','+','-'
+0069   2052 2F 78 74 63 	.DB	'/','x','t','c'
+0070   2056 68          	.DB 'h'
+0071   2057 7B 21 89 21 	.DW	ClrSvreq,SetSvreq,APUadd,APUsub
+0071   205B 97 21 0E 22 
+0072   205F 97 22 18 23 	.DW	APUdiv,APUmul,APUsqrt,convert
+0072   2063 95 23 DF 23 
+0073   2067 7B 20       	.DW help
+0074   2069             
+0075   2069             ; echo the accepted command and do a CR,LF
+0076   2069 0E 17       cecho	ld	c,TXDATA
+0077   206B F7          	rst	30h	;echo
+0078   206C CD 70 20    	call	CRLF
+0079   206F C9          	ret
+0080   2070             ;
+0081   2070             ;send a carriage return line feed
+0082   2070             ;
+0083   2070             CRLF
+0084   2070 3E 0D       	ld	a,CR
+0085   2072 0E 17       	ld	c,TXDATA
+0086   2074 F7          	rst	30h
+0087   2075 3E 0A       	ld	a,LF
+0088   2077 0E 17       	ld	c,TXDATA
+0089   2079 F7          	rst 30h
+0090   207A C9          	ret
+0091   207B             ;
+0092   207B             ; help print help message
+0093   207B             ;	
+0094   207B CD 69 20    help	call cecho
+0095   207E 0E 28       	ld	c,PRNTSZ
+0096   2080 F7          	rst	30h
+0097   2081 0D 0A 20 46 	.db	CR,LF," FLOATING POINT OPERATIONS",CR,LF
+0097   2085 4C 4F 41 54 
+0097   2089 49 4E 47 20 
+0097   208D 50 4F 49 4E 
+0097   2091 54 20 4F 50 
+0097   2095 45 52 41 54 
+0097   2099 49 4F 4E 53 
+0097   209D 0D 0A 
+0098   209F 72 20 3D 20 	.db	"r = turn on SVREG LED",CR,LF
+0098   20A3 74 75 72 6E 
+0098   20A7 20 6F 6E 20 
+0098   20AB 53 56 52 45 
+0098   20AF 47 20 4C 45 
+0098   20B3 44 0D 0A 
+0099   20B6 73 20 3D 20 	.db	"s = turn off SVREG LED",CR,LF
+0099   20BA 74 75 72 6E 
+0099   20BE 20 6F 66 66 
+0099   20C2 20 53 56 52 
+0099   20C6 45 47 20 4C 
+0099   20CA 45 44 0D 0A 
+0100   20CE 2B 20 3D 20 	.db	"+ = Addition",CR,LF
+0100   20D2 41 64 64 69 
+0100   20D6 74 69 6F 6E 
+0100   20DA 0D 0A 
+0101   20DC 2D 20 3D 20 	.db	"- = Subtraction",CR,LF
+0101   20E0 53 75 62 74 
+0101   20E4 72 61 63 74 
+0101   20E8 69 6F 6E 0D 
+0101   20EC 0A 
+0102   20ED 2F 20 3D 20 	.db	"/ = Division",CR,LF
+0102   20F1 44 69 76 69 
+0102   20F5 73 69 6F 6E 
+0102   20F9 0D 0A 
+0103   20FB 78 20 3D 20 	.db	"x = Multiplication",CR,LF
+0103   20FF 4D 75 6C 74 
+0103   2103 69 70 6C 69 
+0103   2107 63 61 74 69 
+0103   210B 6F 6E 0D 0A 
+0104   210F 74 20 3D 20 	.db	"t = Square root",CR,LF
+0104   2113 53 71 75 61 
+0104   2117 72 65 20 72 
+0104   211B 6F 6F 74 0D 
+0104   211F 0A 
+0105   2120 63 20 3D 20 	.db	"c = Convert to float in scientific notation",CR,LF,CR,LF
+0105   2124 43 6F 6E 76 
+0105   2128 65 72 74 20 
+0105   212C 74 6F 20 66 
+0105   2130 6C 6F 61 74 
+0105   2134 20 69 6E 20 
+0105   2138 73 63 69 65 
+0105   213C 6E 74 69 66 
+0105   2140 69 63 20 6E 
+0105   2144 6F 74 61 74 
+0105   2148 69 6F 6E 0D 
+0105   214C 0A 0D 0A 
+0106   214F 20 43 41 50 	.db	" CAPITAL E for exponent i.e. 31.4159E-01"
+0106   2153 49 54 41 4C 
+0106   2157 20 45 20 66 
+0106   215B 6F 72 20 65 
+0106   215F 78 70 6F 6E 
+0106   2163 65 6E 74 20 
+0106   2167 69 2E 65 2E 
+0106   216B 20 33 31 2E 
+0106   216F 34 31 35 39 
+0106   2173 45 2D 30 31 
+0107   2177 0D 0A 00    	.db	CR,LF,0
+0108   217A C9          	ret
+0109   217B             ;-----------------------------------------------------------------
+0110   217B             ; turn on and off SVREG LED
+0111   217B             ; the APU NOP command can be used to turn the SVREG LED on and off
+0112   217B             ;-----------------------------------------------------------------
+0113   217B             ;
+0114   217B             ; turn off SVREG LED
+0115   217B             ;
+0116   217B             ClrSvreq
+0117   217B CD 69 20    	call	cecho
+0118   217E CD 60 24    svoff	call	apubusy
+0119   2181 3E 00       	ld	a,00H	;send NOP, bit 7=0 turns off SVREG LED
+0120   2183 D3 FF       	out	(APUCOMAND),a
+0121   2185 CD 60 24    	call	apubusy
+0122   2188 C9          	ret
+0123   2189             ;
+0124   2189             ; turn on SVREG LED
+0125   2189             ;
+0126   2189             SetSvreq
+0127   2189 CD 69 20    	call	cecho
+0128   218C CD 60 24    svon	call	apubusy
+0129   218F 3E 80       	ld	a,80H	;send NOP bit 7=1 turns on SVREG LED
+0130   2191 D3 FF       	out	(APUCOMAND),a
+0131   2193 CD 60 24    	call	apubusy
+0132   2196 C9          	ret
+0133   2197             ;------------------------
+0134   2197             ; floating point addition
+0135   2197             ; sum = addend1 + addend2
+0136   2197             ;------------------------
+0137   2197             APUadd
+0138   2197 CD 69 20    	call	cecho
+0139   219A 0E 28       	ld	c,PRNTSZ
+0140   219C F7          	rst	30h
+0141   219D 73 75 6D 20 	.db	"sum = addend1 + addend2",CR,LF
+0141   21A1 3D 20 61 64 
+0141   21A5 64 65 6E 64 
+0141   21A9 31 20 2B 20 
+0141   21AD 61 64 64 65 
+0141   21B1 6E 64 32 0D 
+0141   21B5 0A 
+0142   21B6 45 6E 74 65 	.db	"Enter Addend 1 ",0
+0142   21BA 72 20 41 64 
+0142   21BE 64 65 6E 64 
+0142   21C2 20 31 20 00 
+0143   21C6 CD 2C 24    	call	getop1
+0144   21C9 0E 28       	ld	c,PRNTSZ
+0145   21CB F7          	rst	30h
+0146   21CC 45 6E 74 65 	.db	"Enter Addend 2 ",0
+0146   21D0 72 20 41 64 
+0146   21D4 64 65 6E 64 
+0146   21D8 20 32 20 00 
+0147   21DC CD 39 24    	call	getop2
+0148   21DF             
+0149   21DF 0E 28       	ld	c,PRNTSZ
+0150   21E1 F7          	rst	30h
+0151   21E2 53 75 6D 20 	.db	"Sum = ",0
+0151   21E6 3D 20 00 
+0152   21E9             
+0153   21E9 CD 60 24    	call	apubusy
+0154   21EC 26 34       	ld	h,SCRPG
+0155   21EE CD 67 24    	call	push32OP1	;write the operand to the APU
+0156   21F1 26 34       	ld	h,SCRPG
+0157   21F3 CD 7C 24    	call	push32OP2	;write the operand to the APU
+0158   21F6             ;
+0159   21F6             ; issue FADD command
+0160   21F6             ;
+0161   21F6 CD 60 24    	call	apubusy
+0162   21F9 3E 90       	ld	a,FADD	; bit 7 of the command is set to turn on SVREG LED
+0163   21FB D3 FF       	out	(APUCOMAND),a	;give the APU the ADD command
+0164   21FD CD 60 24    	call	apubusy
+0165   2200 CD 7E 21    	call svoff	;command finished turn off SVREG LED
+0166   2203 26 34       	ld	h,SCRPG
+0167   2205 2E 00       	ld	l,OP1
+0168   2207 CD 91 24    	call	pop32
+0169   220A CD 46 24    	call	putop1
+0170   220D C9          	ret
+0171   220E             ;---------------------------------
+0172   220E             ; floating point subtraction
+0173   220E             ;difference = minuend - subtrahend
+0174   220E             ;---------------------------------
+0175   220E             APUsub
+0176   220E CD 69 20    	call	cecho
+0177   2211 0E 28       	ld	c,PRNTSZ
+0178   2213 F7          	rst	30h
+0179   2214 64 69 66 66 	.db	"difference = minuend - subtrahend",CR,LF
+0179   2218 65 72 65 6E 
+0179   221C 63 65 20 3D 
+0179   2220 20 6D 69 6E 
+0179   2224 75 65 6E 64 
+0179   2228 20 2D 20 73 
+0179   222C 75 62 74 72 
+0179   2230 61 68 65 6E 
+0179   2234 64 0D 0A 
+0180   2237 45 6E 74 65 	.db	"Enter Minuend ",0
+0180   223B 72 20 4D 69 
+0180   223F 6E 75 65 6E 
+0180   2243 64 20 00 
+0181   2246 CD 2C 24    	call	getop1
+0182   2249 0E 28       	ld	c,PRNTSZ
+0183   224B F7          	rst	30h
+0184   224C 45 6E 74 65 	.db	"Enter Subtrahend ",0
+0184   2250 72 20 53 75 
+0184   2254 62 74 72 61 
+0184   2258 68 65 6E 64 
+0184   225C 20 00 
+0185   225E CD 39 24    	call	getop2
+0186   2261             
+0187   2261 0E 28       	ld	c,PRNTSZ
+0188   2263 F7          	rst	30h
+0189   2264 44 69 66 66 	.db	"Difference = ",0
+0189   2268 65 72 65 6E 
+0189   226C 63 65 20 3D 
+0189   2270 20 00 
+0190   2272             
+0191   2272 CD 60 24    	call	apubusy
+0192   2275 26 34       	ld	h,SCRPG
+0193   2277 CD 67 24    	call	push32OP1
+0194   227A 26 34       	ld	h,SCRPG
+0195   227C CD 7C 24    	call	push32OP2
+0196   227F             ;
+0197   227F             ; issue FSUB command
+0198   227F             ;
+0199   227F CD 60 24    	call	apubusy
+0200   2282 3E 91       	ld	a,FSUB
+0201   2284 D3 FF       	out	(APUCOMAND),a
+0202   2286 CD 60 24    	call	apubusy
+0203   2289 CD 7E 21    	call svoff
+0204   228C 26 34       	ld	h,SCRPG
+0205   228E 2E 00       	ld	l,OP1
+0206   2290 CD 91 24    	call	pop32
+0207   2293 CD 46 24    	call	putop1
+0208   2296 C9          	ret
+0209   2297             ;-----------------------------
+0210   2297             ; floating point division
+0211   2297             ;quotient = dividend / divisor
+0212   2297             ;-----------------------------
+0213   2297             APUdiv
+0214   2297 CD 69 20    	call	cecho
+0215   229A 0E 28       	ld	c,PRNTSZ
+0216   229C F7          	rst	30h
+0217   229D 71 75 6F 74 	.db	"quotient = dividend / divisor",CR,LF
+0217   22A1 69 65 6E 74 
+0217   22A5 20 3D 20 64 
+0217   22A9 69 76 69 64 
+0217   22AD 65 6E 64 20 
+0217   22B1 2F 20 64 69 
+0217   22B5 76 69 73 6F 
+0217   22B9 72 0D 0A 
+0218   22BC 45 6E 74 65 	.db	"Enter dividend ",0
+0218   22C0 72 20 64 69 
+0218   22C4 76 69 64 65 
+0218   22C8 6E 64 20 00 
+0219   22CC CD 2C 24    	call	getop1
+0220   22CF 0E 28       	ld	c,PRNTSZ
+0221   22D1 F7          	rst	30h
+0222   22D2 45 6E 74 65 	.db	"Enter divisor ",0
+0222   22D6 72 20 64 69 
+0222   22DA 76 69 73 6F 
+0222   22DE 72 20 00 
+0223   22E1 CD 39 24    	call	getop2
+0224   22E4             
+0225   22E4 0E 28       	ld	c,PRNTSZ
+0226   22E6 F7          	rst	30h
+0227   22E7 71 75 6F 74 	.db	"quotient = ",0
+0227   22EB 69 65 6E 74 
+0227   22EF 20 3D 20 00 
+0228   22F3             
+0229   22F3 CD 60 24    	call	apubusy
+0230   22F6 26 34       	ld	h,SCRPG
+0231   22F8 CD 67 24    	call	push32OP1
+0232   22FB 26 34       	ld	h,SCRPG
+0233   22FD CD 7C 24    	call	push32OP2
+0234   2300             ;
+0235   2300             ; issue FDIV command
+0236   2300             ;
+0237   2300 CD 60 24    	call	apubusy
+0238   2303 3E 93       	ld	a,FDIV
+0239   2305 D3 FF       	out	(APUCOMAND),a
+0240   2307 CD 60 24    	call	apubusy
+0241   230A CD 7E 21    	call	svoff
+0242   230D 26 34       	ld	h,SCRPG
+0243   230F 2E 00       	ld	l,OP1
+0244   2311 CD 91 24    	call	pop32
+0245   2314 CD 46 24    	call	putop1
+0246   2317 C9          	ret
+0247   2318             ;------------------------------
+0248   2318             ; floating point multiplication
+0249   2318             ; product = factor1 x factor2
+0250   2318             ;------------------------------
+0251   2318             APUmul
+0252   2318 CD 69 20    	call	cecho
+0253   231B 0E 28       	ld	c,PRNTSZ
+0254   231D F7          	rst	30h
+0255   231E 70 72 6F 64 	.db	"product = factor1 x factor2",CR,LF
+0255   2322 75 63 74 20 
+0255   2326 3D 20 66 61 
+0255   232A 63 74 6F 72 
+0255   232E 31 20 78 20 
+0255   2332 66 61 63 74 
+0255   2336 6F 72 32 0D 
+0255   233A 0A 
+0256   233B 45 6E 74 65 	.db	"Enter factor1 ",0
+0256   233F 72 20 66 61 
+0256   2343 63 74 6F 72 
+0256   2347 31 20 00 
+0257   234A CD 2C 24    	call	getop1
+0258   234D 0E 28       	ld	c,PRNTSZ
+0259   234F F7          	rst	30h
+0260   2350 45 6E 74 65 	.db	"Enter factor2 ",0
+0260   2354 72 20 66 61 
+0260   2358 63 74 6F 72 
+0260   235C 32 20 00 
+0261   235F CD 39 24    	call	getop2
+0262   2362             
+0263   2362 0E 28       	ld	c,PRNTSZ
+0264   2364 F7          	rst	30h
+0265   2365 70 72 6F 64 	.db	"product = ",0
+0265   2369 75 63 74 20 
+0265   236D 3D 20 00 
+0266   2370             
+0267   2370 CD 60 24    	call	apubusy
+0268   2373 26 34       	ld	h,SCRPG
+0269   2375 CD 67 24    	call	push32OP1
+0270   2378 26 34       	ld	h,SCRPG
+0271   237A CD 7C 24    	call	push32OP2
+0272   237D             ;
+0273   237D             ; issue FMUL command
+0274   237D             ;
+0275   237D CD 60 24    	call	apubusy
+0276   2380 3E 92       	ld	a,FMUL
+0277   2382 D3 FF       	out	(APUCOMAND),a
+0278   2384 CD 60 24    	call	apubusy
+0279   2387 CD 7E 21    	call	svoff
+0280   238A 26 34       	ld	h,SCRPG
+0281   238C 2E 00       	ld	l,OP1
+0282   238E CD 91 24    	call	pop32
+0283   2391 CD 46 24    	call	putop1
+0284   2394 C9          	ret
+0285   2395             ;---------------------------
+0286   2395             ; floating point square root
+0287   2395             ;---------------------------
+0288   2395             APUsqrt
+0289   2395 CD 69 20    	call	cecho
+0290   2398 0E 28       	ld	c,PRNTSZ
+0291   239A F7          	rst	30h
+0292   239B 45 6E 74 65 	.db	"Enter Square",CR,LF,0
+0292   239F 72 20 53 71 
+0292   23A3 75 61 72 65 
+0292   23A7 0D 0A 00 
+0293   23AA CD 2C 24    	call	getop1
+0294   23AD 0E 28       	ld	c,PRNTSZ
+0295   23AF F7          	rst	30h
+0296   23B0 53 71 75 61 	.db	"Square Root = ",0
+0296   23B4 72 65 20 52 
+0296   23B8 6F 6F 74 20 
+0296   23BC 3D 20 00 
+0297   23BF             ;
+0298   23BF             ; issue FSQRT command
+0299   23BF             ;
+0300   23BF CD 60 24    	call	apubusy
+0301   23C2 26 34       	ld	h,SCRPG
+0302   23C4 CD 67 24    	call	push32OP1
+0303   23C7 CD 60 24    	call	apubusy
+0304   23CA 3E 81       	ld	a,FSQRT
+0305   23CC D3 FF       	out	(APUCOMAND),a
+0306   23CE CD 60 24    	call	apubusy
+0307   23D1 CD 7E 21    	call	svoff
+0308   23D4 26 34       	ld	h,SCRPG
+0309   23D6 2E 00       	ld	l,OP1
+0310   23D8 CD 91 24    	call	pop32
+0311   23DB CD 46 24    	call	putop1
+0312   23DE C9          	ret	
+0313   23DF             ;-------------------------------------------------------
+0314   23DF             ; convert a string to floating point scientific notation
+0315   23DF             ;-------------------------------------------------------
+0316   23DF             ;
+0317   23DF             ; uses the LLL library routine INPUT to get an input string and 
+0318   23DF             ; CVRT to convert an input string to floating point in
+0319   23DF             ; scientific notation
+0320   23DF             ;
+0321   23DF             convert
+0322   23DF CD 69 20    	call	cecho
+0323   23E2 0E 28       	ld	c,PRNTSZ
+0324   23E4 F7          	rst	30h
+0325   23E5 43 6F 6E 76 	.db	"Convert to FP scientific notation ",0
+0325   23E9 65 72 74 20 
+0325   23ED 74 6F 20 46 
+0325   23F1 50 20 73 63 
+0325   23F5 69 65 6E 74 
+0325   23F9 69 66 69 63 
+0325   23FD 20 6E 6F 74 
+0325   2401 61 74 69 6F 
+0325   2405 6E 20 00 
+0326   2408 CD 2C 24    	call	getop1	;uses LLL code INPUT to get input string
+0327   240B             ;
+0328   240B 0E 28       	ld	c,PRNTSZ
+0329   240D F7          	rst	30h
+0330   240E 46 50 20 53 	.db	"FP Scientific Notation = ",0 
+0330   2412 63 69 65 6E 
+0330   2416 74 69 66 69 
+0330   241A 63 20 4E 6F 
+0330   241E 74 61 74 69 
+0330   2422 6F 6E 20 3D 
+0330   2426 20 00 
+0331   2428 CD 46 24    	call	putop1 ; uses LLL code CVRT to convert to FP scientific notation
+0332   242B C9          	ret
+0333   242C             
+0334   242C             ;get operand 1
+0335   242C             getop1:
+0336   242C 26 34               LD      H,SCRPG         ;SET H REGISTER TO RAM SCRATCH PAGE
+0337   242E 2E 00               LD      L,OP1           ;POINTER TO OPERAND 1
+0338   2430 0E 0C               LD      C,SCR           ;SCRATCH AREA
+0339   2432 CD 8D 2A            CALL    INPUT           ;INPUT OPERAND 1 FROM TERMINAL
+0340   2435 CD 70 20            CALL    CRLF
+0341   2438 C9                  RET
+0342   2439             ;get operand 2
+0343   2439             getop2:
+0344   2439 26 34              LD      H,SCRPG         ;SET H REGISTER TO RAM SCRATCH PAGE
+0345   243B 2E 04              LD      L,OP2           ;POINTER TO OPERAND 2
+0346   243D 0E 0C              LD      C,SCR           ;SCRATCH AREA
+0347   243F CD 8D 2A           CALL    INPUT           ;INPUT OPERAND 1 FROM TERMINAL
+0348   2442 CD 70 20           CALL    CRLF
+0349   2445 C9                 RET
+0350   2446             
+0351   2446             putop1:
+0352   2446 26 34               LD H,SCRPG             ;SET H REGISTER TO RAM SCRATCH PAGE
+0353   2448 2E 00               LD L,OP1
+0354   244A 0E 0C               LD C,SCR               ;SCRATCH AREA
+0355   244C CD FB 28            call CVRT              ;OUTPUT NUMBER STARTING IN LOCATION OP1 TO TERMINAL
+0356   244F CD 70 20            CALL  CRLF
+0357   2452 C9                  RET
+0358   2453             
+0359   2453             putrsult:
+0360   2453 26 34               LD H,SCRPG             ;SET H REGISTER TO RAM SCRATCH PAGE
+0361   2455 2E 08               LD L,RSULT
+0362   2457 0E 0C               LD C,SCR               ;SCRATCH AREA
+0363   2459 CD FB 28            call CVRT              ;OUTPUT NUMBER STARTING IN LOCATION OP1 TO TERMINAL
+0364   245C CD 70 20            CALL  CRLF
+0365   245F C9                  RET
+0366   2460             ;
+0367   2460             ; is the APU busy?
+0368   2460             ;
+0369   2460 DB FF       apubusy	in	a,(APUSTATUS)
+0370   2462 E6 80       	and	BUSY
+0371   2464 20 FA       	jr	nz,apubusy
+0372   2466 C9          	ret
+0373   2467             	
+0374   2467             ;index to bytes within operands OP1 and OP2, 32 bit floats
+0375   2467             OP10:    .equ       0
+0376   2467             OP11:    .equ       1
+0377   2467             OP12:    .equ       2
+0378   2467             OP13:    .equ       3
+0379   2467             
+0380   2467             OP20:    .equ       4
+0381   2467             OP21:    .equ       5
+0382   2467             OP22:    .equ       6
+0383   2467             OP23:    .equ       7
+0384   2467             
+0385   2467             ;
+0386   2467             ; push 32 bit fp operand 1 onto the APU stack
+0387   2467             ;
+0388   2467             push32OP1
+0389   2467 2E 02       	ld	l,OP12
+0390   2469 7E          	ld	a,(hl)
+0391   246A D3 FE       	out	(APUDATA),a
+0392   246C 2E 01       	ld	l,OP11
+0393   246E 7E          	ld	a,(hl)
+0394   246F D3 FE       	out	(APUDATA),a
+0395   2471 2E 00       	ld	l,OP10
+0396   2473 7E          	ld	a,(hl)
+0397   2474 D3 FE       	out	(APUDATA),a
+0398   2476 2E 03       	ld	l,OP13
+0399   2478 7E          	ld	a,(hl)
+0400   2479 D3 FE       	out	(APUDATA),a
+0401   247B C9          	ret
+0402   247C             ;
+0403   247C             ; push 32 bit fp operand 2 onto the APU stack
+0404   247C             ;
+0405   247C             push32OP2
+0406   247C 2E 06       	ld	l,OP22
+0407   247E 7E          	ld	a,(hl)
+0408   247F D3 FE       	out	(APUDATA),a
+0409   2481 2E 05       	ld	l,OP21
+0410   2483 7E          	ld	a,(hl)
+0411   2484 D3 FE       	out	(APUDATA),a
+0412   2486 2E 04       	ld	l,OP20
+0413   2488 7E          	ld	a,(hl)
+0414   2489 D3 FE       	out	(APUDATA),a
+0415   248B 2E 07       	ld	l,OP23
+0416   248D 7E          	ld	a,(hl)
+0417   248E D3 FE       	out	(APUDATA),a
+0418   2490 C9          	ret
+0419   2491             ;
+0420   2491             ; pop 32 bit fp result from APU stack into operand 1
+0421   2491             ;
+0422   2491             pop32:
+0423   2491 2E 03       	ld	l,OP13
+0424   2493 DB FE       	in	a,(APUDATA)
+0425   2495 77          	ld	(hl),a
+0426   2496 2E 00       	ld	l,OP10
+0427   2498 DB FE       	in	a,(APUDATA)
+0428   249A 77          	ld	(hl),a
+0429   249B 2E 01       	ld	l,OP11
+0430   249D DB FE       	in	a,(APUDATA)
+0431   249F 77          	ld	(hl),a
+0432   24A0 2E 02       	ld	l,OP12
+0433   24A2 DB FE       	in	a,(APUDATA)
+0434   24A4 77          	ld	(hl),a
+0435   24A5 C9          	ret
+0436   24A6             	.end
+0437   24A6             
+0438   24A6             #include "LLLFPL.asm"
+0001+  24A6             ; original LLL code restored Herb Johnson Feb 2015
+0002+  24A6             ;
+0003+  24A6             ; original LLL code from "Floating Point Package for
+0004+  24A6             ; Intel 8008 and 8080 Microprocessors" by Maples Oct 24 1975
+0005+  24A6             ; URCL-51940 publication from Lawrence Livermore Laboratory
+0006+  24A6             ; 171286.PDF 
+0007+  24A6             ;
+0008+  24A6             ; fixes:
+0009+  24A6             ; 0) many lines had space in column 1! labels become operands!
+0010+  24A6             ; 1) added LLL square root routine
+0011+  24A6             ; 2) added missing "CALL SIGN" in CVRT routine
+0012+  24A6             ; 3) replaced ERR routine with one from LLL document
+0013+  24A6             ; 4) commented out "ORA A" at end of SAVEN
+0014+  24A6             ;
+0015+  24A6             ; ###S
+0016+  24A6             ; MODIFIED BY TONY GOLD FOR NON-MACRO ASSEMBLER
+0017+  24A6             ; CHANGES WITHIN ;###S AND ;###E LINES
+0018+  24A6             ; ALL ORIGINAL CODE RETAINED AS COMMENTS
+0019+  24A6             ; ###E
+0020+  24A6             ;
+0021+  24A6             ; //// FLOATING POINT PACKAGE FOR THE MCS8
+0022+  24A6             ; //// BY DAVID MEAD
+0023+  24A6             ; //// MODIFIED BY HAL BRAND 9/6/74
+0024+  24A6             ; //// MODIFIED FOR 24 BIT MANTISSAS
+0025+  24A6             ; //// PLUS ADDED I/O CONVERSION ROUTINES
+0026+  24A6             ; //// MODIFIED BY FRANK OLKEN 6/28/75
+0027+  24A6             ;
+0028+  24A6             ;
+0029+  24A6             ; Transcribed to Z80 mnemonics by the z88dk/support/8080/toZ80.awk tool.
+0030+  24A6             ; gawk -f toZ80.awk < 80_lllf.asm > z80_lllf.asm
+0031+  24A6             ;
+0032+  24A6             ; Modified to run on the RC2014 and the YAZ180 by
+0033+  24A6             ; Phillip Stevens @feilipu https://feilipu.me
+0034+  24A6             ; February / March 2017
+0035+  24A6             ;
+0036+  24A6             ; Converted to z88dk z80asm for RC2014 and YAZ180 by
+0037+  24A6             ; Phillip Stevens @feilipu https://feilipu.me
+0038+  24A6             ; August 2017
+0039+  24A6             ;
+0040+  24A6             ;
+0041+  24A6             ;
+0042+  24A6             
+0043+  24A6             ;DEFC    MINCH   =   $C0 ;300Q   ;MINIMUM EXPONENT WITH SIGN EXTENDED
+0044+  24A6             MINCH:    .EQU   $C0
+0045+  24A6             
+0046+  24A6             ;DEFC    MAXCH   =   $3F ;077Q   ;MAXIMUM EXPONENT WITH SIGN EXTENDED
+0047+  24A6             MAXCH:    .EQU  $3F
+0048+  24A6             ;
+0049+  24A6             ;******************************************************
+0050+  24A6             ;       //// PUBLIC FUNCTIONS
+0051+  24A6             ;******************************************************
+0052+  24A6             ;
+0053+  24A6             ;PUBLIC  INPUT, CVRT
+0054+  24A6             ;PUBLIC  LADD, LSUB, LMUL, LDIV, DSQRT
+0055+  24A6             
+0056+  24A6             ;******************************************************
+0057+  24A6             ;       //// LIBRARY ORIGIN
+0058+  24A6             ;******************************************************
+0059+  24A6             ;
+0060+  24A6             ;SECTION     apu_library         ;LIBRARY ORIGIN
+0061+  24A6             ;
+0062+  24A6             
+0063+  24A6             SCRPG:   .equ       $34         ; SCRATCH PAGE IS 3400H  UP FROM   2800H
+0064+  24A6             OP1:     .equ       $00         ; STARTING LOCATION OF OPERAND 1
+0065+  24A6             OP2:     .equ       OP1+$04     ; STARTING LOCATION OF OPERAND 2
+0066+  24A6             RSULT:   .equ       OP2+$04     ; STARTING LOCATION OF RESULT
+0067+  24A6             SCR      .equ       RSULT+$04   ; STARTING LOCATION OF SCRATCH AREA
+0068+  24A6             
+0069+  24A6             ;SCM System Calls 
+0070+  24A6             ;TXDATA  .equ  23
+0071+  24A6             ;RXDATA  .equ  24
+0072+  24A6             
+0073+  24A6             ;******************************************************
+0074+  24A6             ;       //// OUTPUT SUBROUTINE
+0075+  24A6             ;******************************************************
+0076+  24A6             ;
+0077+  24A6             ; OUTR OUTPUT FROM CVRT INTO TX0 OUTPUT BUFFER
+0078+  24A6             ; ALL REG'S MAINTAINED
+0079+  24A6             ;
+0080+  24A6 C5          OUTR:   push    bc
+0081+  24A7 E6 7F               AND     7FH             ;CLEAR HIGH BIT
+0082+  24A9 0E 17               ld      c,TXDATA
+0083+  24AB F7                  rst     30h
+0084+  24AC C1                  pop     bc
+0085+  24AD C9                  RET
+0086+  24AE             ;
+0087+  24AE             ;
+0088+  24AE             ;******************************************************
+0089+  24AE             ;       //// INPUT SUBROUTINES
+0090+  24AE             ;******************************************************
+0091+  24AE             ;
+0092+  24AE             
+0093+  24AE             ; ROUTINE TO INPUT CHAR FROM INPUT BUFFER
+0094+  24AE             ; RST 10H LOOPS TILL A CHARACTER IS AVAILABLE
+0095+  24AE             ; INP RETURNS CHARACTER WITH HIGH BIT SET
+0096+  24AE             ; IN REGISTER A.
+0097+  24AE             ;
+0098+  24AE             ; ROUTINE PASSES SPACE IF THE INPUT IS NOT A NUMBER.
+0099+  24AE             ; NUMERICAL CHARACTERS INCLUDE 0 - 9, +, -, AND E.
+0100+  24AE             ;
+0101+  24AE             ; ROUTINE ECHOS THE CHARACTERS FORWARDED
+0102+  24AE             ;
+0103+  24AE C5          INP:    push    bc
+0104+  24AF 0E 18               ld      c,RXDATA
+0105+  24B1 F7                  RST     30h
+0106+  24B2 C1          		pop     bc
+0107+  24B3 FE 2B               CP      '+'             ;+?
+0108+  24B5 CA D3 24            JP      Z,INP_DONE
+0109+  24B8 FE 2D               CP      '-'             ;-?
+0110+  24BA CA D3 24            JP      Z,INP_DONE
+0111+  24BD FE 2E               CP      '.'             ;DEC. PNT.?           
+0112+  24BF CA D3 24            JP      Z,INP_DONE
+0113+  24C2 FE 45               CP      'E'             ;E?
+0114+  24C4 CA D3 24            JP      Z,INP_DONE
+0115+  24C7 FE 30               CP      '0'             ;ASCII CNTRL.?
+0116+  24C9 FA D1 24            JP      M,SPACE
+0117+  24CC FE 3A               CP      ':'             ;DECIMAL NUMBER?
+0118+  24CE FA D3 24            JP      M,INP_DONE
+0119+  24D1             SPACE:
+0120+  24D1 3E 20               LD      A,' '           ;SEND A SPACE
+0121+  24D3             INP_DONE:
+0122+  24D3 F5                  PUSH    AF
+0123+  24D4 CD A6 24            CALL    OUTR
+0124+  24D7 F1                  POP     AF
+0125+  24D8 F6 80               OR      80H             ;SET HIGH BIT
+0126+  24DA C9                  RET
+0127+  24DB             ;
+0128+  24DB             ;
+0129+  24DB             ;******************************************************
+0130+  24DB             ;       //// DIVIDE SUBROUTINE
+0131+  24DB             ;******************************************************
+0132+  24DB             ;
+0133+  24DB             LDIV:
+0134+  24DB CD 44 28            CALL    CSIGN           ;COMPUTE SIGN OF RESULT
+0135+  24DE CD B5 26            CALL    ZCHK            ;CHECK IF DIVIDEND = ZERO
+0136+  24E1 C2 ED 24            JP      NZ,DTST2        ;IF DIVIDEND .NE. 0 CHECK DIVISOR
+0137+  24E4 CD BD 26            CALL    BCHK            ;CHECK FOR ZERO/ZERO
+0138+  24E7 CA 83 27            JP      Z,INDFC         ;ZERO/ZERO = INDEFINITE
+0139+  24EA C3 8A 27            JP      WZERC           ;ZERO/NONZERO = ZERO
+0140+  24ED             
+0141+  24ED             DTST2:
+0142+  24ED CD BD 26            CALL    BCHK            ;COME HERE IF DIVIDEND .NE. 0
+0143+  24F0 CA 36 28            JP      Z,OFLWC         ;NONZERO/ZERO = OVERFLOW
+0144+  24F3                                             ;IF WE GET HERE, THINGS LOOK OKAY
+0145+  24F3 5D                  LD      E,L             ;SAVE BASE IN E
+0146+  24F4 69                  LD      L,C             ;BASE 6 TO L
+0147+  24F5 CD F8 26            CALL    DCLR            ;CLEAR QUOTIENT MANTISSA SLOT
+0148+  24F8 6B                  LD      L,E             ;RESTORE BASE IN L
+0149+  24F9 CD EB 27            CALL    ENT1            ;DO FIRST CYCLE
+0150+  24FC 69                  LD      L,C             ;BASE 6 TO L
+0151+  24FD CD C4 26            CALL    DLST            ;MOVE QUOTIENT OVER ONE PLACE
+0152+  2500 16 17               LD      D,23            ;NUMBER OF ITERATIONS TO D
+0153+  2502             REP3:
+0154+  2502 6B                  LD      L,E
+0155+  2503 CD E5 27            CALL    ENT2
+0156+  2506 15                  DEC     D               ;DEC D
+0157+  2507 CA 16 25            JP      Z,GOON
+0158+  250A 7D                  LD      A,L
+0159+  250B 69                  LD      L,C             ;BASE 6 TO L
+0160+  250C 4F                  LD      C,A
+0161+  250D CD C4 26            CALL    DLST            ;MOVE QUOTIENT MANT OVER
+0162+  2510 7D                  LD      A,L             ;CPTR TO A
+0163+  2511 59                  LD      E,C             ;LPTR TO E
+0164+  2512 4F                  LD      C,A             ;CPTR TO C
+0165+  2513 C3 02 25            JP      REP3
+0166+  2516             
+0167+  2516             GOON:
+0168+  2516 CD BC 27            CALL    AORS            ;CHECK IF RESULT IS NORMALIZED
+0169+  2519 FA 28 25            JP      M,CRIN
+0170+  251C 7D                  LD      A,L             ;LPTR TO A
+0171+  251D 69                  LD      L,C             ;CPTR TO L
+0172+  251E 4F                  LD      C,A             ;LPTR TO C
+0173+  251F CD C4 26            CALL    DLST            ;SHIFT QUOTIENT LEFT
+0174+  2522 4D                  LD      C,L
+0175+  2523 6B                  LD      L,E
+0176+  2524 CD 14 28            CALL    LDCP            ;COMPUTE THE EXPONENT OF RESULT
+0177+  2527 C9                  RET
+0178+  2528             
+0179+  2528             CRIN:
+0180+  2528 CD 27 27            CALL    CFCHE           ;GET A=CHAR(H,L), E=CHAR(H,B)
+0181+  252B 93                  SUB     E               ;NEW CHAR = CHAR(DIVIDEND) - CHAR(DVISIOR)
+0182+  252C FE 7F               CP      $7F  ;177Q      ;CHECK MAX POSITIVE NUMBER
+0183+  252E CA 36 28            JP      Z,OFLWC         ;JUMP ON OVERFLOW
+0184+  2531 C6 01               ADD     A,1             ;ADD 1 SINCE WE DID NOT LEFTSHIFT
+0185+  2533 CD 1F 28            CALL    CCHK            ;CHECK AND STORE EXPONENT
+0186+  2536 C9                  RET                     ;RETURN
+0187+  2537             ;
+0188+  2537             ;
+0189+  2537             ;******************************************************
+0190+  2537             ;       //// ADDITION SUBROUTINE
+0191+  2537             ;******************************************************
+0192+  2537             ;
+0193+  2537             ;
+0194+  2537             LADD:
+0195+  2537 AF                  XOR     A               ;/***SET UP TO ADD
+0196+  2538 C3 3D 25            JP      LADS            ;NOW DO IT
+0197+  253B             ;
+0198+  253B             ;
+0199+  253B             ;******************************************************
+0200+  253B             ;       //// SUBTRACTION SUBROUTINE
+0201+  253B             ;******************************************************
+0202+  253B             ;
+0203+  253B             ;       SUBROUTINE LADS
+0204+  253B             ;
+0205+  253B             ;       FLOATING POINT ADD OR SUB
+0206+  253B             ;       A 128 ON ENTRY SUB
+0207+  253B             ;       A 0 ON ENTRY ADD
+0208+  253B             ;       F-S F,FIRST OPER DESTROYED
+0209+  253B             ;       BASE 11 USED FOR SCRATCH
+0210+  253B             ;
+0211+  253B             LSUB:
+0212+  253B 3E 80               LD      A,$80  ;200Q    ;/****SET UP TO SUBTRACT
+0213+  253D             ;
+0214+  253D             LADS:
+0215+  253D CD CA 27            CALL    ACPR            ;SAVE ENTRY PNT AT BASE 6
+0216+  2540 CD BD 26            CALL    BCHK            ;CHECK ADDEND/SUBTRAHEND = ZERO
+0217+  2543 C8                  RET     Z               ;IF SO, RESULT=ARG SO RETURN
+0218+  2544                                             ;THIS WILL PREVENT UNDERFLOW INDICATION ON
+0219+  2544                                             ;ZERO + OR - ZERO
+0220+  2544 CD 36 27            CALL    CCMP
+0221+  2547 CA 77 25            JP      Z,EQ02          ;IF EQUAL, GO ON
+0222+  254A 57                  LD      D,A             ;SAVE LPTR CHAR IN D
+0223+  254B DA 5A 25            JP      C,LLTB
+0224+  254E 93                  SUB     E               ;L.GT.B IF HERE
+0225+  254F E6 7F               AND     127
+0226+  2551 57                  LD      D,A             ;DIFFERENCE TO D
+0227+  2552 5D                  LD      E,L             ;SAVE BASE IN E
+0228+  2553 69                  LD      L,C             ;C PTR TO L
+0229+  2554 2C                  INC     L               ;C PTR 1 TO L
+0230+  2555 73                  LD      (HL),E          ;SAVE BASE IN C PTR\1
+0231+  2556 68                  LD      L,B             ;B PTR TO L
+0232+  2557 C3 5F 25            JP      NCHK
+0233+  255A             
+0234+  255A             LLTB:
+0235+  255A 7B                  LD      A,E             ;L.LT.B IF HERE,BPTR TO A
+0236+  255B 92                  SUB     D               ;SUBTRACT LPTR CHAR FROM BPTR CHAR
+0237+  255C E6 7F               AND     127
+0238+  255E 57                  LD      D,A             ;DIFFERENCE TO D
+0239+  255F             NCHK:
+0240+  255F 3E 18               LD      A,24
+0241+  2561 BA                  CP      D
+0242+  2562 D2 67 25            JP      NC,SH10
+0243+  2565 16 18               LD      D,24
+0244+  2567             SH10:
+0245+  2567 B7                  OR      A
+0246+  2568 CD D3 26            CALL    DRST
+0247+  256B 15                  DEC     D
+0248+  256C C2 67 25            JP      NZ,SH10
+0249+  256F             EQUL:
+0250+  256F 7D                  LD      A,L
+0251+  2570 B8                  CP      B
+0252+  2571 C2 77 25            JP      NZ,EQ02         ;F.GT.S IF L.NE.B
+0253+  2574 69                  LD      L,C             ;C PTR TO L
+0254+  2575 2C                  INC     L               ;C PTR\1 TO L
+0255+  2576 6E                  LD      L,(HL)          ;RESTORE L
+0256+  2577             EQ02:
+0257+  2577 CD DD 25            CALL    LASD            ;CHECK WHAT TO
+0258+  257A CD CA 27            CALL    ACPR            ;SAVE ANSWER
+0259+  257D FE 02               CP      2               ;TEST FOR ZERO ANSWER
+0260+  257F C2 85 25            JP      NZ,NOT0
+0261+  2582 C3 68 27            JP      WZER            ;WRITE FLOATING ZERO AND RETURN
+0262+  2585             
+0263+  2585             NOT0:
+0264+  2585 16 01               LD      D,1             ;WILL TEST FOR SUB
+0265+  2587 A2                  AND     D
+0266+  2588 CA B1 25            JP      Z,ADDZ          ;LSB 1 IMPLIES SUB
+0267+  258B CD C2 27            CALL    TSTR            ;CHECK NORMAL/REVERSE
+0268+  258E CA 94 25            JP      Z,SUBZ          ;IF NORMAL,GO SUBZ
+0269+  2591 7D                  LD      A,L             ;OTHERWISE REVERSE
+0270+  2592 68                  LD      L,B             ;ROLES
+0271+  2593 47                  LD      B,A             ;OF L AND B
+0272+  2594             SUBZ:
+0273+  2594 CD 01 27            CALL    DSUB            ;SUBTRACT SMALLER FROM BIGGER
+0274+  2597 CD CA 25            CALL    MANT            ;SET UP SIGN OF RESULT
+0275+  259A CD C2 27            CALL    TSTR            ;SEE IF WE NEED TO INTERCHANGE
+0276+  259D                                             ;BPTR AND LPTR
+0277+  259D CA 88 26            JP      Z,NORM          ;NO INTERCHANGE NECESSARY, SO NORMALIZE
+0278+  25A0                                             ;AND RETURN
+0279+  25A0 7D                  LD      A,L             ;INTERCHANGE
+0280+  25A1 68                  LD      L,B             ;L
+0281+  25A2 47                  LD      B,A             ;AND B
+0282+  25A3 79                  LD      A,C             ;CPTR  TO A
+0283+  25A4 48                  LD      C,B             ;BPTR TO C
+0284+  25A5 5D                  LD      E,L             ;LPTR TO E
+0285+  25A6 47                  LD      B,A             ;CPTR TO B
+0286+  25A7 CD FF 27            CALL    LXFR            ;MOVE BPTR> TO LPTR>
+0287+  25AA 78                  LD      A,B
+0288+  25AB 41                  LD      B,C
+0289+  25AC 4F                  LD      C,A
+0290+  25AD 6B                  LD      L,E
+0291+  25AE C3 88 26            JP      NORM            ;NORMALIZE RESULT AND RETURN
+0292+  25B1             ;
+0293+  25B1             ;   COPY THE LARGER EXPONENT TO THE RESULT
+0294+  25B1             ;
+0295+  25B1             ADDZ:
+0296+  25B1 CD 36 27            CALL    CCMP            ;COMPARE THE CHARACTERISTICS
+0297+  25B4 D2 BA 25            JP      NC,ADD2         ;IF CHAR(H,L) .GE. CHAR(H,B) CONTINUE
+0298+  25B7 CD 68 28            CALL    BCTL            ;IF CHAR(H,L) .LT. CHAR(H,B) THE COPY
+0299+  25BA                                             ;CHAR(H,B) TO CHAR(H,L)
+0300+  25BA             ADD2:
+0301+  25BA CD CA 25            CALL    MANT            ;COMPUTE SIGN OF RESULT
+0302+  25BD CD E1 26            CALL    DADD            ;ADD MANTISSAS
+0303+  25C0 D2 AD 27            JP      NC,SCCFG        ;IF THERE IS NO OVFLW - DONE
+0304+  25C3 CD D3 26            CALL    DRST            ;IF OVERFLOW SHIFT RIGHT
+0305+  25C6 CD 91 27            CALL    INCR            ;AND INCREMENT EXPONENT
+0306+  25C9 C9                  RET                     ;ALL DONE, SO RETURN
+0307+  25CA             ;
+0308+  25CA             ;   THIS ROUTINE STORES THE MANTISSA SIGN IN THE RESULT
+0309+  25CA             ;   THE SIGN HAS PREVIOUSLY BEEN COMPUTED BY LASD.
+0310+  25CA             ;
+0311+  25CA             MANT:
+0312+  25CA 5D                  LD      E,L             ;SAVE L PTR
+0313+  25CB 69                  LD      L,C             ;C PTR TO L
+0314+  25CC 7E                  LD      A,(HL)             ;LOAD INDEX WORD
+0315+  25CD E6 80               AND     128             ;SCARF SIGN
+0316+  25CF 6B                  LD      L,E             ;RESTORE L PTR
+0317+  25D0 2C                  INC     L               ;L PTR 2
+0318+  25D1 2C                  INC     L
+0319+  25D2 2C                  INC     L               ;TO L
+0320+  25D3 5F                  LD      E,A             ;SAVE SIGN IN E
+0321+  25D4 7E                  LD      A,(HL)
+0322+  25D5 E6 7F               AND     127             ;SCARF CHAR
+0323+  25D7 83                  ADD     A,E               ;ADD SIGN
+0324+  25D8 77                  LD      (HL),A             ;STORE IT
+0325+  25D9 2D                  DEC     L               ;RESTORE
+0326+  25DA 2D                  DEC     L
+0327+  25DB 2D                  DEC     L               ;L PTR
+0328+  25DC C9                  RET
+0329+  25DD             ;
+0330+  25DD             ;
+0331+  25DD             ;   SUBROUTINE LASD
+0332+  25DD             ;
+0333+  25DD             ;       UTILITY ROUTINE FOR LADS
+0334+  25DD             ;       CALCULATES TRUE OPER AND SGN
+0335+  25DD             ;       RETURNS ANSWER IN
+0336+  25DD             ;
+0337+  25DD             LASD:
+0338+  25DD CD 54 28            CALL    MSFH            ;FETCH MANT SIGNS, F IN A,D
+0339+  25E0 BB                  CP      E               ;COMPARE SIGNS
+0340+  25E1 DA 0F 26            JP      C,ABCH          ;F\,S- MEANS GO TO A BRANCH
+0341+  25E4 C2 18 26            JP      NZ,BBCH         ;F- S\ MEANS GO TO B BRANCH
+0342+  25E7 83                  ADD     A,E             ;SAME SIGN IF HERE, ADD SIGNS
+0343+  25E8 DA FD 25            JP      C,BMIN          ;IF BOTH MINUS, WILL OVERFLOW
+0344+  25EB CD BC 27            CALL    AORS            ;BOTH POS IF HERE
+0345+  25EE F2 21 26            JP      P,L000          ;IF AN ADD, LOAD 0
+0346+  25F1             
+0347+  25F1             COM1:
+0348+  25F1 CD CF 27            CALL    DCMP            ;COMPARE F WITH S
+0349+  25F4 DA 2F 26            JP      C,L131          ;S.GT.F,SO LOAD 131
+0350+  25F7 C2 23 26            JP      NZ,L001         ;F.GT.S,SO LOAD 1
+0351+  25FA             L002:
+0352+  25FA 3E 02               LD      A,2             ;ERROR CONDITION, ZERO ANSWER
+0353+  25FC C9                  RET
+0354+  25FD             
+0355+  25FD             BMIN:
+0356+  25FD CD BC 27            CALL    AORS            ;CHECK FOR ADD OR SUB
+0357+  2600 F2 29 26            JP      P,L128          ;ADD, SO LOAD 128
+0358+  2603             
+0359+  2603             COM2:
+0360+  2603 CD CF 27            CALL    DCMP            ;COMPARE F WITH S
+0361+  2606 DA 26 26            JP      C,L003          ;S.GT.F,SO LOAD 3
+0362+  2609 C2 2C 26            JP      NZ,L129         ;FGT.S.SO LOAD 129
+0363+  260C C3 FA 25            JP     L002            ;ERROR
+0364+  260F             
+0365+  260F             ABCH:
+0366+  260F CD BC 27            CALL    AORS            ;FT,S- SO TEST FOR A/S
+0367+  2612 FA 21 26            JP      M,L000          ;SUBTRACT, SO LOAD 0
+0368+  2615 C3 F1 25            JP      COM1            ;ADD, SO GO TO DCMP
+0369+  2618             
+0370+  2618             BBCH:
+0371+  2618 CD BC 27            CALL    AORS            ;F-,S\,SO TEST FOR A/S
+0372+  261B FA 29 26            JP      M,L128          ;SUB
+0373+  261E C3 03 26            JP      COM2            ;ADD
+0374+  2621             
+0375+  2621             L000: 
+0376+  2621 AF                  XOR     A
+0377+  2622 C9                  RET
+0378+  2623             
+0379+  2623             L001:
+0380+  2623 3E 01               LD      A,1
+0381+  2625 C9                  RET
+0382+  2626             
+0383+  2626             L003:
+0384+  2626 3E 03               LD      A,3
+0385+  2628 C9                  RET
+0386+  2629             
+0387+  2629             L128:
+0388+  2629 3E 80               LD      A,128
+0389+  262B C9                  RET
+0390+  262C             
+0391+  262C             L129:
+0392+  262C 3E 81               LD      A,129
+0393+  262E C9                  RET
+0394+  262F             
+0395+  262F             L131:
+0396+  262F 3E 83               LD      A,131
+0397+  2631 C9                  RET
+0398+  2632             ;
+0399+  2632             ;       SUBROUTINE LMCM
+0400+  2632             ;       COMPARES THE MAGNITUDE OF
+0401+  2632             ;       TWO FLOATING PNT NUMBERS
+0402+  2632             ;       Z[1 IF [,C[1 IF F.LT.S.
+0403+  2632             ;
+0404+  2632             LMCM:
+0405+  2632 CD 36 27            CALL    CCMP            ;CHECK CHARS
+0406+  2635 C0                  RET     NZ              ;RETURN IF NOT EQUAL
+0407+  2636 CD CF 27            CALL    DCMP            ;IF EQUAL, CHECK MANTS
+0408+  2639 C9                  RET
+0409+  263A             ;
+0410+  263A             ;
+0411+  263A             ;
+0412+  263A             ;***************************************************
+0413+  263A             ;       //// MULTIPLY SUBROUTINE
+0414+  263A             ;***************************************************
+0415+  263A             ;
+0416+  263A             ;   SUBROUTINE LMUL
+0417+  263A             ;
+0418+  263A             ;       FLOATING POINT MULTIPLY
+0419+  263A             ;       L PTR X B PTR TO C PTR
+0420+  263A             ;
+0421+  263A             LMUL:
+0422+  263A CD 44 28            CALL    CSIGN           ;COMPUTE SIGN OF RESULT AND STORE IT
+0423+  263D CD B5 26            CALL    ZCHK            ;CHECK FIRST OPERAND FOR ZERO
+0424+  2640 CA 8A 27            JP      Z,WZERC         ;ZERO * ANYTHING = ZERO
+0425+  2643 CD BD 26            CALL    BCHK            ;CHECK SECOND OPERAND FOR ZERO
+0426+  2646 CA 8A 27            JP      Z,WZERC         ;ANYTHING * ZERO = ZERO
+0427+  2649 5D                  LD      E,L             ;SAVE L PTR
+0428+  264A 69                  LD      L,C             ;C PTR TO L
+0429+  264B CD F8 26            CALL    DCLR            ;CLR PRODUCT MANT LOCS
+0430+  264E 6B                  LD      L,E             ;L PTR TO L
+0431+  264F 16 18               LD      D,24            ;LOAD NUMBER ITERATIONS
+0432+  2651             KPGO:
+0433+  2651 CD D3 26            CALL    DRST            ;SHIFT L PTR RIGHT
+0434+  2654 DA 7F 26            JP      C,MADD          ;WILL ADD B PTR IF C[1
+0435+  2657 7D                  LD      A,L             ;INTERCHANGE
+0436+  2658 69                  LD      L,C             ;L AND
+0437+  2659 4F                  LD      C,A             ;C PTRS
+0438+  265A             INTR:
+0439+  265A CD D3 26            CALL    DRST            ;SHIFT PRODUCT OVER
+0440+  265D 7D                  LD      A,L             ;INTERCHANGE
+0441+  265E 69                  LD      L,C             ;L AND C PTRS_BACK TO
+0442+  265F 4F                  LD      C,A             ;ORIGINAL>
+0443+  2660 15                  DEC     D
+0444+  2661 C2 51 26            JP      NZ,KPGO         ;MORE CYCLES IF Z[0
+0445+  2664 CD BC 27            CALL    AORS            ;TEST IF RESULT IS NORMALIZED
+0446+  2667 FA 1B 28            JP      M,LMCP          ;IF NORMALIZED GO COMPUTE CHAR
+0447+  266A 5D                  LD      E,L             ;SAVE LPTR IN E
+0448+  266B 69                  LD      L,C             ;SET L=CPTR
+0449+  266C CD C4 26            CALL    DLST            ;LEFT SHIFT RESULT TO NORMALIZE
+0450+  266F 6B                  LD      L,E             ;RESTORE LPTR
+0451+  2670 CD 27 27            CALL    CFCHE           ;OTHERWISE SET A=CHAR(H,L), E=CHAR(H,B)
+0452+  2673 83                  ADD     A,E             ;CHAR(RESULT) = CHAR(H,L) + CHAR(H,B)
+0453+  2674 FE 80               CP      $80  ;200Q      ;CHECK FOR SMALLEST NEGATIVE NUMBER
+0454+  2676 CA 3D 28            JP      Z,UFLWC         ;IF SO THEN UNDERFLOW
+0455+  2679 D6 01               SUB     1               ;SUBTRACT 1 TO COMPENSATE FOR NORMALIZE
+0456+  267B CD 1F 28            CALL    CCHK            ;CHECK EXPONENT AND STORE IT
+0457+  267E C9                  RET                     ;RETURN
+0458+  267F             
+0459+  267F             MADD:
+0460+  267F 7D                  LD      A,L             ;INTERCHANGE
+0461+  2680 69                  LD      L,C             ;L AND
+0462+  2681 4F                  LD      C,A             ;C PTRS
+0463+  2682 CD E1 26            CALL    DADD            ;ACCUMULATE PRODUCT
+0464+  2685 C3 5A 26            JP      INTR
+0465+  2688             ;
+0466+  2688             ;   SUBROUTINE NORM
+0467+  2688             ;
+0468+  2688             ;       THIS SUBROUTINE WILL NORMALIZE A FLOATING POINT
+0469+  2688             ;       NUMBER, PRESERVING ITS ORIGINAL SIGN.
+0470+  2688             ;       WE CHECK FOR UNDERFLOW AND SET THE CONDITION
+0471+  2688             ;       FLAG APPROPRIATELY.  (SEE ERROR RETURNS).
+0472+  2688             ;       THERE IS AN ENTRY POINT TO FLOAT A SIGNED INTEGER
+0473+  2688             ;       (FLOAT) AND AN ENTRY POINT TO FLOAT AN UNSIGNED
+0474+  2688             ;       INTEGER.
+0475+  2688             ;
+0476+  2688             ;   ENTRY POINTS:
+0477+  2688             ;
+0478+  2688             ;       NORM  - NORMALIZE FLOATING PT NUMBER AT (H,L)
+0479+  2688             ;       FLOAT - FLOAT TRIPLE PRECISION INTEGER AT (H,L)
+0480+  2688             ;               PRESERVING SIGN BIT IN (H,L)+3
+0481+  2688             ;       DFXL  - FLOAT UNSIGNED (POSITIVE) TRIPLE PRECISION
+0482+  2688             ;               AT (H,L)
+0483+  2688             ;
+0484+  2688             ;   REGISTERS ON EXIT:
+0485+  2688             ;
+0486+  2688             ;       A = CONDITION FLAG (SEE ERROR RETURNS)
+0487+  2688             ;       D,E = GARBAGE
+0488+  2688             ;       B,C,H,L = SAME AS ON ENTRY
+0489+  2688             ;
+0490+  2688             NORM:
+0491+  2688 5D                  LD      E,L             ;SAVE L IN E
+0492+  2689             NORM1:
+0493+  2689 CD 1C 27            CALL    GCHAR           ;GET CHAR(H,L) IN A WITH SIGN EXTENDED
+0494+  268C 57                  LD      D,A             ;SAVE CHAR IN D
+0495+  268D             FXL1:
+0496+  268D 6B                  LD      L,E             ;RESTORE L
+0497+  268E             FXL2:
+0498+  268E CD B5 26            CALL    ZMCHK           ;CHECK FOR ZERO MANTISSA
+0499+  2691 CA 68 27            JP      Z,WZER          ;IF ZERO MANTISSA THEN ZERO RESULT
+0500+  2694             REP6:
+0501+  2694 7E                  LD      A,(HL)          ;GET MOST SIGNIFICANT BYTE OF
+0502+  2695                                             ;MANTISSA
+0503+  2695 B7                  OR      A               ;SET FLAGS
+0504+  2696 FA A6 26            JP      M,SCHAR           ;IF MOST SIGNIFICANT BIT = 1 THEN
+0505+  2699                                             ;NUMBER IS NORMALIZED AND WE GO TO
+0506+  2699                                             ;STORE THE EXPONENT
+0507+  2699 7A                  LD      A,D             ;OTHERWISE CHECK FOR UNDERFLOW
+0508+  269A FE C0               CP      MINCH           ;COMPARE WITH MINIMUM CHAR
+0509+  269C CA 3E 27            JP      Z,WUND          ;IF EQUAL THEN UNDERFLOW
+0510+  269F CD C4 26            CALL    DLST            ;SHIFT MANTISSA LEFT
+0511+  26A2 15                  DEC     D               ;DECREMENT EXPONENT
+0512+  26A3 C3 94 26            JP      REP6            ;LOOP AN TEST NEXT BIT
+0513+  26A6             
+0514+  26A6             SCHAR:
+0515+  26A6 C3 9E 27            JP      INCR3           ;STORE THE EXPONENT USING
+0516+  26A9                                             ;THE SAME CODE AS THE INCREMENT
+0517+  26A9             
+0518+  26A9             DFXL:
+0519+  26A9 5D                  LD      E,L             ;ENTER HERE TO FLOAT UNSIGNED
+0520+  26AA                                             ;INTEGER
+0521+  26AA                                             ;FIRST SAVE L IN E
+0522+  26AA 2C                  INC     L               ;MAKE (H,L) POINT TO CHAR
+0523+  26AB 2C                  INC     L               ;MAKE (H,L) POINT TO CHAR
+0524+  26AC 2C                  INC     L               ;MAKE (H,L) POINT TO CHAR
+0525+  26AD AF                  XOR     A               ;ZERO ACCUMULATOR
+0526+  26AE 77                  LD      (HL),A          ;STORE A PLUS (+) SIGN
+0527+  26AF 6B                  LD      L,E             ;RESTORE L
+0528+  26B0             FLOAT:
+0529+  26B0 16 18               LD      D,24            ;ENTER HERE TO FLOAT INTEGER
+0530+  26B2                                             ;PRESERVING ORIGINAL SIGN IN (H,L)+3
+0531+  26B2                                             ;SET UP EXPONENT
+0532+  26B2 C3 8E 26            JP     FXL2             ;GO FLOAT THE NUMBER
+0533+  26B5             ;
+0534+  26B5             ;
+0535+  26B5             ;
+0536+  26B5             ;
+0537+  26B5             ;   SUBROUTINE ZCHK
+0538+  26B5             ;
+0539+  26B5             ;       THIS ROUTINE SETS THE ZERO FLAG IF IT DETECTS
+0540+  26B5             ;       A FLOATING ZERO AT (H,L).
+0541+  26B5             ;
+0542+  26B5             ;   SUBROUTINE ZMCHK
+0543+  26B5             ;
+0544+  26B5             ;       THIS ROUTINE SETS THE ZERO FLAG IF IT DETECTS A
+0545+  26B5             ;       ZERO MANTISSA AT (H,L)
+0546+  26B5             ;
+0547+  26B5             ZCHK:
+0548+  26B5             ZMCHK:
+0549+  26B5 2C                  INC     L               ;SET L TO POINT LAST BYTE OF MANTISSA
+0550+  26B6 2C                  INC     L               ;SET L TO POINT TO LAST BYTE OF MANTISSA
+0551+  26B7 7E                  LD      A,(HL)          ;LOAD LEAST SIGNIFICANT BYTE
+0552+  26B8 2D                  DEC     L               ;L POINTS TO MIDDLE BYTE
+0553+  26B9 B6                  OR      (HL)            ;OR WITH LEAST SIGNIFICANT BYTE
+0554+  26BA 2D                  DEC     L               ;L POINTS TO MOST SIGNIFICANT BYTE
+0555+  26BB                                             ;OF MANTISSA (ORIGINAL VALUE)
+0556+  26BB B6                  OR      (HL)            ;OR IN MOST SIGNIFICANT BYTE
+0557+  26BC C9                  RET                     ;RETURNS WITH ZERO FLAG SET APPROPRIATELY
+0558+  26BD             ;
+0559+  26BD             ;  SUBROUTINE BCHK
+0560+  26BD             ;
+0561+  26BD             ;       THIS ROUTINE CHECKS (H,B) FOR FLOATING PT ZERO
+0562+  26BD             ;
+0563+  26BD             BCHK:
+0564+  26BD 5D                  LD      E,L             ;SAVE LPTR IN E
+0565+  26BE 68                  LD      L,B             ;SET L=BPTR
+0566+  26BF CD B5 26            CALL    ZCHK            ;CHECK FOR ZERO
+0567+  26C2 6B                  LD      L,E             ;RESTORE L=LPTR
+0568+  26C3 C9                  RET                     ;RETURN
+0569+  26C4             ;
+0570+  26C4             ;
+0571+  26C4             ;   SUBROUTINE DLST
+0572+  26C4             ;
+0573+  26C4             ;       SHIFTS DBL WORD ONE PLACE LF
+0574+  26C4             DLST:
+0575+  26C4 2C                  INC     L
+0576+  26C5 2C                  INC     L               ;/***TP
+0577+  26C6 7E                  LD      A,(HL)          ;LOAD IT
+0578+  26C7 B7                  OR      A               ;KILL CARRY
+0579+  26C8 17                  RLA                     ;SHIFT IT LEFT
+0580+  26C9 77                  LD      (HL),A          ;STORE IT
+0581+  26CA 2D                  DEC     L
+0582+  26CB 7E                  LD      A,(HL)          ;LOAD IT
+0583+  26CC 17                  RLA                     ;SHIFT IT LEFT
+0584+  26CD             ;       IF CARRY SET BY FIRST SHIFT
+0585+  26CD             ;       IT WILL BE IN LSB OF SECOND
+0586+  26CD 77                  LD      (HL),A
+0587+  26CE 2D                  DEC     L               ;/***TP EXTENSION
+0588+  26CF 7E                  LD      A,(HL)
+0589+  26D0 17                  RLA
+0590+  26D1 77                  LD      (HL),A          ;/***ALL DONE TP
+0591+  26D2 C9                  RET
+0592+  26D3             ;
+0593+  26D3             ;
+0594+  26D3             ;   SUBROUTINE DRST
+0595+  26D3             ;
+0596+  26D3             ;       SHIFTS DOUBLE WORD ONE PLACE
+0597+  26D3             ;       TO THE RIGHT
+0598+  26D3             ;           DOES NOT AFFECT D
+0599+  26D3             ;
+0600+  26D3             DRST:
+0601+  26D3 5D                  LD      E,L             ;/***TP MODIFIED RIGHT SHIFT TP
+0602+  26D4 7E                  LD      A,(HL)          ;LOAD FIRST WORD
+0603+  26D5 1F                  RRA                     ;ROTATE IT RIGHT
+0604+  26D6 77                  LD      (HL),A          ;STORE IT
+0605+  26D7 2C                  INC     L               ;/*** TP
+0606+  26D8 7E                  LD      A,(HL)          ;LOAD SECOND WORD
+0607+  26D9 1F                  RRA                     ;SHIFT IT RIGHT
+0608+  26DA 77                  LD      (HL),A          ;STORE IT
+0609+  26DB 2C                  INC     L               ;/*** TP EXTENSION
+0610+  26DC 7E                  LD      A,(HL)
+0611+  26DD 1F                  RRA
+0612+  26DE 77                  LD      (HL),A
+0613+  26DF 6B                  LD      L,E             ;/***TP - ALL DONE TP
+0614+  26E0 C9                  RET
+0615+  26E1             ;
+0616+  26E1             ;
+0617+  26E1             ;   SUBROUTINE DADD
+0618+  26E1             ;
+0619+  26E1             ;       ADDS TWO DOUBLE PRECISION
+0620+  26E1             ;       WORDS, C=1 IF THERE IS OVRFLW
+0621+  26E1             ;
+0622+  26E1             DADD:
+0623+  26E1 5D                  LD      E,L             ;SAVE BASE IN E
+0624+  26E2 68                  LD      L,B             ;BASE \3 TO L
+0625+  26E3 2C                  INC     L               ;BASE \4 TO L
+0626+  26E4 2C                  INC     L               ;/***TP
+0627+  26E5 7E                  LD      A,(HL)          ;LOAD S MANTB
+0628+  26E6 6B                  LD      L,E             ;BASE TO L
+0629+  26E7 2C                  INC     L               ;BASE \1 TO L
+0630+  26E8 2C                  INC     L               ;/***TP
+0631+  26E9 86                  ADD     A,(HL)          ;ADD TWO MANTB]S
+0632+  26EA 77                  LD      (HL),A          ;STORE ANSWER
+0633+  26EB 68                  LD      L,B             ;/***TP EXTENSION
+0634+  26EC 2C                  INC     L
+0635+  26ED 7E                  LD      A,(HL)
+0636+  26EE 6B                  LD      L,E
+0637+  26EF 2C                  INC     L
+0638+  26F0 8E                  ADC     A,(HL)
+0639+  26F1 77                  LD      (HL),A          ;/***TP - ALL DONE
+0640+  26F2 68                  LD      L,B             ;BASE \3 TO L
+0641+  26F3 7E                  LD      A,(HL)          ;MANTA OF S TO A
+0642+  26F4 6B                  LD      L,E             ;BASE TO L
+0643+  26F5 8E                  ADC     A,(HL)          ;ADD WITH CARRY
+0644+  26F6 77                  LD      (HL),A          ;STORE ANSWER
+0645+  26F7 C9                  RET
+0646+  26F8             ;
+0647+  26F8             ;
+0648+  26F8             ;   SUBROUTINE DCLR
+0649+  26F8             ;
+0650+  26F8             ;       CLEARS TWO SUCCESSIVE
+0651+  26F8             ;       LOCATIONS OF MEMORY
+0652+  26F8             ;
+0653+  26F8             DCLR:
+0654+  26F8 AF                  XOR     A
+0655+  26F9 77                  LD      (HL),A
+0656+  26FA 2C                  INC     L
+0657+  26FB 77                  LD      (HL),A
+0658+  26FC 2C                  INC     L               ;/***TP EXTENSION
+0659+  26FD 77                  LD      (HL),A          ;/***TP ZERO 3
+0660+  26FE 2D                  DEC     L               ;/***TP - ALL DONE
+0661+  26FF 2D                  DEC     L
+0662+  2700 C9                  RET
+0663+  2701             ;
+0664+  2701             ;
+0665+  2701             ;       /*****ALL NEW DSUB - SHORTER***
+0666+  2701             ;
+0667+  2701             ;   SUBROUTINE DSUB
+0668+  2701             ;
+0669+  2701             ;       DOUBLE PRECISION SUBTRACT
+0670+  2701             ;
+0671+  2701             DSUB:
+0672+  2701 5D                  LD      E,L             ;SAVE BASE IN E
+0673+  2702 2C                  INC     L               ;/***TP EXTENSION
+0674+  2703 2C                  INC     L               ;/START WITH LOWS
+0675+  2704 7E                  LD      A,(HL)          ;/GET ARG
+0676+  2705 68                  LD      L,B             ;/NOW SET UP TO SUB
+0677+  2706 2C                  INC     L
+0678+  2707 2C                  INC     L
+0679+  2708 96                  SUB     (HL)            ;/NOW DO IT
+0680+  2709 6B                  LD      L,E             ;/NOW MUST PUT IT BACK
+0681+  270A 2C                  INC     L
+0682+  270B 2C                  INC     L
+0683+  270C 77                  LD      (HL),A          ;/PUT BACK
+0684+  270D 2D                  DEC     L               ;/***TP - ALL DONE
+0685+  270E 7E                  LD      A,(HL)          ;/GET LOW OF LOP
+0686+  270F 68                  LD      L,B             ;/SET TO BOP
+0687+  2710 2C                  INC     L               ;/SET TO BOP LOW
+0688+  2711 9E                  SBC     A,(HL)          ;/GET DIFF. OF LOWS
+0689+  2712 6B                  LD      L,E             ;/SAVE IN LOP LOW
+0690+  2713 2C                  INC     L               ;/TO LOP LOW
+0691+  2714 77                  LD      (HL),A          ;/INTO RAM
+0692+  2715 2D                  DEC     L               ;/BACK UP TO LOP HIGH
+0693+  2716 7E                  LD      A,(HL)          ;/GET LOP HIGH
+0694+  2717 68                  LD      L,B             ;/SET TO BOP HIGH
+0695+  2718 9E                  SBC     A,(HL)          ;/SUB. WITH CARRY
+0696+  2719 6B                  LD      L,E             ;/SAVE IN LOP HIGH
+0697+  271A 77                  LD      (HL),A          ;/INTO RAM
+0698+  271B C9                  RET                     ;/ALL DONE - MUCH SHORTER
+0699+  271C             ;
+0700+  271C             ;   SUBROUTINE GCHAR
+0701+  271C             ;
+0702+  271C             ;       THIS SUBROUTINE RETURNS THE EXPONENT OF
+0703+  271C             ;       THE FLOATING POINT NUMBER POINTED TO BY (H,L)
+0704+  271C             ;       IN THE A REGISTER WITH ITS SIGN EXTENDED INTO THE
+0705+  271C             ;       LEFTMOST BIT.
+0706+  271C             ;
+0707+  271C             ;   REGISTERS ON EXIT:
+0708+  271C             ;
+0709+  271C             ;       A = EXPONENT OF (H,L) WITH SIGN EXTENDED
+0710+  271C             ;       L = (ORIGINAL L) + 3
+0711+  271C             ;       B,C,D,E,H = SAME AS ON ENTRY
+0712+  271C             ;
+0713+  271C             GCHAR:
+0714+  271C 2C                  INC     L               ;MAKE (H,L) POINT TO CHAR
+0715+  271D 2C                  INC     L               ;MAKE (H,L) POINT TO CHAR
+0716+  271E 2C                  INC     L               ;MAKE (H,L) POINT TO CHAR
+0717+  271F 7E                  LD      A,(HL)          ;SET A=CHAR + MANTISSA SIGN
+0718+  2720 E6 7F               AND     $7F  ;177Q      ;GET RID OF MANTISSA SIGN BIT
+0719+  2722 C6 40               ADD     A,$40  ;100Q    ;PROPAGATE CHAR SIGN INTO LEFTMOST BIT
+0720+  2724 EE 40               XOR     $40  ;100Q      ;RESTORE ORIGINAL CHAR SIGN BIT
+0721+  2726 C9                  RET                     ;RETURN WITH (H,L) POINTING TO THE
+0722+  2727                                             ;CHAR = ORIGINAL (H,L)+3
+0723+  2727                                             ;SOMEONE ELSE WILL CLEAN UP
+0724+  2727             ;
+0725+  2727             ;
+0726+  2727             ;   SUBROUTINE CFCHE
+0727+  2727             ;
+0728+  2727             ;       THIS SUBROUTINE RETURNS THE CHARACTERISTICS OF THE
+0729+  2727             ;       FLOATING POINT NUMBERS POINTED TO BY (H,L) AND
+0730+  2727             ;       (H,B) IN THE A AND E REGISTERS RESPECTIVELY,
+0731+  2727             ;       WITH THEIR SIGNS EXTENDED INTO THE LEFTMOST BIT.
+0732+  2727             ;
+0733+  2727             ;   REGISTERS ON EXIT:
+0734+  2727             ;
+0735+  2727             ;       A = EXPONENT OF (H,L) WITH SIGN EXTENDED
+0736+  2727             ;       E = EXPONENT OF (H,B) WITH SIGN EXTENDED
+0737+  2727             ;       B,C,H,L = SAME AS ON ENTRY
+0738+  2727             ;       D = A
+0739+  2727             ;
+0740+  2727             CFCHE:
+0741+  2727 5D                  LD      E,L             ;SAVE LPTR IN E
+0742+  2728 68                  LD      L,B             ;SET L = BPTR
+0743+  2729 CD 1C 27            CALL    GCHAR           ;GET CHAR(H,B) WITH SIGN EXTENDED IN A
+0744+  272C 6B                  LD      L,E             ;RESTORE L = LPTR
+0745+  272D 5F                  LD      E,A             ;SET E=CHAR(H,B) WITH SIGN EXTENDED
+0746+  272E CD 1C 27            CALL    GCHAR           ;SET A=CHAR(H,L) WITH SIGN EXTENDED
+0747+  2731 2D                  DEC     L               ;RESTORE L = LPTR
+0748+  2732 2D                  DEC     L               ;RESTORE L = LPTR
+0749+  2733 2D                  DEC     L               ;RESTORE L = LPTR
+0750+  2734 57                  LD      D,A             ;SET D=A=CHAR(H,L) WITH SIGN EXTENDED
+0751+  2735 C9                  RET
+0752+  2736             ;
+0753+  2736             ;
+0754+  2736             ;   SUBROUTINE CCMP
+0755+  2736             ;
+0756+  2736             ;       THIS SUBROUTINE COMPARES THE CHARACTERISTICS OF
+0757+  2736             ;       FLOATING POINT NUMBERS POINTED TO BY (H,L) AND (H,B).
+0758+  2736             ;       THE ZERO FLIP-FLOP IS SET IF CHAR(H,L) EQUALS
+0759+  2736             ;       CHAR(H,B).  IF CHAR(H,L) IS LESS THAN CHAR(H,B) THEN
+0760+  2736             ;       THE CARRY BIT WILL BE SET.
+0761+  2736             ;
+0762+  2736             ;   REGISTERS ON EXIT:
+0763+  2736             ;
+0764+  2736             ;       A = EXPONENT OF (H,L) WITH SIGN EXTENDED
+0765+  2736             ;       E = EXPONENT OF (H,B) WITH SIGN EXTENDED
+0766+  2736             ;       D = A
+0767+  2736             ;       B,C,H,L = SAME AS ON ENTRY
+0768+  2736             ;
+0769+  2736             CCMP:
+0770+  2736 CD 27 27            CALL    CFCHE           ;FETCH CHARACTERISTICS WITH SIGN EXTENDED
+0771+  2739                                             ;INTO A (CHAR(H,L)) AND E (CHAR(H,B)) REGISTERS
+0772+  2739 57                  LD      D,A             ;SAVE CHAR (H,L)
+0773+  273A 93                  SUB     E               ;SUBTRACT E (CHAR(H,B))
+0774+  273B 17                  RLA                     ;ROTATE SIGN BIT INTO CARRY BIT
+0775+  273C 7A                  LD      A,D             ;RESTORE A=CHAR(H,L)
+0776+  273D C9                  RET                     ;RETURN
+0777+  273E             ;
+0778+  273E             ;   ERROR RETURNS
+0779+  273E             ;
+0780+  273E             ;       THE FOLLOWING CODE IS USED TO RETURN VARIOUS
+0781+  273E             ;       ERROR CONDITIONS.  IN EACH CASE A FLOATING POINT
+0782+  273E             ;       NUMBER IS STORED IN  THE 4 WORDS POINTED TO BY (H,L)
+0783+  273E             ;       AND A FLAG IS STORED IN THE ACCUMULATOR.
+0784+  273E             ;
+0785+  273E             ;       CONDITION   FLAG   RESULT (+)        RESULT (-)
+0786+  273E             ;
+0787+  273E             ;       UNDERFLOW    377   000 000 000 100   000 000 000 300
+0788+  273E             ;       OVERFLOW     177   377 377 377 077   377 377 377 277
+0789+  273E             ;       INDEFINITE   077   377 377 377 077   377 377 377 277
+0790+  273E             ;       NORMAL       000   XXX XXX XXX XXX   XXX XXX XXX XXX
+0791+  273E             ;       NORMAL ZERO  000   000 000 000 100   (ALWAYS RETURNS +0)
+0792+  273E             ;
+0793+  273E             ;   ENTRY POINTS:
+0794+  273E             ;
+0795+  273E             ;       WUND - WRITE UNDERFLOW
+0796+  273E             ;       WOVR - WRITE OVERFLOW
+0797+  273E             ;       WIND - WRITE INDEFINITE
+0798+  273E             ;       WZER - WRITE NORMAL ZERO
+0799+  273E             ;
+0800+  273E             
+0801+  273E             WUND:
+0802+  273E 16 40               LD      D,$40  ;100Q    ;LOAD EXPONENT INTO D REGISTER
+0803+  2740 CD 7A 27            CALL    WCHAR           ;WRITE EXPONENT
+0804+  2743             UFLW1:
+0805+  2743 3E 00               LD      A,0             ;LOAD MANTISSA VALUE
+0806+  2745                                             ;WE ASSUME HERE THAT ALL BYTES OF MANTISSA
+0807+  2745                                             ;ARE THE SAME
+0808+  2745 CD 73 27            CALL    WMANT           ;WRITE THE MANTISSA
+0809+  2748 3E FF               LD      A,$FF  ;377Q    ;SET ACCUMULATOR TO FLAG
+0810+  274A B7                  OR      A               ;SET FLAGS PROPERLY
+0811+  274B C9                  RET                     ;RETURN (WMANT RESTORED (H,L))
+0812+  274C             
+0813+  274C             WOVR:
+0814+  274C 16 3F               LD      D,$3F  ;77Q     ;LOAD EXPONENT INTO D REGISTER
+0815+  274E CD 7A 27            CALL    WCHAR           ;WRITE EXPONENT
+0816+  2751             OFLW1:
+0817+  2751 3E FF               LD      A,$FF  ;377Q    ;LOAD MANTISSA VALUE
+0818+  2753                                             ;WE ASSUME HERE THAT ALL BYTES OF MANTISSA
+0819+  2753                                             ;ARE THE SAME
+0820+  2753 CD 73 27            CALL    WMANT           ;WRITE THE MANTISSA
+0821+  2756 3E 7F               LD      A,$7F  ;177Q    ;SET ACCUMULATOR TO FLAG
+0822+  2758 B7                  OR      A               ;SET FLAGS PROPERLY
+0823+  2759 C9                  RET                     ;RETURN (WMANT RESTORED (H,L))
+0824+  275A             
+0825+  275A             WIND:
+0826+  275A 16 3F               LD      D,$3F  ;77Q     ;LOAD EXPONENT INTO D REGISTER
+0827+  275C CD 7A 27            CALL    WCHAR           ;WRITE EXPONENT
+0828+  275F             INDF1:
+0829+  275F 3E FF               LD      A,$FF  ;377Q    ;LOAD MANTISSA VALUE
+0830+  2761                                             ;WE ASSUME HERE THAT ALL BYTES OF MANTISSA
+0831+  2761                                             ;ARE THE SAME
+0832+  2761 CD 73 27            CALL    WMANT           ;WRITE THE MANTISSA
+0833+  2764 3E 3F               LD      A,$3F  ;77Q     ;SET ACCUMULATOR TO FLAG
+0834+  2766 B7                  OR      A               ;SET FLAGS PROPERLY
+0835+  2767 C9                  RET                     ;RETURN (WMANT RESTORED (H,L))
+0836+  2768             
+0837+  2768             WZER:
+0838+  2768 2C                  INC     L               ;WRITE NORMAL ZERO
+0839+  2769 2C                  INC     L               ;
+0840+  276A 2C                  INC     L               ;
+0841+  276B 36 40               LD      (HL),$40  ;100Q ;STORE EXPONENT FOR ZERO
+0842+  276D AF                  XOR     A               ;ZERO ACCUMULATOR
+0843+  276E CD 73 27            CALL    WMANT           ;STORE ZERO MANTISSA
+0844+  2771 B7                  OR      A               ;SET FLAGS PROPERLY
+0845+  2772 C9                  RET                     ;RETURN
+0846+  2773             ;
+0847+  2773             ; ROUTINE TO WRITE MANTISSA FOR ERROR RETURNS
+0848+  2773             ;
+0849+  2773             WMANT:
+0850+  2773 2D                  DEC     L               ;POINT LEAST SIGNIFICANT BYTE
+0851+  2774                                             ;OF MANTISSA
+0852+  2774 77                  LD      (HL),A          ;STORE LSBYTE OF MANTISSA
+0853+  2775 2D                  DEC     L               ;POINT TO NEXT LEAST SIGNIFICANT BYTE
+0854+  2776                                             ;OF MANTISSA
+0855+  2776 77                  LD      (HL),A          ;STORE NLSBYTE OF MANTISSA
+0856+  2777 2D                  DEC     L               ;POINT TO MOST SIGNIFICANT BYTE
+0857+  2778                                             ;OF MANTISSA
+0858+  2778 77                  LD      (HL),A          ;STORE MSBYTE OF MANTISSA
+0859+  2779 C9                  RET                     ;RETURN (H,L) POINTS TO BEGINNING OF
+0860+  277A                                             ;FLOATING POINT RESULT
+0861+  277A             ;
+0862+  277A             ; ROUTINE TO WRITE EXPONENT FOR ERROR RETURNS
+0863+  277A             ; NOTE:  WE PRESERVE ORIGINAL MANTISSA SIGN
+0864+  277A             ; ON ENTRY D CONTAINS NEW EXPONENT TO BE STORED.
+0865+  277A             ;
+0866+  277A             WCHAR:
+0867+  277A 2C                  INC     L               ;SET (H,L) TO POINT TO EXPONENT
+0868+  277B 2C                  INC     L               ;PART OF ABOVE
+0869+  277C 2C                  INC     L               ;PART OF ABOVE
+0870+  277D 7E                  LD      A,(HL)          ;LOAD EXPONENT A
+0871+  277E                                             ;AND MANTISSA SIGN
+0872+  277E E6 80               AND     $80  ;200Q      ;JUST KEEP MANTISSA SIGN
+0873+  2780 B2                  OR      D               ;OR IN NEW EXPONENT
+0874+  2781 77                  LD      (HL),A          ;STORE IT BACK
+0875+  2782 C9                  RET                     ;RETURN WITH (H,L) POINT TO EXPONENT
+0876+  2783                                             ;OF RESULT
+0877+  2783                                             ;SOMEONE ELSE WILL FIX UP (H,L)
+0878+  2783             ;
+0879+  2783             ;   SUBROUTINE INDFC
+0880+  2783             ;
+0881+  2783             ;       THIS ROUTINE WRITES A FLOATING INDEFINITE, SETS
+0882+  2783             ;       THIS WRITES WRITES A FLOATING POINT INDEFINITE
+0883+  2783             ;       AT (H,C), SETS THE CONDITION FLAG AND RETURNS
+0884+  2783             ;
+0885+  2783             ;
+0886+  2783             INDFC:
+0887+  2783 5D                  LD      E,L             ;SAVE LPTR IN E
+0888+  2784 69                  LD      L,C             ;SET L=CPTR SO (H,L)-ADDR OF RESULT
+0889+  2785 CD 5A 27            CALL    WIND            ;WRITE INDEFINITE
+0890+  2788 6B                  LD      L,E             ;RESTORE L=LPTR
+0891+  2789 C9                  RET                     ;RETURN
+0892+  278A             ;
+0893+  278A             ;
+0894+  278A             ;   SUBROUTINE WZERC
+0895+  278A             ;
+0896+  278A             ;       THIS ROUTINE WRITES A NORMAL FLOATING POINT ZERO
+0897+  278A             ;       AT (H,C), SETS THE CONDITION FLAG AND RETURNS
+0898+  278A             ;
+0899+  278A             WZERC:
+0900+  278A 5D                  LD      E,L             ;SAVE LPTR IN E
+0901+  278B 69                  LD      L,C             ;SETL=CPTR SO (H,L)=ADDR OF RESULT
+0902+  278C CD 68 27            CALL    WZER            ;WRITE NORMAL ZERO
+0903+  278F 6B                  LD      L,E             ;RESTORE L=LPTR
+0904+  2790 C9                  RET                     ;RETURN
+0905+  2791             ;
+0906+  2791             ;   SUBROUTINE INCR
+0907+  2791             ;
+0908+  2791             ;       THIS SUBROUTINE INCREMENTS THE EXPONENT
+0909+  2791             ;       OF THE FLOATING POINT NUMBER POINTED TO BY (H,L).
+0910+  2791             ;       WE TEST FOR OVERFLOW AND SET APPROPRIATE FLAG.
+0911+  2791             ;       (SEE ERROR RETURNS).
+0912+  2791             ;
+0913+  2791             ;   REGISTERS ON EXIT:
+0914+  2791             ;
+0915+  2791             ;        A = CONDITION FLAG (SEE ERROR RETURNS)
+0916+  2791             ;        D = CLOBBERED
+0917+  2791             ;        B,C,H,L = SAME AS ON ENTRY
+0918+  2791             ;
+0919+  2791             INCR:
+0920+  2791 CD 1C 27            CALL    GCHAR           ;GET CHAR WITH SIGN EXTENDED
+0921+  2794 FE 3F               CP      MAXCH           ;COMPARE WITH MAX CHAR PERMITTED
+0922+  2796 CA 51 27            JP      Z,OFLW1         ;INCREMENT WOULD CAUSE OVERFLOW
+0923+  2799 57                  LD      D,A             ;SAVE IT IN D
+0924+  279A 14                  INC     D               ;INCREMENT IT
+0925+  279B C3 A1 27            JP      INCR2           ;JUMP AROUND ALTERNATE ENTRY POINT
+0926+  279E             
+0927+  279E             INCR3:
+0928+  279E 2C                  INC     L               ;COME HERE TO STORE EXPONENT
+0929+  279F 2C                  INC     L               ;POINT (H,L) TO CHAR
+0930+  27A0 2C                  INC     L               ;POINT (H,L) TO CHAR
+0931+  27A1             INCR2:
+0932+  27A1 3E 7F               LD      A,$7F  ;177Q
+0933+  27A3 A2                  AND     D               ;KILL SIGN BIT
+0934+  27A4 57                  LD      D,A             ;BACK TO D
+0935+  27A5 7E                  LD      A,(HL)          ;NOW SIGN IT
+0936+  27A6 E6 80               AND     $80  ;200Q      ;GET MANTISSA SIGN
+0937+  27A8 B2                  OR      D               ;PUT TOGETHER
+0938+  27A9 77                  LD      (HL),A          ;STORE IT BACK
+0939+  27AA 2D                  DEC     L               ;NOW BACK TO BASE
+0940+  27AB 2D                  DEC     L               ;/***TP
+0941+  27AC 2D                  DEC     L
+0942+  27AD             SCCFG:
+0943+  27AD AF                  XOR     A               ;SET SUCCESS FLAG
+0944+  27AE C9                  RET
+0945+  27AF             ;
+0946+  27AF             ;   SUBROUTINE DECR
+0947+  27AF             ;
+0948+  27AF             ;       THIS SUBROUTINE DECREMENTS THE EXPONENT
+0949+  27AF             ;       OF THE FLOATING POINT NUMBER POINTED TO BY (H,L).
+0950+  27AF             ;       WE TEST FOR UNDERFLOW AND SET APPROPRIATE FLAG.
+0951+  27AF             ;       (SEE ERROR RETURNS).
+0952+  27AF             ;
+0953+  27AF             ;   REGISTERS ON EXIT:
+0954+  27AF             ;
+0955+  27AF             ;        A = CONDITION FLAG (SEE ERROR RETURNS)
+0956+  27AF             ;        D = CLOBBERED
+0957+  27AF             ;        B,C,H,L = SAME AS ON ENTRY
+0958+  27AF             ;
+0959+  27AF             DECR:
+0960+  27AF CD 1C 27            CALL    GCHAR           ;GET CHAR WITH SIGN EXTENDED
+0961+  27B2 FE C0               CP      MINCH           ;COMPARE WITH MIN CHAR PERMITTED
+0962+  27B4 CA 43 27            JP      Z,UFLW1         ;DECREMENT WOULD CAUSE UNDERFLOW
+0963+  27B7 57                  LD      D,A             ;SAVE EXPONENT IN D
+0964+  27B8 15                  DEC     D               ;DECREMENT EXPONENT
+0965+  27B9 C3 A1 27            JP      INCR2           ;GO STORE IT BACK
+0966+  27BC             ;
+0967+  27BC             ;   SUBROUTINE AORS
+0968+  27BC             ;
+0969+  27BC             ;       RETURN S=1 IF BASE 6
+0970+  27BC             ;       HAS A 1 IN MSB
+0971+  27BC             ;
+0972+  27BC             AORS:
+0973+  27BC 5D                  LD      E,L             ;SAVE BASE
+0974+  27BD 69                  LD      L,C             ;BASE 6 TO L
+0975+  27BE 7E                  LD      A,(HL)          ;LOAD IT
+0976+  27BF B7                  OR      A               ;SET FLAGS
+0977+  27C0 6B                  LD      L,E             ;RESTORE BASE
+0978+  27C1 C9                  RET
+0979+  27C2             ;
+0980+  27C2             ;
+0981+  27C2             ;   SUBROUTINE TSTR
+0982+  27C2             ;
+0983+  27C2             ;       CHECKS C PTR TO SEE IF
+0984+  27C2             ;       NLSB !
+0985+  27C2             ;       RETURNS Z=1 IF NOT
+0986+  27C2             ;       DESTROYS E,D
+0987+  27C2             ;
+0988+  27C2             TSTR:
+0989+  27C2 5D                  LD      E,L             ;SAVE BASE
+0990+  27C3 69                  LD      L,C             ;C PTR TO L
+0991+  27C4 16 02               LD      D,2             ;MASK TO D
+0992+  27C6 7E                  LD      A,(HL)          ;LOAD VALUE
+0993+  27C7 6B                  LD      L,E             ;RESTORE BASE
+0994+  27C8 A2                  AND     D               ;AND VALUE WITH MASK
+0995+  27C9 C9                  RET
+0996+  27CA             ;
+0997+  27CA             ;
+0998+  27CA             ;   SUBROUTINE ACPR
+0999+  27CA             ;
+1000+  27CA             ;       STORES A IN LOCATION OF CPTR
+1001+  27CA             ;       LPTR IN E
+1002+  27CA             ;
+1003+  27CA             ACPR:
+1004+  27CA 5D                  LD      E,L             ;SAVE LPTR
+1005+  27CB 69                  LD      L,C             ;CPTR TO L
+1006+  27CC 77                  LD      (HL),A          ;STORE A
+1007+  27CD 6B                  LD      L,E             ;RESTORE BASE
+1008+  27CE C9                  RET
+1009+  27CF             ;
+1010+  27CF             ;
+1011+  27CF             ;   SUBROUTINE DCMP
+1012+  27CF             ;
+1013+  27CF             ;       COMPARES TWO DOUBLE LENGTH
+1014+  27CF             ;       WORDS
+1015+  27CF             ;
+1016+  27CF             DCMP:
+1017+  27CF 7E                  LD      A,(HL)          ;NUM MANTA TO A
+1018+  27D0 5D                  LD      E,L             ;SAVE BASE IN E
+1019+  27D1 68                  LD      L,B             ;BASE 3 TO L
+1020+  27D2 BE                  CP      (HL)            ;COMPARE WITH DEN MANTA
+1021+  27D3 6B                  LD      L,E             ;RETURN BASE TO L
+1022+  27D4 C0                  RET     NZ              ;RETURN IF NOT THE SAME
+1023+  27D5 2C                  INC     L               ;L TO NUM MANTB
+1024+  27D6 7E                  LD      A,(HL)          ;LOAD IT
+1025+  27D7 68                  LD      L,B             ;DEN MANTB ADD TO L
+1026+  27D8 2C                  INC     L               ;BASE 4 TO L
+1027+  27D9 BE                  CP      (HL)
+1028+  27DA 6B                  LD      L,E
+1029+  27DB C0                  RET     NZ              ;/***TP EXTENSION
+1030+  27DC 2C                  INC     L               ;NOW CHECK BYTE 3
+1031+  27DD 2C                  INC     L
+1032+  27DE 7E                  LD      A,(HL)          ;GET FOR COMPARE
+1033+  27DF 68                  LD      L,B
+1034+  27E0 2C                  INC     L
+1035+  27E1 2C                  INC     L               ;BYTE 3 NOW
+1036+  27E2 BE                  CP      (HL)            ;COMPARE
+1037+  27E3 6B                  LD      L,E             ;/***TP - ALL DONE
+1038+  27E4 C9                  RET
+1039+  27E5             ;
+1040+  27E5             ;
+1041+  27E5             ;   SUBROUTINE DIVC
+1042+  27E5             ;
+1043+  27E5             ;       PERFORMS ONE CYCLE OF DOUBLE
+1044+  27E5             ;       PRECISION FLOATING PT DIVIDE
+1045+  27E5             ;       ENTER AT ENT1 ON FIRST CYCLE
+1046+  27E5             ;       ENTER AT ENT2 ALL THEREAFTER
+1047+  27E5             ;
+1048+  27E5             ENT2:
+1049+  27E5 CD C4 26            CALL    DLST            ;SHIFT MOVING DIVIDEND
+1050+  27E8 DA F2 27            JP      C,OVER          ;IF CARRY=1,NUM.GT.D
+1051+  27EB             ENT1:
+1052+  27EB CD CF 27            CALL    DCMP            ;COMPARE NUM WITH DEN
+1053+  27EE D2 F2 27            JP      NC,OVER         ;IF CARRY NOT SET,NUM.GE.DEN
+1054+  27F1 C9                  RET
+1055+  27F2             OVER:
+1056+  27F2 CD 01 27            CALL    DSUB            ;CALL DOUBLE SUBTRACT
+1057+  27F5 5D                  LD      E,L             ;SAVE BASE IN E
+1058+  27F6 69                  LD      L,C             ;BASE 6 TO L
+1059+  27F7 2C                  INC     L               ;BASE 7 TO L
+1060+  27F8 2C                  INC     L               ;/***TP
+1061+  27F9 7E                  LD      A,(HL)
+1062+  27FA C6 01               ADD     A,1             ;ADD 1
+1063+  27FC 77                  LD      (HL),A          ;PUT IT BACK
+1064+  27FD 6B                  LD      L,E             ;RESTORE BASE TO L
+1065+  27FE C9                  RET
+1066+  27FF             ;
+1067+  27FF             ;
+1068+  27FF             ;   SUBROUTINE LXFR
+1069+  27FF             ;
+1070+  27FF             ;       MOVES CPTR TO EPTR
+1071+  27FF             ;       MOVES 3 WORDS IF ENTER AT LXFR
+1072+  27FF             ;
+1073+  27FF             LXFR:
+1074+  27FF 16 04               LD      D,4             ;MOVE 4 WORDS
+1075+  2801             REP5:
+1076+  2801 69                  LD      L,C             ;CPTR TO L
+1077+  2802 7E                  LD      A,(HL)             ;CPTR> TO A
+1078+  2803 6B                  LD      L,E             ;EPTR TO L
+1079+  2804 77                  LD      (HL),A
+1080+  2805 0C                  INC     C               ;INCREMENT C
+1081+  2806 1C                  INC     E               ;INCREMENT E TO NEXT
+1082+  2807 15                  DEC     D               ;TEST FOR DONE
+1083+  2808 C2 01 28            JP      NZ,REP5         ;GO FOR FOR TILL D=0
+1084+  280B 7B                  LD      A,E             ;NOW RESET C AND E
+1085+  280C D6 04               SUB     4               ;RESET BACK BY 4
+1086+  280E 5F                  LD      E,A             ;PUT BACK IN E
+1087+  280F 79                  LD      A,C             ;NOW RESET C
+1088+  2810 D6 04               SUB     4               ;BY 4
+1089+  2812 4F                  LD      C,A             ;BACK TO C
+1090+  2813 C9                  RET                     ;DONE
+1091+  2814             ;
+1092+  2814             ;   SUBROUTINE LDCP
+1093+  2814             ;
+1094+  2814             ;       THIS SUBROUTINE COMPUTES THE EXPONENT
+1095+  2814             ;       FOR THE FLOATING DIVIDE ROUTINE
+1096+  2814             ;
+1097+  2814             ;   REGISTERS ON EXIT:
+1098+  2814             ;
+1099+  2814             ;       A = CONDITION FLAG (SEE ERROR RETURNS)
+1100+  2814             ;       D,E = GARBAGE
+1101+  2814             ;       B,C,H,L = SAME AS ON ENTRY
+1102+  2814             ;
+1103+  2814             ;   REGISTERS ON ENTRY:
+1104+  2814             ;
+1105+  2814             ;       (H,B) = ADDRESS OFF DIVISOR
+1106+  2814             ;       (H,C) = ADDRESS OF QUOTIENT
+1107+  2814             ;       (H,L) = ADDRESS OF DIVIDEND
+1108+  2814             ;
+1109+  2814             LDCP:
+1110+  2814 CD 27 27            CALL    CFCHE           ;SET E=CHAR(H,B), A=CHAR(H,L)
+1111+  2817 93                  SUB     E               ;SUBTRACT TO GET NEW EXPONENT
+1112+  2818 C3 1F 28            JP      CCHK            ;GO CHECK FOR OVER/UNDERFLOW
+1113+  281B                                             ;AND STORE EXPONENT
+1114+  281B             ;
+1115+  281B             ;
+1116+  281B             ;   SUBROUTINE LMCP
+1117+  281B             ;
+1118+  281B             ;       THIS SUBROUTINE COMPUTES THE EXPONENT
+1119+  281B             ;       FOR THE FLOATING MULTIPLY ROUTINE.
+1120+  281B             ;
+1121+  281B             ;   REGISTERS ON EXIT:
+1122+  281B             ;
+1123+  281B             ;       A = CONDITION FLAG (SEE ERROR RETURNS)
+1124+  281B             ;       D,E = GARBAGE
+1125+  281B             ;       B,C,H,L = SAME AS ON ENTRY
+1126+  281B             ;
+1127+  281B             ;   REGISTERS ON ENTRY:
+1128+  281B             ;
+1129+  281B             ;       (H,B) = ADDRESS OFF MULTIPLICAND
+1130+  281B             ;       (H,C) = ADDRESS OF PRODUCT
+1131+  281B             ;       (H,L) = ADDRESS OF MULTIPLIER
+1132+  281B             ;
+1133+  281B             LMCP:
+1134+  281B CD 27 27            CALL    CFCHE           ;SET E=CHAR(H,B), A=CHAR(H,L)
+1135+  281E 83                  ADD     A,E             ;ADD TO GET NEW EXPONENT
+1136+  281F                                             ;NOW FALL INTO THE ROUTINE
+1137+  281F                                             ;WHICH CHECKS FOR OVER/UNDERFLOW
+1138+  281F                                             ;AND STORE EXPONENT
+1139+  281F             ;
+1140+  281F             ;
+1141+  281F             ;   SUBROUTINE CCHK
+1142+  281F             ;
+1143+  281F             ;       THIS SUBROUTINE CHECKS A EXPONENT IN
+1144+  281F             ;       THE ACCUMULATOR FOR OVERFLOW OR UNDERFLOW.
+1145+  281F             ;       IT THEN STORES THE EXPONENT, PRESERVING
+1146+  281F             ;       THE PREVIOUSLY COMPUTED MANTISSA SIGN.
+1147+  281F             ;
+1148+  281F             ;  REGISTERS ON ENTRY:
+1149+  281F             ;
+1150+  281F             ;       (H,L) = ADDRESS OF ONE OPERAND
+1151+  281F             ;       (H,B) = ADDRESS OF OTHER OPERAND
+1152+  281F             ;       (H,C) = ADDRESS OF RESULT
+1153+  281F             ;       A     = NEW EXPONENT OF  RESULT
+1154+  281F             ;
+1155+  281F             ;   REGISTERS ON EXIT:
+1156+  281F             ;
+1157+  281F             ;       A = CONDITION FLAG (SEE ERROR RETURNS)
+1158+  281F             ;       D,E = GARBAGE
+1159+  281F             ;       B,C,H,L = SAME AS ON ENTRY
+1160+  281F             ;
+1161+  281F             CCHK:                           ;ENTER HERE TO CHECK EXPONENT
+1162+  281F FE 40               CP      $40  ;100Q      ;CHECK FOR 0 TO +63
+1163+  2821 DA 2E 28            JP      C,STORC         ;JUMP IF OKAY
+1164+  2824 FE 80               CP      $80  ;200Q      ;CHECK FOR +64 TO +127
+1165+  2826 DA 36 28            JP      C,OFLWC         ;JUMP IF OVERFLOW
+1166+  2829 FE C0               CP      $C0  ;300Q      ;CHECK FOR -128 TO -65
+1167+  282B DA 3D 28            JP      C,UFLWC         ;JUMP IF UNDERFLOW
+1168+  282E             STORC:
+1169+  282E 5D                  LD      E,L             ;SAVE L IN E
+1170+  282F 69                  LD      L,C             ;LET L POINT TO RESULT
+1171+  2830 57                  LD      D,A             ;SAVE EXPONENT IN D
+1172+  2831 CD 9E 27            CALL    INCR3           ;STORE EXPONENT
+1173+  2834 6B                  LD      L,E             ;RESTORE L
+1174+  2835 C9                  RET                     ;RETURN
+1175+  2836             ;
+1176+  2836             ;   SUBROUTINE OFLWC
+1177+  2836             ;
+1178+  2836             ;       THIS ROUTINE WRITES A FLOATING POINT OVERFLOW AT (H,C)
+1179+  2836             ;       SETS THE CONDITION FLAG, AND RETURNS.
+1180+  2836             ;
+1181+  2836             OFLWC:
+1182+  2836 5D                  LD      E,L             ;SAVE L IN E
+1183+  2837 69                  LD      L,C             ;SET L=CPTR, SO (H,L)=ADDR OF RESULT
+1184+  2838 CD 4C 27            CALL    WOVR            ;WRITE OUT OVERFLOW
+1185+  283B 6B                  LD      L,E             ;RESTORE L
+1186+  283C C9                  RET                     ;RETURN
+1187+  283D             ;
+1188+  283D             ;   SUBROUTINE UFLWC
+1189+  283D             ;
+1190+  283D             ;       THIS ROUTINE WRITES A FLOATING POINT UNDERFLOW AT (H,C)
+1191+  283D             ;       SETS THE CONDITION FLAG, AND RETURNS.
+1192+  283D             ;
+1193+  283D             UFLWC:
+1194+  283D 5D                  LD      E,L             ;SAVE L IN E
+1195+  283E 69                  LD      L,C             ;SET L=CPTR, SO (H,L)=ADDR OF RESULT
+1196+  283F CD 3E 27            CALL    WUND            ;WRITE OUT UNDERFLOW
+1197+  2842 6B                  LD      L,E             ;RESTORE L
+1198+  2843 C9                  RET                     ;RETURN
+1199+  2844             ;
+1200+  2844             ;
+1201+  2844             ;   SUBROUTINE CSIGN
+1202+  2844             ;
+1203+  2844             ;       THIS SUBROUTINE COMPUTES AND STORE THE MANTISSA
+1204+  2844             ;       SIGN FOR THE FLOATING MULTIPLY AND DIVIDE ROUTINES
+1205+  2844             ;
+1206+  2844             ;   REGISTERS ON ENTRY:
+1207+  2844             ;
+1208+  2844             ;       (H,L) = ADDRESS OF ONE OPERAND
+1209+  2844             ;       (H,B) = ADDRESS OF OTHER OPERAND
+1210+  2844             ;       (H,C) = ADDRESS OF RESULT
+1211+  2844             ;
+1212+  2844             ;   REGISTERS ON EXIT:
+1213+  2844             ;
+1214+  2844             ;       A,D,E = GARBAGE
+1215+  2844             ;       B,C,H,L = SAME AS ON ENTRY
+1216+  2844             ;
+1217+  2844             ;
+1218+  2844             CSIGN:
+1219+  2844 CD 54 28            CALL    MSFH            ;SET A=SIGN(H,L), E=SIGN(H,B)
+1220+  2847 AB                  XOR     E               ;EXCLUSIVE OR SIGNS TO GET NEW SIGN
+1221+  2848 CD 4C 28            CALL    CSTR            ;STORE SIGN INTO RESULT
+1222+  284B C9                  RET                     ;RETURN
+1223+  284C             ;
+1224+  284C             ;
+1225+  284C             ;   SUBROUTINE CSTR
+1226+  284C             ;
+1227+  284C             ;       STORES VALUE IN A IN
+1228+  284C             ;       CPTR 2
+1229+  284C             ;       PUTS LPTR IN E
+1230+  284C             ;
+1231+  284C             CSTR:
+1232+  284C 5D                  LD      E,L             ;SAVE LPTR IN E
+1233+  284D 69                  LD      L,C             ;CPTR TO L
+1234+  284E 2C                  INC     L               ;CPTR\2
+1235+  284F 2C                  INC     L               ;TO L
+1236+  2850 2C                  INC     L               ;/***TP
+1237+  2851 77                  LD      (HL),A          ;STORE ANSWER
+1238+  2852 6B                  LD      L,E             ;LPTR BACK TO L
+1239+  2853 C9                  RET
+1240+  2854             ;
+1241+  2854             ;   SUBROUTINE MSFH
+1242+  2854             ;
+1243+  2854             ;       THIS SUBROUTINE FETCHES THE SIGNS OF THE MANTISSAS
+1244+  2854             ;       OF THE FLOATING POINT NUMBERS POINTED TO BY (H,L)
+1245+  2854             ;       AND (H,B) INTO THE A AND E REGISTERS RESPECTIVELY.
+1246+  2854             ;
+1247+  2854             ;   REGISTERS ON EXIT:
+1248+  2854             ;
+1249+  2854             ;       A = SIGN  OF MANTISSA OF (H,L)
+1250+  2854             ;       E = SIGN OF MANTISSA OF (H,B)
+1251+  2854             ;       B,C,D,H,L = SAME AS ON ENTRY
+1252+  2854             ;
+1253+  2854             MSFH:
+1254+  2854 5D                  LD      E,L             ;SAVE LPTR
+1255+  2855 68                  LD      L,B             ;BPTR TO L
+1256+  2856 2C                  INC     L               ;BPTR\2
+1257+  2857 2C                  INC     L               ;/***TP
+1258+  2858 2C                  INC     L               ;TO L
+1259+  2859 7E                  LD      A,(HL)          ;BPTR 2>TO A
+1260+  285A E6 80               AND     128             ;SAVE MANT SIGN
+1261+  285C 6B                  LD      L,E             ;LPTR BACK TO L
+1262+  285D 5F                  LD      E,A             ;STORE BPTR MANT SIGN
+1263+  285E 2C                  INC     L               ;LPTR\2
+1264+  285F 2C                  INC     L               ;/***TP
+1265+  2860 2C                  INC     L               ;TO L
+1266+  2861 7E                  LD      A,(HL)          ;LPTR\2>TO A
+1267+  2862 E6 80               AND     128             ;SAVE LPTR MANT SIGN
+1268+  2864 2D                  DEC     L               ;LPTR BACK
+1269+  2865 2D                  DEC     L               ;TO L
+1270+  2866 2D                  DEC     L               ;/***TP
+1271+  2867 C9                  RET
+1272+  2868             ;
+1273+  2868             ;
+1274+  2868             ;   SUBROUTINE BCTL
+1275+  2868             ;
+1276+  2868             ;           MOVES BPTR CHAR TO LPTR CHAR
+1277+  2868             ;           DESTROYS E
+1278+  2868             ;
+1279+  2868             BCTL:
+1280+  2868 5D                  LD      E,L             ;LPTR TO E
+1281+  2869 68                  LD      L,B             ;BPTR TO L
+1282+  286A 2C                  INC     L               ;BPTR 2
+1283+  286B 2C                  INC     L               ;/***TP
+1284+  286C 2C                  INC     L               ;TO L
+1285+  286D 7E                  LD      A,(HL)          ;BPTR CHAR TO A
+1286+  286E 6B                  LD      L,E             ;LPTR TO L
+1287+  286F 2C                  INC     L               ;LPTR 2
+1288+  2870 2C                  INC     L               ;TO L
+1289+  2871 2C                  INC     L               ;/***TP
+1290+  2872 77                  LD      (HL),A          ;STORE BPTR CHAR IN LPTR CHAR
+1291+  2873 6B                  LD      L,E             ;LPTR TO L
+1292+  2874 C9                  RET
+1293+  2875             ;
+1294+  2875             ;HRJ for some reason the square root routine was not included
+1295+  2875             ;
+1296+  2875             ;
+1297+  2875             ;       SUBROUTINE DSQRT
+1298+  2875             ;
+1299+  2875             ;       THE L REG PTS TO THE    TO BE
+1300+  2875             ;       OPERATED ON.
+1301+  2875             ;       THE B REG PTS TO THE LOC WHERE
+1302+  2875             ;       THE RESULT IS TO BE STORED
+1303+  2875             ;       THE C REG PTS TO 17(10) SCRATCH 
+1304+  2875             ;       AREA.
+1305+  2875             ;       WHERE:
+1306+  2875             ;       C = ITERATION COUNT
+1307+  2875             ;       C+1 = L REG
+1308+  2875             ;       C+2 = B REG
+1309+  2875             ;       C+3 TO C+6 = INTRL REG 1
+1310+  2875             ;       C+7 TO C+10 = INTRL REG 2
+1311+  2875             ;       C+11 TO C+14 = INTRL REG 3
+1312+  2875             ;       C+15 = 
+1313+  2875             ;
+1314+  2875             DSQRT:
+1315+  2875 7D                  LD      A,L             ;STORE L IN
+1316+  2876 69                  LD      L,C             ;2ND WRD SCRATCH
+1317+  2877 36 00               LD      (HL),0          ;INITIALIZE ITER COUNT
+1318+  2879 2C                  INC     L
+1319+  287A 77                  LD      (HL),A
+1320+  287B 2C                  INC     L               ;STR B IN 3RD
+1321+  287C 70                  LD      (HL),B          ;WRD OF SCRATCH
+1322+  287D 2C                  INC     L               ;SET C TO INTRL
+1323+  287E 4D                  LD      C,L             ;REG I
+1324+  287F 6F                  LD      L,A             ;SET L PRT AT
+1325+  2880 7C                  LD      A,H             ;SET REGS FOR COPY
+1326+  2881 CD 63 2A            CALL    COPY            ;COPY TC INTRL REG1
+1327+  2884 CD 01 2A            CALL    GCHR            ;PUT CHR IN A
+1328+  2887 47                  LD      B,A             ;MAKE COPY
+1329+  2888 E6 80               AND     $80  ;200Q      ;OK NEG
+1330+  288A C2 F4 28            JP      NZ,ERSQ
+1331+  288D 78                  LD      A,B
+1332+  288E E6 40               AND     $40  ;100Q      ;OK NEG EXP
+1333+  2890 78                  LD      A,B
+1334+  2891 CA 9D 28            JP      Z,EPOS
+1335+  2894 1F                  RRA                     ;DIV BY 2
+1336+  2895 E6 7F               AND     $7F  ;177Q
+1337+  2897 F6 40               OR      $40  ;100Q      ;SET SIGN BIT
+1338+  2899 77                  LD      (HL),A          ;SAVE 1ST APPROX
+1339+  289A C3 A1 28            JP      AGN4
+1340+  289D             
+1341+  289D             EPOS:
+1342+  289D 1F                  RRA                     ;DIV BY 2
+1343+  289E E6 7F               AND     $7F  ;177Q
+1344+  28A0 77                  LD      (HL),A          ;SAVE 1ST APPROX
+1345+  28A1             AGN4:
+1346+  28A1 69                  LD      L,C             ;SET REGS
+1347+  28A2 79                  LD      A,C             ;TO COPY 1ST
+1348+  28A3 C6 04               ADD     A,4             ;APPROX
+1349+  28A5 4F                  LD      C,A             ;INTO INTRL REG 2
+1350+  28A6 7C                  LD      A,H             ;FRM INTRL REG1
+1351+  28A7 CD 63 2A            CALL    COPY
+1352+  28AA 79                  LD      A,C
+1353+  28AB D6 04               SUB     4               ;MULTIPLY INTRL REG 1
+1354+  28AD 6F                  LD      L,A
+1355+  28AE 41                  LD      B,C             ;TIME INTRL REG2
+1356+  28AF C6 08               ADD     A,$8  ;10Q      ;PLACE RESULT IN
+1357+  28B1 4F                  LD      C,A             ;INMTRL REG 3
+1358+  28B2 CD 3A 26            CALL    LMUL
+1359+  28B5 79                  LD      A,C
+1360+  28B6 D6 08               SUB     $8  ;10Q        ;COPY ORG INTO
+1361+  28B8 4F                  LD      C,A             ;INTRL REG 1
+1362+  28B9 D6 02               SUB     2
+1363+  28BB 6F                  LD      L,A
+1364+  28BC 6E                  LD      L,(HL)
+1365+  28BD 7C                  LD      A,H
+1366+  28BE CD 63 2A            CALL    COPY
+1367+  28C1 79                  LD      A,C
+1368+  28C2 C6 08               ADD     A,$8  ;10Q      ;ADD INTRL
+1369+  28C4 6F                  LD      L,A             ;REG3 OT
+1370+  28C5 41                  LD      B,C             ;INTRL REG1
+1371+  28C6 C6 04               ADD     A,4             ;ANS TO INTRL
+1372+  28C8 4F                  LD      C,A             ;REG3
+1373+  28C9 CD 37 25            CALL    LADD
+1374+  28CC 7D                  LD      A,L
+1375+  28CD D6 04               SUB     4               ;DIV INTRL REG 3
+1376+  28CF 47                  LD      B,A             ;BY INTRL REG 2
+1377+  28D0 D6 04               SUB     4               ;PUT ANSR IN INTRL
+1378+  28D2 4F                  LD      C,A             ;REG1
+1379+  28D3 CD DB 24            CALL    LDIV
+1380+  28D6 CD 01 2A            CALL    GCHR
+1381+  28D9 D6 01               SUB     1
+1382+  28DB E6 7F               AND     $7F  ;177Q
+1383+  28DD 77                  LD      (HL),A
+1384+  28DE 79                  LD      A,C
+1385+  28DF D6 03               SUB     3               ;C PTS TO INTRL REG 1
+1386+  28E1 6F                  LD      L,A             ;GET INTR
+1387+  28E2 46                  LD      B,(HL)             ;COUNT NOW INCR
+1388+  28E3 04                  INC     B
+1389+  28E4 70                  LD      (HL),B
+1390+  28E5 78                  LD      A,B
+1391+  28E6 FE 05               CP      5               ;IF = 5 RTN ANS
+1392+  28E8 C2 A1 28            JP      NZ,AGN4         ;OTHERWISE CONT
+1393+  28EB 69                  LD      L,C
+1394+  28EC             ALDN:
+1395+  28EC 2D                  DEC     L               ;COPY ANS INTO
+1396+  28ED 4E                  LD      C,(HL)          ;LOC REQUESTED
+1397+  28EE 2C                  INC     L
+1398+  28EF 7C                  LD      A,H
+1399+  28F0 CD 63 2A            CALL    COPY
+1400+  28F3 C9                  RET
+1401+  28F4             
+1402+  28F4             ERSQ:
+1403+  28F4 69                  LD      L,C
+1404+  28F5 CD 68 27            CALL    WZER            ;WRITE A FLOATING ZERO
+1405+  28F8 C3 EC 28            JP      ALDN
+1406+  28FB             ;                        ; C+1 = L REG
+1407+  28FB             ;
+1408+  28FB             ;******************************************************
+1409+  28FB             ;       //// 5 DIGIT FLOATING PT. OUTPUT
+1410+  28FB             ;******************************************************
+1411+  28FB             ;
+1412+  28FB             ;
+1413+  28FB             ;       ROUTINE TO CONVERT FLOATING PT.
+1414+  28FB             ;       NUMBERS TO ASCII AND OUTPUT THEM VIA A SUBROUTINE
+1415+  28FB             ;       CALLED OUTR  -  NOTE: THIS IS CURRENTLY SET
+1416+  28FB             ;       TO ODT'S OUTPUT ROUTINE
+1417+  28FB             ;
+1418+  28FB             CVRT:
+1419+  28FB CD B5 26            CALL    ZCHK            ;CHECK FOR NEW ZERO
+1420+  28FE C2 13 29            JP      NZ,NNZRO        ;NOT ZERO
+1421+  2901 0C                  INC     C               ;IT WAS, OFFSET C BY 2
+1422+  2902 0C                  INC     C
+1423+  2903 69                  LD      L,C
+1424+  2904 CD 68 27            CALL    WZER            ;WRITE ZERO
+1425+  2907 CD F4 29            CALL    SIGN            ;SEND SPACE ON POS ZERO [HRJ: was missing]
+1426+  290A 2C                  INC     L               ;PNT TO DECIMAL EXPONENT
+1427+  290B 2C                  INC     L
+1428+  290C 2C                  INC     L
+1429+  290D 2C                  INC     L
+1430+  290E AF                  XOR     A               ;SET IT TO ZERO
+1431+  290F 77                  LD      (HL),A
+1432+  2910 C3 72 29            JP      MDSKP           ;OUTPUT IT
+1433+  2913             
+1434+  2913             NNZRO:
+1435+  2913 56                  LD      D,(HL)          ;GET THE NUMBER TO CONVERT
+1436+  2914 2C                  INC     L
+1437+  2915 46                  LD      B,(HL)
+1438+  2916 2C                  INC     L
+1439+  2917 5E                  LD      E,(HL)
+1440+  2918 2C                  INC     L               ;4 WORD***TP
+1441+  2919 7E                  LD      A,(HL)          ;/***TP
+1442+  291A 0C                  INC     C               ;OFFSET SCRATCH POINTER BY 2
+1443+  291B 0C                  INC     C
+1444+  291C 69                  LD      L,C             ;L NOT NEEDED ANY MORE
+1445+  291D 72                  LD      (HL),D          ;SAVE NUMBER IN SCRATCH
+1446+  291E 2C                  INC     L
+1447+  291F 70                  LD      (HL),B
+1448+  2920 2C                  INC     L
+1449+  2921 73                  LD      (HL),E          ;/***TP
+1450+  2922 2C                  INC     L               ;/***TP
+1451+  2923 47                  LD      B,A             ;SAVE COPY OF CHAR & SIGN
+1452+  2924 E6 7F               AND     $7F  ;177Q      ;GET ONLY CHAR.
+1453+  2926 77                  LD      (HL),A          ;SAVE ABS(NUMBER)
+1454+  2927 FE 40               CP      $40  ;100Q      ;CK FOR ZERO
+1455+  2929 CA 30 29            JP      Z,NZRO
+1456+  292C D6 01               SUB     1               ;GET SIGN OF DEC. EXP
+1457+  292E E6 40               AND     $40  ;100Q      ;GET SIGN OF CHAR.
+1458+  2930             NZRO:
+1459+  2930 07                  RLCA                    ;MOVE IT TO SIGN POSITION
+1460+  2931 2C                  INC     L               ;MOVE TO DECIMAL EXP.
+1461+  2932 77                  LD      (HL),A          ;SAVE SIGN OF EXP.
+1462+  2933 78                  LD      A,B             ;GET MANT. SIGH BACK
+1463+  2934 CD F4 29            CALL    SIGN            ;OUTPUT SIGN
+1464+  2937 2E 78               LD      L,TEN5 & $FF  ;377Q  ;TRY MULT. OR DIV. BY 100000 FIRST
+1465+  2939 CD 55 2A            CALL    COPT            ;MAKE A COPY IN RAM
+1466+  293C             TST8:
+1467+  293C CD 01 2A            CALL    GCHR            ;GET CHAR. OF NUMBER
+1468+  293F 47                  LD      B,A             ;SAVE A COPY
+1469+  2940 E6 40               AND     $40  ;100Q      ;GET ABSOLUTE VALUE OF CHAR
+1470+  2942 78                  LD      A,B             ;IN CASE PLUS
+1471+  2943 CA 49 29            JP      Z,GOTV          ;ALREADY PLUS
+1472+  2946 3E 80               LD      A,$80  ;200Q    ;MAKE MINUS INTO PLUS
+1473+  2948 90                  SUB     B               ;PLUS=200B-CHAR
+1474+  2949             GOTV:
+1475+  2949 FE 12               CP      $12  ;22Q       ;TEST FOR USE OF 100000
+1476+  294B FA 57 29            JP      M,TRY1          ;WONT GO
+1477+  294E CD 07 2A            CALL    MORD            ;WILL GO SO DO IT
+1478+  2951 C6 05               ADD     A,5             ;INCREMENT DEC. EXPONENT BY 5
+1479+  2953 77                  LD      (HL),A          ;UPDATE MEM
+1480+  2954 C3 3C 29            JP     TST8             ;GO TRY AGAIN
+1481+  2957             
+1482+  2957             TRY1:
+1483+  2957 2E 7C               LD      L,TEN & $FF  ;377Q  ;NOW USE JUST TEN
+1484+  2959 CD 55 2A            CALL    COPT            ;PUT IT IN RAM
+1485+  295C             TST1:
+1486+  295C CD 01 2A            CALL    GCHR            ;GET EXPONENT
+1487+  295F FE 01               CP     1                ;MUST GET IN RANGE 1 TO 6
+1488+  2961 F2 6D 29            JP      P,OK1           ;AT LEAST ITS 1 OR BIGGER
+1489+  2964             
+1490+  2964             MDGN:
+1491+  2964 CD 07 2A            CALL    MORD            ;MUST MUL OF DIV BY 10
+1492+  2967 C6 01               ADD     A,1             ;INCREMENT DECIMAL EXP.
+1493+  2969 77                  LD      (HL),A          ;UPDATE MEM
+1494+  296A C3 5C 29            JP      TST1            ;NOW TRY AGAIN
+1495+  296D             
+1496+  296D             OK1:
+1497+  296D FE 07               CP     7                ;TEST FOR LESS THAN 7
+1498+  296F F2 64 29            JP      P,MDGN          ;NOPE - 7 OR GREATER
+1499+  2972             
+1500+  2972             MDSKP:
+1501+  2972 69                  LD      L,C             ;SET UP DIGIT COUNT
+1502+  2973 2D                  DEC     L
+1503+  2974 2D                  DEC     L               ;IN 1ST WORD OF SCRATCH
+1504+  2975 36 05               LD      (HL),5          ;5 DIGITS
+1505+  2977 5F                  LD      E,A             ;SAVE CHAR. AS LEFT SHIFT COUNT
+1506+  2978 CD DA 29            CALL    LSFT            ;SHIFT LEFT PROPER NUMBER
+1507+  297B FE 0A               CP      $0A  ;12Q       ;TEST FOR 2 DIGITS HERE
+1508+  297D F2 2D 2A            JP      P,TWOD          ;JMP IF 2 DIGITS TO OUTPUT
+1509+  2980 CD 9E 29            CALL    DIGO            ;OUTPUT FIRST DIGIT
+1510+  2983             POPD:
+1511+  2983 CD B2 29            CALL    MULTT           ;MULTIPLY THE NUMBER BY 10
+1512+  2986             INPOP:
+1513+  2986 CD 9E 29            CALL    DIGO            ;PRINT DIGIT IN A
+1514+  2989 C2 83 29            JP      NZ,POPD         ;MORE DIGITS?
+1515+  298C 3E C5               LD      A,$C5  ;305Q    ;NO SO PRINT E
+1516+  298E CD A6 24            CALL    OUTR            ;BASIC CALL TO OUTPUT
+1517+  2991 CD 22 2A            CALL    GETEX           ;GET DECIMAL EXP
+1518+  2994 47                  LD      B,A             ;SAVE A COPY
+1519+  2995 CD F4 29            CALL    SIGN            ;OUTPUT SIGN
+1520+  2998 78                  LD      A,B             ;GET EXP BACK
+1521+  2999 E6 3F               AND     $3F  ;77Q       ;GET GOOD BITS
+1522+  299B CD 44 2A            CALL    CTWO            ;GO CONVERT 2 DIGITS
+1523+  299E             DIGO:
+1524+  299E C6 B0               ADD     A,$B0  ;260Q    ;MAKE A INTO ASCII
+1525+  29A0 CD A6 24            CALL    OUTR            ;OUTPUT DIGIT
+1526+  29A3 69                  LD      L,C             ;GET DIGIT COUNT
+1527+  29A4 2D                  DEC     L               ;BACK UP TO DIGIT COUNT
+1528+  29A5 2D                  DEC     L
+1529+  29A6 7E                  LD      A,(HL)          ;TEST FOR DECIMAL PT
+1530+  29A7 FE 05               CP      5               ;PRINT . AFTER 1ST DIGIT
+1531+  29A9 3E AE               LD      A,$AE  ;256Q    ;JUST IN CASE
+1532+  29AB CC A6 24            CALL	Z,OUTR          ;OUTPUT . IF 1ST DIGIT
+1533+  29AE 56                  LD      D,(HL)          ;NOW DECREMENT DIGIT COUNT
+1534+  29AF 15                  DEC     D
+1535+  29B0 72                  LD      (HL),D          ;UPDATE MEM AND LEAVE FLOPS SET
+1536+  29B1 C9                  RET                     ;SERVES AS TERM FOR DIGO & CVRT
+1537+  29B2             
+1538+  29B2             MULTT:
+1539+  29B2 1E 01               LD      E,1             ;MULT. BY 10 (START WITH X2)
+1540+  29B4 CD DA 29            CALL    LSFT            ;LEFT SHIFT 1 = X2
+1541+  29B7 69                  LD      L,C             ;SAVE X2 IN "RESULT"
+1542+  29B8 2D                  DEC     L               ;SET TO TOP OF NUMBER
+1543+  29B9 79                  LD      A,C             ;SET C TO RESULT
+1544+  29BA C6 09               ADD     A,$09  ;11Q
+1545+  29BC 4F                  LD      C,A             ;NOW C SET RIGHT
+1546+  29BD 7C                  LD      A,H             ;SHOW RAM TO RAM TRANSFER
+1547+  29BE CD 63 2A            CALL    COPY            ;SAVE X2 FINALLY
+1548+  29C1 79                  LD      A,C             ;MUST RESET C
+1549+  29C2 D6 09               SUB     $09  ;11Q       ;BACK TO NORMAL
+1550+  29C4 4F                  LD      C,A
+1551+  29C5 1E 02               LD      E,2             ;NOW GET (X2)X4=X8
+1552+  29C7 69                  LD      L,C             ;BUT MUST SAVE OVERFLOW
+1553+  29C8 2D                  DEC     L
+1554+  29C9 CD DE 29            CALL    TLP2            ;GET X8
+1555+  29CC 69                  LD      L,C             ;SET UP TO CALL DADD
+1556+  29CD 79                  LD      A,C             ;SET B TO X2
+1557+  29CE C6 0A               ADD     A,$0A  ;12Q     ;TO X2
+1558+  29D0 47                  LD      B,A
+1559+  29D1 CD E1 26            CALL    DADD            ;ADD TWO LOW WORDS
+1560+  29D4 2D                  DEC     L               ;BACK UP TO OVERFLOW
+1561+  29D5 7E                  LD      A,(HL)          ;GET IT
+1562+  29D6 68                  LD      L,B             ;NOW SET TO X2 OVERFLOW
+1563+  29D7 2D                  DEC     L               ;ITS AT B-1
+1564+  29D8 8E                  ADC     A,(HL)          ;ADD WITH CARRY - CARRY WAS PRESERVED
+1565+  29D9 C9                  RET                     ;ALL DONE, RETURN OVERFLOW IN A
+1566+  29DA             
+1567+  29DA             LSFT:
+1568+  29DA 69                  LD      L,C             ;SET PTR FOR LEFT SHIFT OF NUMBER
+1569+  29DB 2D                  DEC     L               ;BACK UP TO OVERFLOW
+1570+  29DC AF                  XOR     A               ;OVERFLOW=0 1ST TIME
+1571+  29DD             TLOOP:
+1572+  29DD 77                  LD      (HL),A          ;SAVE OVERFLOW
+1573+  29DE             TLP2:
+1574+  29DE 1D                  DEC     E               ;TEST FOR DONE
+1575+  29DF F8                  RET	M                   ;DONE WHEN E MINUS
+1576+  29E0 2C                  INC     L               ;MOVE TO LOW
+1577+  29E1 2C                  INC     L
+1578+  29E2 2C                  INC     L               ;/***TP EXTENSION
+1579+  29E3 7E                  LD      A,(HL)          ;SHIFT LEFT 4 BYTES
+1580+  29E4 17                  RLA
+1581+  29E5 77                  LD      (HL),A          ;PUT BACK
+1582+  29E6 2D                  DEC     L               ;/***TP - ALL DONE
+1583+  29E7 7E                  LD      A,(HL)          ;GET LOW
+1584+  29E8 17                  RLA                     ;SHIFT LEFT 1
+1585+  29E9 77                  LD      (HL),A          ;RESTORE IT
+1586+  29EA 2D                  DEC     L               ;BACK UP TO HIGH
+1587+  29EB 7E                  LD      A,(HL)          ;GET HIGH
+1588+  29EC 17                  RLA                     ;SHIFT IT LEFT WITH CARRY
+1589+  29ED 77                  LD      (HL),A          ;PUT IT BACK
+1590+  29EE 2D                  DEC     L               ;BACK UP TO OVERFLOW
+1591+  29EF 7E                  LD      A,(HL)          ;GET OVERFLOW
+1592+  29F0 17                  RLA                     ;SHIFT IT LEFT
+1593+  29F1 C3 DD 29            JP     TLOOP            ;GO FOR MORE
+1594+  29F4             
+1595+  29F4             SIGN:
+1596+  29F4 E6 80               AND     $80  ;200Q      ;GET SIGN BIT
+1597+  29F6 3E A0               LD      A,$A0  ;240Q    ;SPACE INSTEAD OF PLUS
+1598+  29F8 CA FD 29            JP      Z,PLSV          ;TEST FOR +
+1599+  29FB 3E AD               LD      A,$AD  ;255Q    ;NEGATIVE
+1600+  29FD             PLSV:
+1601+  29FD CD A6 24            CALL    OUTR            ;OUTPUT SIGN
+1602+  2A00 C9                  RET
+1603+  2A01             
+1604+  2A01             GCHR:
+1605+  2A01 69                  LD      L,C             ;GET EXPONENT
+1606+  2A02             GETA:
+1607+  2A02 2C                  INC     L               ;MOVE TO IT
+1608+  2A03 2C                  INC     L
+1609+  2A04 2C                  INC     L               ;/***TP
+1610+  2A05 7E                  LD      A,(HL)             ;FETCH INTO A
+1611+  2A06 C9                  RET                     ;DONE
+1612+  2A07             
+1613+  2A07             MORD:
+1614+  2A07 CD 22 2A            CALL    GETEX           ;MUL OR DIV DEPENDING ON EXP
+1615+  2A0A 5F                  LD      E,A             ;SAVE DECIMAL EXP
+1616+  2A0B 45                  LD      B,L             ;SET UP TO MULT OR DIV
+1617+  2A0C 04                  INC     B               ;NOW BOP POINTER SET
+1618+  2A0D 69                  LD      L,C             ;L POINTS TO NUMBER TO CONVERT
+1619+  2A0E 79                  LD      A,C             ;POINT C AT "RESULT" AREA
+1620+  2A0F C6 09               ADD     A,$09  ;11Q     ;IN SCRATCH
+1621+  2A11 4F                  LD      C,A             ;NOW C SET RIGHT
+1622+  2A12 7B                  LD      A,E             ;NOW TEST FOR MUL
+1623+  2A13 E6 80               AND     $80  ;200Q      ;TEST NEGATIVE DEC. EXP.
+1624+  2A15 CA 27 2A            JP      Z,DIVIT         ;IF EXP IS + THEN DIVIDE
+1625+  2A18 CD 3A 26            CALL    LMUL            ;MULT.
+1626+  2A1B             FINUP:
+1627+  2A1B 79                  LD      A,C             ;SAVE LOC. OF RESULT
+1628+  2A1C 4D                  LD      C,L             ;C=LOC OF NUMBER (IT WAS DESTROYED)
+1629+  2A1D 6F                  LD      L,A             ;SET L TO LOC. OF RESULT
+1630+  2A1E 7C                  LD      A,H             ;SHOW RAM TO RAM TRANSFER
+1631+  2A1F CD 63 2A            CALL    COPY            ;MOVE RESULT TO NUMBER
+1632+  2A22             GETEX:
+1633+  2A22 69                  LD      L,C             ;NOW GET DECIMAL EXP
+1634+  2A23 2C                  INC     L
+1635+  2A24 C3 02 2A            JP     GETA            ;USE PART OF GCHR
+1636+  2A27             
+1637+  2A27             DIVIT:
+1638+  2A27 CD DB 24            CALL    LDIV            ;DIVIDE
+1639+  2A2A C3 1B 2A            JP     FINUP
+1640+  2A2D             
+1641+  2A2D             TWOD:
+1642+  2A2D CD 44 2A            CALL    CTWO            ;CONVERT TO 2 DIGITS
+1643+  2A30 47                  LD      B,A             ;SAVE ONES DIGIT
+1644+  2A31 CD 22 2A            CALL    GETEX           ;GET DECIMAL EXP
+1645+  2A34 5F                  LD      E,A             ;SAVE A COPY
+1646+  2A35 E6 80               AND     $80  ;200Q      ;TEST FOR NEGATIVE
+1647+  2A37 CA 40 2A            JP      Z,ADD1          ;BUMP EXP BY 1 SINCE 2 DIGITS
+1648+  2A3A 1D                  DEC     E               ;DECREMENT NEGATIVE EXP SINCE 2 DIGITS
+1649+  2A3B             FINIT:
+1650+  2A3B 73                  LD      (HL),E          ;RESTORE EXP WITH NEW VALUE
+1651+  2A3C 78                  LD      A,B             ;NOW DO 2ND DIGIT
+1652+  2A3D C3 86 29            JP      INPOP           ;GO OUT 2ND AND REST OF DIGITS
+1653+  2A40             
+1654+  2A40             ADD1:
+1655+  2A40 1C                  INC     E               ;COMPENSATE FOR 2 DIGITS
+1656+  2A41 C3 3B 2A            JP     FINIT
+1657+  2A44             
+1658+  2A44             CTWO:
+1659+  2A44 1E FF               LD      E,$FF  ;377Q    ;CONVERT 2 DIGIT BIN TO BCD
+1660+  2A46             LOOP:
+1661+  2A46 1C                  INC     E               ;ADD UP TENS DIGIT
+1662+  2A47 D6 0A               SUB     $0A  ;12Q       ;SUBTRACT 10
+1663+  2A49 F2 46 2A            JP      P,LOOP          ;TILL NEGATIVE RESULT
+1664+  2A4C C6 0A               ADD     A,$0A  ;12Q     ;RESTORE ONES DIGIT
+1665+  2A4E 47                  LD      B,A             ;SAVE ONES DIGIT
+1666+  2A4F 7B                  LD      A,E             ;GET TENS DIGIT
+1667+  2A50 CD 9E 29            CALL    DIGO            ;OUTPUT IT
+1668+  2A53 78                  LD      A,B             ;SET A TO 2ND DIGIT
+1669+  2A54 C9                  RET
+1670+  2A55             
+1671+  2A55             COPT:
+1672+  2A55 79                  LD      A,C             ;COPY FROM 10N TO RAM
+1673+  2A56 C6 05               ADD     A,5
+1674+  2A58 4F                  LD      C,A             ;SET C TO PLACE TO PUT
+1675+  2A59 3E 2A               LD      A,TEN5/256
+1676+  2A5B CD 63 2A            CALL    COPY            ;COPY IT
+1677+  2A5E 79                  LD      A,C             ;NOW RESET C
+1678+  2A5F D6 05               SUB     5
+1679+  2A61 4F                  LD      C,A             ;ITS RESET
+1680+  2A62 C9                  RET
+1681+  2A63             
+1682+  2A63             COPY:
+1683+  2A63 44                  LD      B,H             ;SAVE RAM H
+1684+  2A64 67                  LD      H,A             ;SET TO SOURCE H
+1685+  2A65 7E                  LD      A,(HL)          ;GET 4 WORDS INTO THE REGS.
+1686+  2A66 2C                  INC     L
+1687+  2A67 56                  LD      D,(HL)
+1688+  2A68 2C                  INC     L
+1689+  2A69 5E                  LD      E,(HL)
+1690+  2A6A 2C                  INC     L
+1691+  2A6B 6E                  LD      L,(HL)          ;LAST ONE ERASES L
+1692+  2A6C 60                  LD      H,B             ;SET TO DESTINATION RAM
+1693+  2A6D 45                  LD      B,L             ;SAVE 4TH WORD IN B
+1694+  2A6E 69                  LD      L,C             ;SET TO DESTINATION
+1695+  2A6F 77                  LD      (HL),A          ;SAVE FIRST WORD
+1696+  2A70 2C                  INC     L
+1697+  2A71 7E                  LD      A,(HL)          ;SAVE THIS WORD IN A (INPUT SAVES C HERE
+1698+  2A72 72                  LD      (HL),D          ;NOW PUT 2ND WORD
+1699+  2A73 2C                  INC     L
+1700+  2A74 73                  LD      (HL),E
+1701+  2A75 2C                  INC     L
+1702+  2A76 70                  LD      (HL),B          ;ALL 4  COPIED NOW
+1703+  2A77 C9                  RET                     ;ALL DONE
+1704+  2A78             
+1705+  2A78             ;SECTION     apu_data
+1706+  2A78             
+1707+  2A78             ;TEN5:  .DB     303Q,120Q,0Q,21Q    ;303240(8) = 100000.
+1708+  2A78             ;TEN:   .DB     240Q,0Q,0Q,4Q       ;12(8) = 10
+1709+  2A78             
+1710+  2A78             ;TEN5:   DEFB    $C3,$50,$00,$11 ;303240(8) = 100000.
+1711+  2A78             ;TEN:    DEFB    $A0,$00,$00,$04 ;12(8) = 10
+1712+  2A78             
+1713+  2A78 C3 50 00 11 TEN5:   .DB    $C3,$50,$00,$11 ;303240(8) = 100000.
+1714+  2A7C A0 00 00 04 TEN:    .DB    $A0,$00,$00,$04 ;12(8) = 10
+1715+  2A80             
+1716+  2A80             
+1717+  2A80             
+1718+  2A80             ;SECTION     apu_library         ;LIBRARY ORIGIN
+1719+  2A80             
+1720+  2A80             ;
+1721+  2A80             ;       SCRATCH MAP FOR I/O CONVERSION ROUTINES
+1722+  2A80             ;
+1723+  2A80             ;       RELATIVE TO (C+2)USE
+1724+  2A80             ;       C-2             DIGIT COUNT
+1725+  2A80             ;       C-1             OVERFLOW
+1726+  2A80             ;       C               HIGH NUMBER - MANTISSA
+1727+  2A80             ;       C+1             LOW NUMBER
+1728+  2A80             ;       C+2             EXPONENT
+1729+  2A80             ;       C+3             DECIMAL EXPONENT (SIGN & MAG.)
+1730+  2A80             ;       C+4             TEN**N
+1731+  2A80             ;       C+5             TEN**N
+1732+  2A80             ;       C+6             TEN**N
+1733+  2A80             ;       C+7             RESULT OF MULT & DIV
+1734+  2A80             ;       C+8             AND TEMP FOR X2
+1735+  2A80             ;       C+9             "       "
+1736+  2A80             ;       C+10            L FOR NUMBER TO GO INTO (INPUT ONLY)
+1737+  2A80             ;       C+11            DIGIT JUST INPUT (INPUT ONLY)
+1738+  2A80             ;
+1739+  2A80             ;
+1740+  2A80             ;       /*****BEGIN INPUT*************
+1741+  2A80             ;
+1742+  2A80             ;
+1743+  2A80             ;HRJ was:
+1744+  2A80             ;ERR:
+1745+  2A80             ;       STC                     ;ERROR FLAG
+1746+  2A80             ;       RET                     ;AND RETURN
+1747+  2A80             ; replaced with code in (PDF) document HRJ
+1748+  2A80             
+1749+  2A80             ;
+1750+  2A80             ;
+1751+  2A80             ;   SUBROUTINE ERR
+1752+  2A80             ;
+1753+  2A80             ERR:
+1754+  2A80 3E BF               LD      A,$BF  ;277Q    ;ERROR IN INPUT
+1755+  2A82 CD A6 24            CALL    OUTR            ;SEND A ?(SPACE)
+1756+  2A85 3E A0               LD      A,$A0  ;240Q    ;
+1757+  2A87 CD A6 24            CALL    OUTR            ;OUTPUT SPACE
+1758+  2A8A C3 95 2A            JP      PRMT            ;GO PROMPT USER AND RESTART
+1759+  2A8D             ;HRJ  end replacing code
+1760+  2A8D             ;
+1761+  2A8D             ;********************************************************
+1762+  2A8D             ;       //// 4 1/2 DIGIT INPUT ROUTINE
+1763+  2A8D             ;*******************************************************
+1764+  2A8D             ;
+1765+  2A8D             ;
+1766+  2A8D             ;       /L POINTS TO WHERE TO PUT INPUT NUMBER
+1767+  2A8D             ;       /C POINTS TO 13(10) WORDS OF SCRATCH
+1768+  2A8D             ;
+1769+  2A8D             INPUT:
+1770+  2A8D 45                  LD      B,L             ;SAVE ADDRESS WHERE DATA IS TO GO
+1771+  2A8E 79                  LD      A,C             ;IN SCRATCH
+1772+  2A8F C6 0F               ADD     A,$0F  ;17Q     ;COMPUTE LOC. IN SCRATCH
+1773+  2A91 6F                  LD      L,A
+1774+  2A92 70                  LD      (HL),B          ;PUT IT
+1775+  2A93 0C                  INC     C               ;OFFSET SCRATCH POINTER
+1776+  2A94 0C                  INC     C               ;BY 2
+1777+  2A95             PRMT:
+1778+  2A95 3E BA               LD      A,$BA  ;272Q    ;PROMPT USER WITH :
+1779+  2A97 CD A6 24            CALL    OUTR            ;OUTPUT :
+1780+  2A9A CD A0 2B            CALL    ZROIT           ;ZERO NUMBER
+1781+  2A9D 2C                  INC     L               ;AND ZERO
+1782+  2A9E 77                  LD      (HL),A          ;DECIMAL EXPONENT
+1783+  2A9F CD 3D 2B            CALL    GNUM            ;GET INTEGER PART OF NUM
+1784+  2AA2 FE FE               CP      $FE  ;376Q      ;TERM=.?
+1785+  2AA4 CA F7 2A            JP      Z,DECPT         ;YES
+1786+  2AA7             TSTEX:
+1787+  2AA7 FE 15               CP      $15  ;25Q       ;TEST FOR E
+1788+  2AA9 CA 0C 2B            JP      Z,INEXP         ;YES - HANDLE EXP
+1789+  2AAC FE F0               CP      $F0  ;360Q      ;TEST FOR SPACE TERM (240B-260B)
+1790+  2AAE C2 80 2A            JP      NZ,ERR          ;NOT LEGAL TERM
+1791+  2AB1 CD 86 2B            CALL    FLTSGN          ;FLOAT # AND SIGN IT
+1792+  2AB4             SCALE:
+1793+  2AB4 CD 22 2A            CALL    GETEX           ;GET DECIMAL EXP
+1794+  2AB7 E6 7F               AND     $7F  ;177Q      ;GET GOOD BITS
+1795+  2AB9 5F                  LD      E,A             ;SAVE COPY
+1796+  2ABA E6 40               AND     $40  ;100Q      ;GET SIGN OF EXP
+1797+  2ABC 07                  RLCA                    ;INTO SIGN BIT
+1798+  2ABD B7                  OR      A               ;SET FLOPS
+1799+  2ABE 47                  LD      B,A             ;SAVE SIGN
+1800+  2ABF 7B                  LD      A,E             ;GET EXP BACK
+1801+  2AC0 CA C6 2A            JP      Z,APLS          ;JMP IS +
+1802+  2AC3 3E 80               LD      A,$80  ;200Q    ;MAKE MINUS +
+1803+  2AC5 93                  SUB     E               ;NOW ITS +
+1804+  2AC6             APLS:
+1805+  2AC6 80                  ADD     A,B             ;SIGN NUMBER
+1806+  2AC7 77                  LD      (HL),A          ;SAVE EXP (SIGN & MAG.)
+1807+  2AC8 2E 78               LD      L,TEN5 & $FF    ;377Q  ;TRY MORD WITH 10**5 FIRST
+1808+  2ACA CD 55 2A            CALL    COPT            ;TRANSFER TO RAM
+1809+  2ACD CD 22 2A            CALL    GETEX           ;GET DECIMAL EXP
+1810+  2AD0             INT5:
+1811+  2AD0 E6 3F               AND     $3F  ;77Q       ;GET MAG. OF EXP
+1812+  2AD2 FE 05               CP      $05  ;5Q        ;TEST FOR USE OF 10**5
+1813+  2AD4 FA E0 2A            JP      M,TRYTN         ;WONT GO - TRY 10
+1814+  2AD7 CD 07 2A            CALL    MORD            ;WILL GO SO DO IT
+1815+  2ADA D6 05               SUB     $05  ;5Q        ;MAG = MAG -5
+1816+  2ADC 77                  LD      (HL),A          ;UPDATE DEC. EXP IN MEM
+1817+  2ADD C3 D0 2A            JP      INT5            ;GO TRY AGAIN
+1818+  2AE0             
+1819+  2AE0             TRYTN:
+1820+  2AE0 2E 7C               LD      L,TEN & $FF     ;377Q  ;PUT TEN IN RAM
+1821+  2AE2 CD 55 2A            CALL    COPT
+1822+  2AE5 CD 22 2A            CALL    GETEX           ;SET UP FOR LOOP
+1823+  2AE8             INT1:
+1824+  2AE8 E6 3F               AND     $3F  ;77Q       ;GET MAGNITUDE
+1825+  2AEA B7                  OR      A               ;TEST FOR 0
+1826+  2AEB CA 8A 2B            JP      Z,SAVEN         ;DONE, MOVE NUM OUT AND GET OUT
+1827+  2AEE CD 07 2A            CALL    MORD            ;NOT DONE - DO 10
+1828+  2AF1 D6 01               SUB     $01  ;1Q        ;EXP = EXP -1
+1829+  2AF3 77                  LD      (HL),A          ;UPDATE MEM
+1830+  2AF4 C3 E8 2A            JP      INT1            ;TRY AGAIN
+1831+  2AF7             
+1832+  2AF7             DECPT:
+1833+  2AF7 69                  LD      L,C             ;ZERO DIGIT COUNT
+1834+  2AF8 2D                  DEC     L               ;SINCE ITS NECESSARY
+1835+  2AF9 2D                  DEC     L               ;TO COMPUTE EXP.
+1836+  2AFA 36 00               LD      (HL),0          ;ZEROED
+1837+  2AFC CD 80 2B            CALL    EP1             ;GNUM IN MIDDLE
+1838+  2AFF 5F                  LD      E,A             ;SAVE TERMINATOR
+1839+  2B00 69                  LD      L,C             ;MOVE DIGIT COUNT TO EXP
+1840+  2B01 2D                  DEC     L               ;BACK UP TO DIGIT COUNT
+1841+  2B02 2D                  DEC     L
+1842+  2B03 46                  LD      B,(HL)          ;GOT DIGIT COUNT
+1843+  2B04 CD 22 2A            CALL    GETEX           ;SET L TO DEC. EXP
+1844+  2B07 70                  LD      (HL),B          ;PUT EXP
+1845+  2B08 7B                  LD      A,E             ;TERM BACK TO A
+1846+  2B09 C3 A7 2A            JP      TSTEX           ;TEST FOR E+OR-XX
+1847+  2B0C             
+1848+  2B0C             INEXP:
+1849+  2B0C CD 86 2B            CALL    FLTSGN          ;FLOAT AND SIGN NUMBER
+1850+  2B0F CD 8A 2B            CALL    SAVEN           ;SAVE NUMBER IN (L) TEMP
+1851+  2B12 CD A0 2B            CALL    ZROIT           ;ZERO OUT NUM. FOR INPUTTING EXP
+1852+  2B15 CD 3D 2B            CALL    GNUM            ;NOW INPUT EXPONENT
+1853+  2B18 FE F0               CP      $F0  ;360Q      ;TEST FOR SPACE TERM.
+1854+  2B1A C2 80 2A            JP      NZ,ERR          ;NOT LEGAL - TRY AGAIN
+1855+  2B1D 69                  LD      L,C             ;GET EXP OUT OF MEM
+1856+  2B1E 2C                  INC     L               ;/***TP
+1857+  2B1F 2C                  INC     L               ;EXP LIMITED TO 5 BITS
+1858+  2B20 7E                  LD      A,(HL)          ;GET LOWEST 8 BITS
+1859+  2B21 E6 1F               AND     $1F  ;37Q       ;GET GOOD BITS
+1860+  2B23 47                  LD      B,A             ;SAVE THEM
+1861+  2B24 2C                  INC     L               ;GET SIGN OF EXP
+1862+  2B25 7E                  LD      A,(HL)          ;INTO A
+1863+  2B26 B7                  OR      A               ;SET FLOPS
+1864+  2B27 78                  LD      A,B             ;IN CASE NOTHING TO DO
+1865+  2B28 FA 2E 2B            JP      M,USEIT         ;IF NEG. USE AS +
+1866+  2B2B 3E 00               LD      A,$00  ;0Q      ;IF + MAKE -
+1867+  2B2D 90                  SUB     B               ;0-X = -X
+1868+  2B2E             USEIT:
+1869+  2B2E 2C                  INC     L               ;POINT AT EXP
+1870+  2B2F 86                  ADD     A,(HL)          ;GET REAL DEC. EXP
+1871+  2B30 77                  LD      (HL),A          ;PUT IN MEM
+1872+  2B31 79                  LD      A,C             ;NOW GET NUMBER BACK
+1873+  2B32 C6 0D               ADD     A,$0D  ;15Q     ;GET ADD OF L
+1874+  2B34 6F                  LD      L,A             ;L POINTS TO L OF NUMBER
+1875+  2B35 6E                  LD      L,(HL)          ;NOW L POINTS TO NUMBER
+1876+  2B36 7C                  LD      A,H             ;RAM TO RAM COPY
+1877+  2B37 CD 63 2A            CALL    COPY            ;COPY IT BACK
+1878+  2B3A C3 B4 2A            JP      SCALE           ;NOW ADJUST FOR EXP
+1879+  2B3D             
+1880+  2B3D             GNUM:
+1881+  2B3D CD AE 24            CALL    INP             ;GET A CHAR
+1882+  2B40 FE A0               CP      $A0  ;240Q      ;IGNORE LEADING SPACES
+1883+  2B42 CA 3D 2B            JP      Z,GNUM
+1884+  2B45 FE AD               CP      $AD  ;255Q      ;TEST FOR -
+1885+  2B47 C2 53 2B            JP      NZ,TRYP         ;NOT MINUS
+1886+  2B4A 69                  LD      L,C             ;MINUS SO SET SIGN
+1887+  2B4B 2C                  INC     L               ;IN CHAR LOC.
+1888+  2B4C 2C                  INC     L               ;/***TP
+1889+  2B4D 2C                  INC     L
+1890+  2B4E 36 80               LD      (HL),$80  ;200Q ;SET - SIGN
+1891+  2B50 C3 3D 2B            JP      GNUM
+1892+  2B53             
+1893+  2B53             TRYP:
+1894+  2B53 FE AB               CP      $AB  ;253Q      ;IGNORE +
+1895+  2B55 CA 3D 2B            JP      Z,GNUM
+1896+  2B58             TSTN:
+1897+  2B58 D6 B0               SUB     $B0  ;260Q      ;STRIP ASCII
+1898+  2B5A F8                  RET     M               ;RETURN IF TERM
+1899+  2B5B FE 0A               CP      $0A  ;12Q       ;TEST FOR NUMBER
+1900+  2B5D F0                  RET     P               ;ILLEGAL
+1901+  2B5E 5F                  LD      E,A             ;SAVE DIGIT
+1902+  2B5F CD 9A 2B            CALL    GETN            ;LOC. OF DIGIT STORAGE TO L
+1903+  2B62 73                  LD      (HL),E          ;SAVE DIGIT
+1904+  2B63 CD B2 29            CALL    MULTT           ;MULT NUMBER BY 10
+1905+  2B66 B7                  OR      A               ;TEST FOR TOO MANY DIGITS
+1906+  2B67 C0                  RET     NZ              ;TOO MANY DIGITS
+1907+  2B68 CD 9A 2B            CALL    GETN            ;GET DIGIT
+1908+  2B6B 69                  LD      L,C             ;SET L TO NUMBER
+1909+  2B6C 2C                  INC     L
+1910+  2B6D 2C                  INC     L               ;/***TP
+1911+  2B6E 86                  ADD     A,(HL)          ;ADD IN THE DIGIT
+1912+  2B6F 77                  LD      (HL),A          ;PUT RESULT BACK
+1913+  2B70 2D                  DEC     L               ;NOW DO HIGH
+1914+  2B71 7E                  LD      A,(HL)          ;GET HIGH TO ADD IN CARRY
+1915+  2B72 CE 00               ADC     A,$00  ;0Q      ;ADD IN CARRY
+1916+  2B74 77                  LD      (HL),A          ;UPDATE HIGH
+1917+  2B75 2D                  DEC     L               ;/***TP EXTENSION
+1918+  2B76 7E                  LD      A,(HL)
+1919+  2B77 CE 00               ADC     A,$00  ;0Q      ;ADD IN CARRY
+1920+  2B79 77                  LD      (HL),A          ;/***TP ALL DONE
+1921+  2B7A D8                  RET     C               ;OVERFLOW ERROR
+1922+  2B7B 2D                  DEC     L               ;BUMP DIGIT COUNT NOW
+1923+  2B7C 2D                  DEC     L
+1924+  2B7D 46                  LD      B,(HL)          ;GET DIGIT COUNT
+1925+  2B7E 04                  INC     B               ;BUMP DIGIT COUNT
+1926+  2B7F 70                  LD      (HL),B          ;UPDATE DIGIT COUNT
+1927+  2B80             EP1:
+1928+  2B80 CD AE 24            CALL    INP             ;GET NEXT CHAR
+1929+  2B83 C3 58 2B            JP      TSTN            ;MUST BE NUM. OR TERM
+1930+  2B86             
+1931+  2B86             FLTSGN:
+1932+  2B86 69                  LD      L,C             ;POINT L AT NUMBER TO FLOAT
+1933+  2B87 C3 B0 26            JP      FLOAT           ;GO FLOAT IT
+1934+  2B8A             
+1935+  2B8A             SAVEN:
+1936+  2B8A 79                  LD      A,C             ;PUT NUMBER IN (L)
+1937+  2B8B C6 0D               ADD     A,$0D  ;15Q     ;GET ADD OF L
+1938+  2B8D 6F                  LD      L,A
+1939+  2B8E 5E                  LD      E,(HL)          ;GET L OF RESULT
+1940+  2B8F 6B                  LD      L,E             ;POINT L AT (L)
+1941+  2B90 2C                  INC     L               ;SET TO 2ND WORD TO SAVE C
+1942+  2B91 71                  LD      (HL),C          ;SAVE C IN (L) +1 SINCE IT WILL BE DESTROYED
+1943+  2B92 69                  LD      L,C             ;SET UP TO CALL COPY
+1944+  2B93 4B                  LD      C,E             ;NOW L&C SET
+1945+  2B94 7C                  LD      A,H             ;RAM TO RAM COPY
+1946+  2B95 CD 63 2A            CALL    COPY            ;COPY TO L
+1947+  2B98 4F                  LD      C,A             ;(L)+1 RETURNED HERE SO SET AS C
+1948+  2B99                     ;ORA    A               ;MAKE SURE CY=0 (NO ERROR) 
+1949+  2B99                                             ;HRJ ORA above not in LLL document
+1950+  2B99 C9                  RET                     ;NOW EVERYTHING HUNKY-DORRY
+1951+  2B9A             
+1952+  2B9A             GETN:
+1953+  2B9A 79                  LD      A,C             ;GET DIGIT
+1954+  2B9B C6 0E               ADD     A,$0E  ;16Q     ;LAST LOC. IN SCRATCH
+1955+  2B9D 6F                  LD      L,A             ;PUT IN L
+1956+  2B9E 7E                  LD      A,(HL)          ;GET DIGIT
+1957+  2B9F C9                  RET
+1958+  2BA0             
+1959+  2BA0             ZROIT:
+1960+  2BA0 69                  LD      L,C             ;ZERO NUMBER
+1961+  2BA1 AF                  XOR     A
+1962+  2BA2 77                  LD      (HL),A          ;/***TP
+1963+  2BA3 2C                  INC     L               ;/***TP
+1964+  2BA4 77                  LD      (HL),A
+1965+  2BA5 2C                  INC     L
+1966+  2BA6 77                  LD      (HL),A
+1967+  2BA7 2C                  INC     L               ;NOW SET SIGN TO +
+1968+  2BA8 77                  LD      (HL),A
+1969+  2BA9 C9                  RET                     ;DONE
+1970+  2BAA             
+1971+  2BAA             ;
+1972+  2BAA             ; END of code from LLNL PDF document
+1973+  2BAA             ;
+1974+  2BAA                     .END
+tasm: Number of errors = 0
