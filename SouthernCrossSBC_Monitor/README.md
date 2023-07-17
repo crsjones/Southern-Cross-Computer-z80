@@ -23,3 +23,6 @@ that can be used in your own programs, an short example of its use is also inclu
 A version of the 1.8 Monitor has been patched with the ACIA code from the SC-6850_Serial\Code folder to work with the 6850 ACIA
 instead of the Bit Bang Serial Port, only the Source file is provided.
 
+### SCNEO
+Built with Buffered Interrupt driven serial communication using the SC-SERIAL ACIA Add-on board.
+
