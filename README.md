@@ -20,6 +20,10 @@ An add-on board that connects a Gameboy FLASH cartridge to the Southern Cross SB
 A MC6850 serial board based on the Grant Searle 'Minimum System Z80' design.
 ### SC-APU
 An add-on card for the AM9511A  Arithmetic Processor Unit.
+### SC-MEM
+Expansion memory board. 2x28 pin sockets for either 8kx8 or 32kx8 devices. 
+
+
 
 # Current Version
 
