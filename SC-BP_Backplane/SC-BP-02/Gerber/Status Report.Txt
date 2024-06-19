@@ -1,0 +1,12 @@
+Output: NC Drill Files
+Type  : NC Drill
+From  : Project [SC-BUS.PrjPcb]
+   Generated File[SC-BP-02.TXT]
+   Generated File[SC-BP-02.LDP]
+   Generated File[SC-BP-02.DRR]
+
+
+Files Generated   : 3
+Documents Printed : 0
+
+Finished Output Generation At 10:45:51 AM On 18/04/2024
