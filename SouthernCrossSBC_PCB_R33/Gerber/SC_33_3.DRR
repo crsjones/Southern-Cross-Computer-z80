@@ -1,0 +1,21 @@
+----------------------------------------------------------------------------------------------------------------------------------
+NCDrill File Report For: SC_33_3.PcbDoc   15/08/2024  7:56:22 PM
+----------------------------------------------------------------------------------------------------------------------------------
+
+Layer Pair : Top Layer to Bottom Layer
+ASCII RoundHoles File : SC_33_3-RoundHoles.TXT
+ASCII SlotHoles File : SC_33_3-SlotHoles.TXT
+
+Tool       Hole Size               Hole Tolerance               Hole Type       Hole Count   Plated         Tool Travel
+----------------------------------------------------------------------------------------------------------------------------------
+T1      28mil (0.7mm)                                             Round             216       PTH        66.41inch (1686.93mm)
+T2      32mil (0.8mm)                                             Round             388       PTH        78.45inch (1992.74mm)
+T3      39mil (1mm)                                               Round             91        PTH        35.65inch (905.42mm)
+T4      45mil (1.143mm)                                           Slot              3         PTH        1.31inch (33.32mm)
+T5      47mil (1.2mm)                                             Round             87        PTH        26.74inch (679.27mm)
+T6      55mil (1.4mm)                                             Round             2         PTH        0.20inch (5.08mm)
+T7      126mil (3.2mm)                                            Round             5         PTH        23.48inch (596.48mm)
+----------------------------------------------------------------------------------------------------------------------------------
+Totals                                                                              792
+
+Total Processing Time (hh:mm:ss) : 00:00:00
