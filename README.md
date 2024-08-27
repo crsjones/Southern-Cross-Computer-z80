@@ -24,14 +24,15 @@ An add-on card for the AM9511A  Arithmetic Processor Unit.
 Expansion memory board. 2x28 pin sockets for either 8kx8 or 32kx8 devices. 
 ### SC-CPU
 Connect your expansion boards to this CPU board instead of the Southern Cross SBC!
+### SC-BP
+An expandable six slot backplane that connects to the SC expansion connector.
 
 # Current Version
 
-The current version of the PCB is 3.2, Gerbers are available in the SouthernCrossSBC_PCB_R32 folder.
-It is also available as a shared design on PCBWay.com
+The current version of the Southern Cross PCB is 3.3, Gerbers are available in the SouthernCrossSBC_PCB_R33 folder.
 
 The current version of the monitor is 1.8.
- Source code, listing,binary and INTEL hex files can be found in the SCMonitorV18 folder under the SouthernCrossSBC_Monitor folder.
+ Source code, listing, binary and INTEL hex files can be found in the SCMonitorV18 folder under the SouthernCrossSBC_Monitor folder.
 
 
 
