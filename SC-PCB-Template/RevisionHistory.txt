@@ -1,0 +1,27 @@
+
+----------------------------------------------------------------------------------------------------------
+2024-12-29  SC_Template_5
+
+SC_footprint.pretty\EDGE40.kicad_mod
+Removed stubs from edge connector component.
+Increased pad sizes for pins 19 to 25 to 70mils up from 62 mils
+
+SC_footprint.pretty\IDC40EDGE.kicad_mod
+Removed stubs from combined IDC40EDGE edge connector component.
+Increased pad sizes for pins 19 to 25 to 70mils up from 62 mils
+
+SC_Template_5.kicad_Sch
+Removed the picture of the SC expansion connector.
+Renamed /BUSREQ as /BUSRQ
+Renamed /BUSACK as /BUSAK
+
+SC_Template_5.kicad_Pcb
+Updated the footprints and the nets from the Schematic document to correct Net names and duplicate /BUSAK
+---------------------------------------------------------------------------------------------------------
+
+2024-12-30 SC-Template
+Moved to Github repository
+
+SC_Template.kicad_Pcb
+Updated footprints to remove stubs.
+---------------------------------------------------------------------------------------------------------

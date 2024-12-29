@@ -1,0 +1,90 @@
+(footprint "SC-MT-3mm"
+	(version 20240108)
+	(generator "pcbnew")
+	(generator_version "8.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -0.5 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "012d2787-cb03-47c9-8ce2-ba25fe2ea17e")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "SC-MT-3mm"
+		(at 0.3048 4.2926 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "4d7c6514-d2c8-4df6-b7eb-c050c22da457")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Footprint" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "a58f5dcf-d4ee-4991-bfa7-4e78532e82dc")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "677d3a55-b8e0-4ec7-8272-3c884cd0f518")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "569197fb-12a8-4186-b5d8-b7bdbe9c1a5f")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr through_hole)
+	(fp_text user "${REFERENCE}"
+		(at 0.5842 5.8166 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "1ae7a5e2-bfe6-4c24-945d-fffe050848fe")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "0" thru_hole circle
+		(at 0 0)
+		(size 6.35 6.35)
+		(drill 3.2)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "7416d5ae-8ddb-4fdc-ae23-1140d7ec9d0e")
+	)
+)
