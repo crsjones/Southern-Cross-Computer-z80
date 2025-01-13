@@ -1,0 +1,202 @@
+0001   0000             ;-------------------------------------------
+0002   0000             ; Southern Cross ALED Addressable LED board 
+0003   0000             ;-------------------------------------------
+0004   0000             ;
+0005   0000             ; Craig RS Jones Dec 2024
+0006   0000             ;
+0007   0000             ; Calibrate output pulse widths
+0008   0000             ; 
+0009   0000             
+0010   0000             shifter	.equ	10h	;ALED board I/O Address
+0011   0000             
+0012   2000             	.org	2000h
+0013   2000             ;
+0014   2000             ; Set each LED to full brightness to 
+0015   2000             ; produce the colour white and output only
+0016   2000             ; the 'high' pulse width.
+0017   2000             ; adjust the P2 trimpot for white.
+0018   2000             ; you made need to turn the P1 trimpot down first!.
+0019   2000             CalHiPulse
+0020   2000             
+0021   2000             ;first WS2812B data
+0022   2000             
+0023   2000 3E FF       	ld	a,0ffh
+0024   2002 D3 10       	out	(shifter),a	;output green data
+0025   2004 00          	nop
+0026   2005 00          	nop
+0027   2006 00          	nop
+0028   2007 00          	nop
+0029   2008 00          	nop
+0030   2009             
+0031   2009 3E FF       	ld	a,0ffh
+0032   200B D3 10       	out	(shifter),a	;output red data
+0033   200D 00          	nop
+0034   200E 00          	nop
+0035   200F 00          	nop
+0036   2010 00          	nop
+0037   2011 00          	nop
+0038   2012             
+0039   2012 3E FF       	ld	a,0ffh
+0040   2014 D3 10       	out	(shifter),a	;output blue data
+0041   2016 00          	nop
+0042   2017 00          	nop
+0043   2018 00          	nop
+0044   2019 00          	nop
+0045   201A 00          	nop
+0046   201B             
+0047   201B             ; If you have a CRO, look at the regenerated data
+0048   201B             ; coming out of the first ARGB
+0049   201B             ;
+0050   201B             ;second WS2812B data
+0051   201B             ;
+0052   201B 3E FF       	ld	a,0ffh
+0053   201D D3 10       	out	(shifter),a	;output green data
+0054   201F 00          	nop
+0055   2020 00          	nop
+0056   2021 00          	nop
+0057   2022 00          	nop
+0058   2023 00          	nop
+0059   2024             
+0060   2024 3E FF       	ld	a,0ffh
+0061   2026 D3 10       	out	(shifter),a	;output red data
+0062   2028 00          	nop
+0063   2029 00          	nop
+0064   202A 00          	nop
+0065   202B 00          	nop
+0066   202C 00          	nop
+0067   202D             
+0068   202D 3E FF       	ld	a,0ffh
+0069   202F D3 10       	out	(shifter),a	;output blue data
+0070   2031 00          	nop
+0071   2032 00          	nop
+0072   2033 00          	nop
+0073   2034 00          	nop
+0074   2035 00          	nop
+0075   2036             
+0076   2036 CD 17 22    	call	ResetDelay
+0077   2039 C3 00 20    	jp		CalHiPulse
+0078   203C             
+0079   203C             ;
+0080   203C             ; set the green LED to full brightness and
+0081   203C             ; the red and blue off to produce mostly the
+0082   203C             ; 'low' pulse width.
+0083   203C             ; Adjust P1 for green.
+0084   203C             
+0085   2100             	.org	2100h
+0086   2100             
+0087   2100             CalLoPulse
+0088   2100             
+0089   2100             
+0090   2100             ;first WS2812 data
+0091   2100             
+0092   2100             
+0093   2100 3E FF       	ld	a,0ffh
+0094   2102             
+0095   2102 D3 10       	out	(shifter),a	;output green data
+0096   2104 00          	nop
+0097   2105 00          	nop
+0098   2106 00          	nop
+0099   2107 00          	nop
+0100   2108 00          	nop
+0101   2109 3E 00       	ld	a,00h
+0102   210B             
+0103   210B D3 10       	out	(shifter),a	;output red data
+0104   210D 00          	nop
+0105   210E 00          	nop
+0106   210F 00          	nop
+0107   2110 00          	nop
+0108   2111 00          	nop
+0109   2112 3E 00       	ld	a,00h
+0110   2114             
+0111   2114 D3 10       	out	(shifter),a	;output blue data
+0112   2116 00          	nop
+0113   2117 00          	nop
+0114   2118 00          	nop
+0115   2119 00          	nop
+0116   211A 00          	nop
+0117   211B             ; If you have a CRO, look at the regenerated data
+0118   211B             ; coming out of the first ARGB
+0119   211B             ;second WS2812B data
+0120   211B             
+0121   211B 3E FF       	ld	a,0ffh
+0122   211D             
+0123   211D D3 10       	out	(shifter),a	;output green data
+0124   211F 00          	nop
+0125   2120 00          	nop
+0126   2121 00          	nop
+0127   2122 00          	nop
+0128   2123 00          	nop
+0129   2124 3E 00       	ld	a,00h
+0130   2126             
+0131   2126 D3 10       	out	(shifter),a	;output red data
+0132   2128 00          	nop
+0133   2129 00          	nop
+0134   212A 00          	nop
+0135   212B 00          	nop
+0136   212C 00          	nop
+0137   212D 3E 00       	ld	a,00h
+0138   212F             
+0139   212F D3 10       	out	(shifter),a	;output blue data
+0140   2131 00          	nop
+0141   2132 00          	nop
+0142   2133 00          	nop
+0143   2134 00          	nop
+0144   2135 00          	nop
+0145   2136             
+0146   2136 CD 17 22    	call	ResetDelay
+0147   2139 C3 00 21    	jp		CalLoPulse
+0148   213C             
+0149   213C             
+0150   2200             	.org	2200h
+0151   2200             
+0152   2200             ; output 6 bytes 
+0153   2200             
+0154   2200             onebyte
+0155   2200 06 06       	ld	b,6
+0156   2202 3E AA       obyte1	ld	a,0aah
+0157   2204 D3 10       	out	(shifter),a	;output data
+0158   2206 00          	nop
+0159   2207 00          	nop
+0160   2208 00          	nop
+0161   2209 00          	nop
+0162   220A 10 F6       	djnz	obyte1
+0163   220C             
+0164   220C CD 17 22    	call	ResetDelay
+0165   220F             
+0166   220F 06 19       	ld	b,25
+0167   2211 CD 1D 22    	call	msdelay
+0168   2214 C3 00 22    	jp	onebyte
+0169   2217             
+0170   2217             ; reset the light sequence
+0171   2217             
+0172   2217             ResetDelay
+0173   2217 06 10       	ld	b,$10
+0174   2219 00          ResetDelay1	nop
+0175   221A 10 FD       	djnz	ResetDelay1
+0176   221C C9          	ret
+0177   221D             ;------------------
+0178   221D             ; millisecond delay
+0179   221D             ;------------------
+0180   221D             ; approx. 1 millisecond delay
+0181   221D             ; 
+0182   221D             ; entry : b = 1 to 255 milliseconds
+0183   221D             ; exit  : b = 0
+0184   221D             ;
+0185   221D C5          msdelay	push	bc	;11t
+0186   221E 06 E9       	ld	b,233	;7t
+0187   2220 00          msdel1	nop	;4t
+0188   2221 10 FD       	djnz	msdel1	;nz=13t,z=8t
+0189   2223 C1          	pop	bc	;10t
+0190   2224 10 F7       	djnz	msdelay	;nz=13t,z=8t
+0191   2226 C9          	ret	;10t
+0192   2227             	.end
+
+
+
+Label        Value      Label        Value      Label        Value
+------------------      ------------------      ------------------
+CalHiPulse    2000      CalLoPulse    2100      ResetDelay    2217      
+ResetDelay1   2219      msdelay       221D      msdel1        2220      
+onebyte       2200      obyte1        2202      shifter       0010      
+
+tasm: Number of errors = 0

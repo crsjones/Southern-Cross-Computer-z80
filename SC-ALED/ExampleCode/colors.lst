@@ -1,0 +1,154 @@
+0001   0000             ;---------------------------------------
+0002   0000             ; Southern Cross ALED WS2812B ARGB board 
+0003   0000             ;---------------------------------------
+0004   0000             ;
+0005   0000             ; Craig RS Jones Dec 2024
+0006   0000             ;
+0007   0000             ; steps through four colours on a single ARGB
+0008   0000             ;
+0009   0000             shifter	.equ	10h	;ALED board I/O Address
+0010   0000             
+0011   2000             	.org	2000h
+0012   2000             
+0013   2000 C3 06 20    	jp	init
+0014   2003             green	.block	1
+0015   2004             red	.block	1
+0016   2005             blue	.block	1
+0017   2006             
+0018   2006             ;blue
+0019   2006 3E 0F       init	ld	a,0fh
+0020   2008 32 03 20    	ld	(green),a
+0021   200B 3E 00       	ld	a,00h
+0022   200D 32 04 20    	ld	(red),a
+0023   2010 3E 1A       	ld	a,1ah
+0024   2012 32 05 20    	ld	(blue),a
+0025   2015 CD 71 20    	call	show
+0026   2018 CD 96 20    	call ResetDelay
+0027   201B 06 01       	ld	b,1
+0028   201D CD 9C 20    	call	sdelay
+0029   2020             	
+0030   2020             ;red
+0031   2020 3E 00       	ld	a,00h
+0032   2022 32 03 20    	ld	(green),a
+0033   2025 3E 20       	ld	a,20h
+0034   2027 32 04 20    	ld	(red),a
+0035   202A 3E 00       	ld	a,00h
+0036   202C 32 05 20    	ld	(blue),a
+0037   202F CD 71 20    	call	show
+0038   2032 CD 96 20    	call ResetDelay
+0039   2035 06 01       	ld	b,1
+0040   2037 CD 9C 20    	call	sdelay
+0041   203A             
+0042   203A             ;yellow
+0043   203A 3E 18       	ld	a,18h
+0044   203C 32 03 20    	ld	(green),a
+0045   203F 3E 1E       	ld	a,1eh
+0046   2041 32 04 20    	ld	(red),a
+0047   2044 3E 00       	ld	a,00h
+0048   2046 32 05 20    	ld	(blue),a
+0049   2049 CD 71 20    	call	show
+0050   204C CD 96 20    	call ResetDelay
+0051   204F 06 01       	ld	b,1
+0052   2051 CD 9C 20    	call	sdelay
+0053   2054             
+0054   2054             ;green
+0055   2054 3E 1E       	ld	a,1eh
+0056   2056 32 03 20    	ld	(green),a
+0057   2059 3E 00       	ld	a,00h
+0058   205B 32 04 20    	ld	(red),a
+0059   205E 3E 00       	ld	a,00h
+0060   2060 32 05 20    	ld	(blue),a
+0061   2063 CD 71 20    	call	show
+0062   2066 CD 96 20    	call ResetDelay
+0063   2069 06 01       	ld	b,1
+0064   206B CD 9C 20    	call	sdelay
+0065   206E C3 06 20    	jp	init
+0066   2071             
+0067   2071             ;
+0068   2071             ; update the WS2812B
+0069   2071             ;
+0070   2071             show
+0071   2071 3A 03 20    	ld	a,(green)
+0072   2074 D3 10       	out	(shifter),a	;output green data
+0073   2076 23          	inc	hl
+0074   2077 00          	nop
+0075   2078 00          	nop
+0076   2079 00          	nop
+0077   207A 00          	nop
+0078   207B 00          	nop
+0079   207C             
+0080   207C 3A 04 20    	ld	a,(red)
+0081   207F D3 10       	out	(shifter),a	;output red data
+0082   2081 23          	inc	hl
+0083   2082 00          	nop
+0084   2083 00          	nop
+0085   2084 00          	nop
+0086   2085 00          	nop
+0087   2086 00          	nop
+0088   2087             
+0089   2087 3A 05 20    	ld	a,(blue)
+0090   208A D3 10       	out	(shifter),a	;output blue data
+0091   208C 23          	inc	hl
+0092   208D 00          	nop
+0093   208E 00          	nop
+0094   208F 00          	nop
+0095   2090 00          	nop
+0096   2091 00          	nop
+0097   2092 CD 96 20    	call	ResetDelay	;no more data
+0098   2095 C9          	ret
+0099   2096             ;-----------------------
+0100   2096             ; end the light sequence
+0101   2096             ;-----------------------
+0102   2096             ResetDelay
+0103   2096 06 10       	ld	b,$10
+0104   2098 00          ResetDelay1	nop
+0105   2099 10 FD       	djnz	ResetDelay1
+0106   209B C9          	ret
+0107   209C             ;-------------
+0108   209C             ; second delay
+0109   209C             ;-------------
+0110   209C             ; one second delay
+0111   209C             ;
+0112   209C             ; entry : b = 1 to 255 seconds
+0113   209C             ; exit  : b = 0
+0114   209C             ;
+0115   209C             sdelay
+0116   209C C5          sdelay1	push	bc
+0117   209D 06 0A       	ld	b,10
+0118   209F C5          sdelay2	push	bc
+0119   20A0 06 64       	ld	b,100
+0120   20A2 CD AC 20    	call	msdelay
+0121   20A5 C1          	pop	bc
+0122   20A6 10 F7       	djnz	sdelay2
+0123   20A8 C1          	pop	bc
+0124   20A9 10 F1       	djnz	sdelay1
+0125   20AB C9          	ret
+0126   20AC             
+0127   20AC             ;------------------
+0128   20AC             ; millisecond delay
+0129   20AC             ;------------------
+0130   20AC             ; approx. 1 millisecond delay
+0131   20AC             ; 
+0132   20AC             ; entry : b = 1 to 255 milliseconds
+0133   20AC             ; exit  : b = 0
+0134   20AC             ;
+0135   20AC C5          msdelay	push	bc	;11t
+0136   20AD 06 E9       	ld	b,233	;7t
+0137   20AF 00          msdel1	nop	;4t
+0138   20B0 10 FD       	djnz	msdel1	;nz=13t,z=8t
+0139   20B2 C1          	pop	bc	;10t
+0140   20B3 10 F7       	djnz	msdelay	;nz=13t,z=8t
+0141   20B5 C9          	ret	;10t
+0142   20B6             	.end
+
+
+
+Label        Value      Label        Value      Label        Value
+------------------      ------------------      ------------------
+ResetDelay    2096      ResetDelay1   2098      blue          2005      
+green         2003      init          2006      msdelay       20AC      
+msdel1        20AF      red           2004      shifter       0010      
+show          2071      sdelay        209C      sdelay1       209C      
+sdelay2       209F      
+
+tasm: Number of errors = 0
