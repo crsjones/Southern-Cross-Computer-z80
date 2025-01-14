@@ -9,7 +9,7 @@ Kitsrus distributed the kit into the US and the UK and was sold online from Hong
 The Southern Cross Computer appeared in Australia's Silicon Chip Magazine in the August 1993 edition.
 A follow up article appeared in Silicon Chip in December 1993 describing the 8x8 LED Matrix and 8 Channel Relay add-on board.
 
-A facebook group for the Southern Cross has been established 
+There is a Facebook group for the Southern Cross SBC
 [https://www.facebook.com/groups/1553416258519631)
 
 ### SC-8x8   8 x 8 LED Matrix
@@ -26,6 +26,9 @@ Expansion memory board. 2x28 pin sockets for either 8kx8 or 32kx8 devices.
 Connect your expansion boards to this CPU board instead of the Southern Cross SBC!
 ### SC-BP
 An expandable six slot backplane that connects to the SC expansion connector.
+
+### SC-ALED
+A hardware, parallel to serial PWM WS2812B addressable RGB LED driver board.
 
 # Current Version
 
