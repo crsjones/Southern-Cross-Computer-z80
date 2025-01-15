@@ -7,7 +7,7 @@
 
 The Backplane board allows the expansion of the Southern Cross SBC, the 40 way Box header on the main board brings out all of the Z80 pins.
 
-You can also use the backplane with the processor board, a expansion memory board and a serial port board to create a stand-alone system.
+You can also use the backplane with the processor board, a expansion memory board and a serial port board to create a stand-alone "rack" system.
 
 ![Southern Cross Rack Mount](SC-BPRack.jpg)
 
