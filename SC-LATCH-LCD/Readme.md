@@ -8,5 +8,5 @@ The code uses the same routines as the monitor uses for the seven segment displa
 string out the serial port.
  
 The code is a work in progress so the backlight control is currently not implemented and there 
-are some additional functions needed to conplete the LCD driver.
+are some additional functions needed to complete the LCD driver.
 
