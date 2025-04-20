@@ -1,0 +1,709 @@
+0001   0000             #include "scm18_include.asm"
+0001+  0000             ;--------------------------------------------
+0002+  0000             ; S O U T H E R N   C R O S S   M O N I T O R
+0003+  0000             ;--------------------------------------------
+0004+  0000             ;
+0005+  0000             ;  MONITOR DEFINITIONS FILE 
+0006+  0000             ;  Version 1.8
+0007+  0000             ;
+0008+  0000             ; WRITTEN BY CRAIG R. S. JONES
+0009+  0000             ; MELBOURNE, AUSTRALIA.
+0010+  0000             ;
+0011+  0000             ;
+0012+  0000             ; SOUTHERN CROSS I/O ASSIGNMENTS
+0013+  0000             ;
+0014+  0000             IO0	.EQU	80H	;IO PORT 0
+0015+  0000             IO1	.EQU	81H	;IO PORT 1
+0016+  0000             IO2	.EQU	82H	;IO PORT 2
+0017+  0000             IO3	.EQU	83H	;IO PORT 3
+0018+  0000             DISPLY	.EQU	84H	;DISPLAY LATCH
+0019+  0000             SCAN	.EQU	85H	;DISPLAY SCAN LATCH
+0020+  0000             KEYBUF	.EQU	86H	;KEYBOARD BUFFER
+0021+  0000             IO7	.EQU	87H	;ENABLE/DISABLE SINGLE STEPPER (IF INSTALLED)
+0022+  0000             ;---------------
+0023+  0000             ; RAM MEMORY MAP
+0024+  0000             ;---------------
+0025+  0000             BOTRAM	.EQU	2000H	;BOTTOM OF SRAM
+0026+  0000             TOPRAM	.EQU	3FFFH	;TOP OF SRAM
+0027+  0000             ;
+0028+  0000             VARBLS	.EQU	TOPRAM-0FFH	;MONITOR VARIABLES
+0029+  0000             BUFFER	.EQU	VARBLS-0100H	;GENERAL PURPOSE BUFFER AREA
+0030+  0000             ISTACK	.EQU	BUFFER - 0200H	;INITIAL MONITOR STACK
+0031+  0000             ;
+0032+  0000             RAMEND	.EQU	ISTACK-0400H	;END OF USER RAM
+0033+  0000             RAMSRT	.EQU	BOTRAM	;START OF USER RAM
+0034+  0000             ;
+0035+  0000             ; BIT BANG BAUD RATE CONSTANTS
+0036+  0000             ;
+0037+  0000             B300	.EQU	0220H	;300 BAUD
+0038+  0000             B1200	.EQU	0080H	;1200 BAUD
+0039+  0000             B2400	.EQU	003FH	;2400 BAUD
+0040+  0000             B4800	.EQU	001BH	;4800 BAUD
+0041+  0000             B9600	.EQU	000BH	;9600 BAUD
+0042+  0000             ;
+0043+  0000             ; KEY CODES
+0044+  0000             ;
+0045+  0000             KEYFN	.EQU	10H	;FN OR GO KEY
+0046+  0000             KEYAD	.EQU	11H	;ADDRESS KEY
+0047+  0000             KEYINC	.EQU	12H	;PLUS KEY
+0048+  0000             KEYDEC	.EQU	13H	;MINUS KEY
+0049+  0000             ;-------------------------
+0050+  0000             ; MONITOR GLOBAL VARIABLES
+0051+  0000             ;-------------------------
+0052+  0000             ;
+0053+  3F00             	.ORG	VARBLS
+0054+  3F00             ;
+0055+  3F00             ;SERIAL MONITOR VARIABLES
+0056+  3F00             ;
+0057+  3F00             VARIDX	.BLOCK	16	;RESERVE SOME SPACE FOR INDEXED VARIABLES (SEE INTELH)
+0058+  3F10             SPSAVE	.BLOCK	2	;SAVE THE STACK POINTER
+0059+  3F12             ADDR	.BLOCK	2	;THE ADDRESS
+0060+  3F14             DATA	.BLOCK	1	;THE DATA
+0061+  3F15             ;
+0062+  3F15             FUNTBL	.BLOCK	 2	;FN TABLE ADDRESS
+0063+  3F17             ;
+0064+  3F17             ; DALLAS SMARTWATCH REGISTERS
+0065+  3F17             ;
+0066+  3F17             CALMDE	.BLOCK	2	;CALENDAR MODE
+0067+  3F19             SWREG0	.BLOCK	1	;10THS, 100THS
+0068+  3F1A             SWREG1	.BLOCK	1	;SECONDS
+0069+  3F1B             SWREG2	.BLOCK	1	;MINUTES
+0070+  3F1C             SWREG3	.BLOCK	1	;HOURS
+0071+  3F1D             SWREG4	.BLOCK	1	;DAY
+0072+  3F1E             SWREG5	.BLOCK	1	;DATE
+0073+  3F1F             SWREG6	.BLOCK	1	;MONTH
+0074+  3F20             SWREG7	.BLOCK	1	;YEAR
+0075+  3F21             ;
+0076+  3F21             BAUD	.BLOCK	2	;BIT BANG BAUD RATE
+0077+  3F23             KEYTIM	.BLOCK	2	;BEEP DELAY
+0078+  3F25             SPTEMP	.BLOCK	2	;TEMP SYSTEM CALL SP
+0079+  3F27             ;
+0080+  3F27             ; BLOCK FUNCTIONS
+0081+  3F27             ;
+0082+  3F27             COUNT	.BLOCK	2	;NUMBER OF BYTES TO MOVE
+0083+  3F29             BLKSRT	.BLOCK	2	;BLOCK START ADDRESS
+0084+  3F2B             BLKEND	.BLOCK	2	;BLOCK END ADDRESS
+0085+  3F2D             BLKDST	.BLOCK	2	;DESTINATION ADDRESS
+0086+  3F2F             ;
+0087+  3F2F             FUNJMP	.BLOCK	2	;FN FN KEY JUMP ADDRESS
+0088+  3F31             ;
+0089+  3F31             ; DISPLAY SCAN REGISTERS
+0090+  3F31             ;
+0091+  3F31             DISBUF	.BLOCK	6	;DISPLAY BUFFER
+0092+  3F37             ONTIM	.BLOCK	1	;DISPLAY SCAN ON TIME
+0093+  3F38             OFTIM	.BLOCK	1	;DISPLAY SCAN OFF TIME
+0094+  3F39             ;
+0095+  3F39             ; MONITOR VARIABLES
+0096+  3F39             ;
+0097+  3F39             MODE	.BLOCK	2	;DISPLAY MODE
+0098+  3F3B             ADRESS	.BLOCK	2	;USER ADDRESS
+0099+  3F3D             KEYDEL	.BLOCK	2	;AUTO INCREMENT DELAY
+0100+  3F3F             ;
+0101+  3F3F             ; TEMPORARY REGISTER STORAGE
+0102+  3F3F             ;
+0103+  3F3F             REGPNT	.BLOCK	2	;REGISTER POINTER
+0104+  3F41             TMPPC	.BLOCK	2	;PROGRAM COUNTER
+0105+  3F43             TMPAF	.BLOCK	2	;ACCUMULATOR,FLAG
+0106+  3F45             TMPBC	.BLOCK	2	;BC REGISTER PAIR
+0107+  3F47             TMPDE	.BLOCK	2	;DE REGISTER PAIR
+0108+  3F49             TMPHL	.BLOCK	2	;HL REGISTER PAIR
+0109+  3F4B             TMPIX	.BLOCK	2	;INDEX REGISTER X
+0110+  3F4D             TMPIY	.BLOCK	2	;INDEX REGISTER Y
+0111+  3F4F             TMPSP	.BLOCK	2	;STACK POINTER
+0112+  3F51             ;
+0113+  3F51             ; RESTART JUMP TABLE AND HARWARE TEST
+0114+  3F51             ;
+0115+  3F51             RST08	.BLOCK	2	;RESTART 08H JUMP
+0116+  3F53             RST10	.BLOCK	2	;RESTART 10H JUMP
+0117+  3F55             RST18	.BLOCK	2	;RESTART 18H JUMP
+0118+  3F57             RST20	.BLOCK	2	;RESTART 20H JUMP
+0119+  3F59             RST28	.BLOCK	2	;RESTART 28H JUMP
+0120+  3F5B             RST38	.BLOCK	2	;INT INTERRUPT JUMP
+0121+  3F5D             RST66	.BLOCK	2	;NMI INTERRUPT JUMP
+0122+  3F5F             RAMSUM	.BLOCK	1	;USER RAM CHECKSUM
+0123+  3F60             DALLAS	.BLOCK	1	;RAM TEST LOCATION
+0124+  3F61             SYSERR	.BLOCK	2	;SYSTEM CALL ERROR JUMP
+0125+  3F63             ;--------------------
+0126+  3F63             ; SYSTEM CALL NUMBERS
+0127+  3F63             ;--------------------
+0128+  3F63             ;
+0129+  3F63             ;  LD   C,SYSTEM CALL NUMBER
+0130+  3F63             ;  RST  30H
+0131+  3F63             ;
+0132+  3F63             MAIN	.EQU	0	;RESTART MONITOR
+0133+  3F63             VERS	.EQU	1	;RETURNS MONITOR VERSION
+0134+  3F63             DISADD	.EQU	2	;ADDRESS -> DISPLAY BUFFER
+0135+  3F63             DISBYT	.EQU	3	;DATA -> DISPLAY BUFFER
+0136+  3F63             CLRBUF	.EQU	4	;CLEAR DISPLAY BUFFER
+0137+  3F63             SCAND	.EQU	5	;SCAN DISPLAY
+0138+  3F63             CONBYT	.EQU	6	;BYTE -> DISPLAY CODE
+0139+  3F63             CONVHI	.EQU	7	;HI NYBBLE -> DISPLAY CODE
+0140+  3F63             CONVLO	.EQU	8	;LO NYBBLE - > DISPLAY CODE
+0141+  3F63             SKEYIN	.EQU	9	;SCAN DISPLAY UNTIL KEY PRESS
+0142+  3F63             SKEYRL	.EQU	10	;SCAN DISPLAY UNTIL KEY RELEASE
+0143+  3F63             KEYIN	.EQU	11	;WAIT FOR KEY PRESS
+0144+  3F63             KEYREL	.EQU	12	;WAIT FOR KEY RELEASE
+0145+  3F63             MENU	.EQU	13	;SELECT ENTRY FROM MENU
+0146+  3F63             CHKSUM	.EQU	14	;CALCULATE CHECKSUM
+0147+  3F63             MUL16	.EQU	15	;16 BIT MULTIPLY
+0148+  3F63             RAND	.EQU	16	;GENERATE RANDOM NUMBER
+0149+  3F63             INDEXB	.EQU	17	;INDEX INTO BYTE TABLE
+0150+  3F63             INDEXW	.EQU	18	;INDEX INTO WORD TABLE
+0151+  3F63             MUSIC	.EQU	19	;PLAY MUSIC TABLE
+0152+  3F63             TONE	.EQU	20	;PLAY A NOTE
+0153+  3F63             BEEP	.EQU	21	;KEY ENTRY BEEP
+0154+  3F63             SKATE	.EQU	22	;SCAN 8X8 DISPLAY
+0155+  3F63             TXDATA	.EQU	23	;TRANSMIT SERIAL BYTE
+0156+  3F63             RXDATA	.EQU	24	;RECEIVE SERIAL BYTE
+0157+  3F63             ASCHEX	.EQU	25	;ASCII CODE -> HEX
+0158+  3F63             WWATCH	.EQU	26	;WRITE TO SMART WATCH
+0159+  3F63             RWATCH	.EQU	27	;READ FROM SMART WATCH
+0160+  3F63             ONESEC	.EQU	28	;ONE SECOND DELAY USING SMARTWATCH
+0161+  3F63             RLSTEP	.EQU	29	;RELAY SEQUENCER
+0162+  3F63             DELONE	.EQU	30	;ONE SECOND DELAY LOOP
+0163+  3F63             SCANKEY .EQU	31	;SCAN THE KEYBOARD
+0164+  3F63             INTELH	.EQU	32	;RECEIVE INTEL HEX FILE
+0165+  3F63             SPLIT	.EQU	33	;SEPARATE A BYTE INTO NYBBLES
+0166+  3F63             SNDMSG	.EQU	34	;SND ZERO TERMINATED STRING TO SERIAL PORT
+0167+  3F63             BITASC	.EQU	35	;CONVERT A BYTE INTO AN ASCII STRING OF ONES AND ZEROES
+0168+  3F63             WRDASC	.EQU	36	;CONVERT A WORD TO ASCII
+0169+  3F63             BYTASC	.EQU	37	;CONVERT A BYTE TO ASCII
+0170+  3F63             NYBASC	.EQU	38	;CONVERT A NYBBLE TO ASCII
+0171+  3F63             PCBTYP	.EQU	39	;RETURNS BOARD TYPE, SC OR TEC-1F
+0172+  3F63             PRNTSZ	.EQU	40	;INLINE SERIAL PRINT STRING
+0173+  3F63             KBDTYP	.EQU	41	;RETURNS KEYBOARD TYPE
+0174+  3F63             UPDATE	.EQU	42  ;UPDATE DISPLAY AND MODE DECIMAL POINT SEGMENTS
+0175+  3F63             VARRAM	.EQU	43	;RETURN BASE VARIABLE ADDRESS
+0176+  3F63             SERINI	.EQU	44	;INITIALISE BIT BANG SERIAL PORT
+0177+  3F63             SCBUG	.EQU	45	;SCBUG SERIAL MONITOR
+0178+  3F63             
+0179+  3F63             ;END OF INCLUDE FILE
+0002   3F63             ;
+0003   3F63             ; 4 bit LCD Driver  seven segment display replacement/addition
+0004   3F63             ;
+0005   3F63             
+0006   3F63             ;16 x 2 columns,rows
+0007   3F63             cols     .equ    16
+0008   3F63             rows     .equ    2
+0009   3F63             ;20 x 4 columns,rows
+0010   3F63             ;cols     .equ    20
+0011   3F63             ;rows     .equ    4
+0012   3F63             
+0013   3F63             ;latch bitfield
+0014   3F63             RSEL     .equ    4     ;lcd register select bit
+0015   3F63             ECLK     .equ    5     ;lcd e clock bit
+0016   3F63             BLIGHT   .equ    6     ;lcd backlight control bit
+0017   3F63             
+0018   3F63             ; ascii codes
+0019   3F63             ESC     .equ   1bh
+0020   3F63             CR      .equ   0dh
+0021   3F63             LF      .equ   0ah
+0022   3F63             
+0023   2000                      .org  2000h
+0024   2000             
+0025   2000 C3 08 20             jp    start
+0026   2003             
+0027   2003             LCDPORT  .block  1      ;use this latch I/o address
+0028   2004             
+0029   2004             
+0030   2004             test     .block  1
+0031   2005             var1     .block  1
+0032   2006             var2     .block  1
+0033   2007             backlight .block 1     ;backlight state
+0034   2008             
+0035   2008             
+0036   2008 CD 81 21    start   call   LCDinit
+0037   200B 06 02               ld     b,2
+0038   200D CD 2E 22            call   delae
+0039   2010             
+0040   2010 3E 80               ld     a,80h
+0041   2012 32 39 3F            ld     (MODE),a     ;start off in address mode
+0042   2015 0E 27               ld     c,PCBTYP
+0043   2017 F7                  rst    30h          ;get the board type from the monitor
+0044   2018 CD 5F 21            call   LCDprint
+0045   201B 21 2F 21            ld     hl,signon
+0046   201E CD 5F 21            call   LCDprint
+0047   2021 0E 01               ld     c,VERS
+0048   2023 F7                  rst    30h          ;get the monitor version
+0049   2024 CD 5F 21            call   LCDprint
+0050   2027             ;
+0051   2027             ; show the signon for 2 seconds
+0052   2027             ;
+0053   2027 06 02               ld     B,2
+0054   2029 0E 1E       L1      ld     c,DELONE
+0055   202B F7                  rst    30h
+0056   202C 10 FB               djnz   L1
+0057   202E             ;
+0058   202E             ; clear the display and home the cursor
+0059   202E             ;
+0060   202E CD 50 21    L3      call   LCDclear
+0061   2031 CD 54 21            call   LCDhome
+0062   2034             ;
+0063   2034             ;put the address in the buffer
+0064   2034             ;
+0065   2034 ED 5B 12 3F L2      ld     de,(ADDR)
+0066   2038 21 00 3F            ld     hl,VARIDX     ;build up the row 1 display in this buffer
+0067   203B 0E 24               ld     c,WRDASC
+0068   203D F7                  rst    30h           ;convert the addr to ASCII into buffer
+0069   203E             ;
+0070   203E             ; display the address or data sign
+0071   203E             ;
+0072   203E 3A 39 3F            ld     a,(MODE)
+0073   2041 CB 7F               bit    7,a           ;ADDR or DATA mode?
+0074   2043 CA 4E 20            jp     z,L9          ;In ADDR mode
+0075   2046             ; DATA mode
+0076   2046 3E 3E               ld     a,'>'
+0077   2048 CD 21 21            call   inbuf
+0078   204B C3 53 20            jp     L10
+0079   204E 3E 3C       L9      ld     a,'<'
+0080   2050 CD 21 21            call   inbuf
+0081   2053             ;
+0082   2053             ; put four bytes of data in
+0083   2053             ; the buffer starting at the displayed address
+0084   2053             ;
+0085   2053 ED 5B 12 3F L10     ld     de,(ADDR)
+0086   2057 1A                  ld     a,(de)
+0087   2058 0E 25               ld     c,BYTASC
+0088   205A F7                  rst    30h
+0089   205B CD 1F 21            call   spcbuf
+0090   205E 13                  inc    de
+0091   205F 1A                  ld     a,(de)
+0092   2060 0E 25               ld     c,BYTASC
+0093   2062 F7                  rst    30h
+0094   2063 CD 1F 21            call   spcbuf
+0095   2066 13                  inc    de
+0096   2067 1A                  ld     a,(de)
+0097   2068 0E 25               ld     c,BYTASC
+0098   206A F7                  rst    30h
+0099   206B CD 1F 21            call   spcbuf
+0100   206E 13                  inc    de
+0101   206F 1A                  LD     a,(de)
+0102   2070 0E 25               ld     c,BYTASC
+0103   2072 F7                  rst    30h
+0104   2073             ;
+0105   2073             ; the string is ready for the display
+0106   2073             ; put a zero terminator on it
+0107   2073             ;and put it on the display
+0108   2073             ;
+0109   2073 AF                  xor    a             ;terminate string
+0110   2074 77                  ld     (hl),a
+0111   2075 21 00 3F            ld     hl,VARIDX
+0112   2078 CD 5F 21            call   LCDprint      ;display string
+0113   207B             ;
+0114   207B             ; may as well send it out the serial port too...
+0115   207B             ;
+0116   207B 21 00 3F            ld     hl,VARIDX
+0117   207E 0E 22               ld     c,SNDMSG
+0118   2080 F7                  RST    30h
+0119   2081 CD 24 21            call   txcrlf
+0120   2084             ;
+0121   2084             ;get a key
+0122   2084             ;
+0123   2084 0E 1F       L5      ld     c,SCANKEY
+0124   2086 F7                  rst    30h
+0125   2087 CB 6F               bit    5,a
+0126   2089 28 F9               jr     Z,L5        ;no key press
+0127   208B E6 1F               and    1Fh         ;strip unused bits
+0128   208D 21 99 20            ld     hl,keytbl
+0129   2090 0E 0D               ld     c,MENU
+0130   2092 F7                  rst    30h
+0131   2093 0E 0C               ld     c,KEYREL
+0132   2095 F7                  rst    30h         ;wait for key release
+0133   2096 C3 2E 20            jp     L3
+0134   2099             ;
+0135   2099             ; main menu key table
+0136   2099             ;
+0137   2099 14          keytbl  .db 20
+0138   209A 00 01 02 03     .db 00h,01h,02h,03h,04h,05h,06h,07h
+0138   209E 04 05 06 07 
+0139   20A2 08 09 0A 0B     .db 08h,09h,0ah,0bh,0ch,0dh,0eh,0fh
+0139   20A6 0C 0D 0E 0F 
+0140   20AA 10 11 12 13     .db 10h,11h,12h,13h
+0141   20AE D6 20 D6 20     .dw hexkey,hexkey,hexkey,hexkey
+0141   20B2 D6 20 D6 20 
+0142   20B6 D6 20 D6 20     .dw hexkey,hexkey,hexkey,hexkey
+0142   20BA D6 20 D6 20 
+0143   20BE D6 20 D6 20     .dw hexkey,hexkey,hexkey,hexkey
+0143   20C2 D6 20 D6 20 
+0144   20C6 D6 20 D6 20     .dw hexkey,hexkey,hexkey,hexkey
+0144   20CA D6 20 D6 20 
+0145   20CE 05 21 06 21     .dw funkey,addkey,inckey,deckey ;sc-1 keys  fn  ad  +  -
+0145   20D2 0F 21 17 21 
+0146   20D6             ;
+0147   20D6             ;handle hex key presses
+0148   20D6             ;
+0149   20D6             hexkey
+0150   20D6 21 39 3F            ld     hl,MODE
+0151   20D9 CB 7E               bit    7,(hl)      ;addr or data mode?
+0152   20DB CA EC 20            jp     z,hexky2    ;in addr mode
+0153   20DE             ; data mode
+0154   20DE 2A 12 3F    hexky1  ld     hl,(ADDR)
+0155   20E1 CB 26               sla   (hl)         ;from the current
+0156   20E3 CB 26               sla   (hl)         ;address,move the
+0157   20E5 CB 26               sla   (hl)         ;lsn to the msn.
+0158   20E7 CB 26               sla   (hl)         ;put the key in
+0159   20E9 B6                  or    (hl)         ;the new data back at
+0160   20EA 77                  ld    (hl),a       ;the current address
+0161   20EB C9                  ret
+0162   20EC             ; address mode
+0163   20EC 2A 12 3F    hexky2  ld     hl,(ADDR)
+0164   20EF CB 25               sla    l           ;current address
+0165   20F1 CB 14               rl     h           ;and do a 16 bit
+0166   20F3 CB 25               sla    l           ;left shift 4 times
+0167   20F5 CB 14               rl     h           ;to make room
+0168   20F7 CB 25               sla    l           ;for the new key
+0169   20F9 CB 14               rl     h
+0170   20FB CB 25               sla    l
+0171   20FD CB 14               rl     h
+0172   20FF B5                  or     l           ;it in the least
+0173   2100 6F                  ld     l,a         ;significant nybble
+0174   2101 22 12 3F            ld     (ADDR),hl   ;save current address
+0175   2104 C9                  ret
+0176   2105             ;
+0177   2105             ; function key handler
+0178   2105             ;
+0179   2105 C9          funkey  ret
+0180   2106             ;
+0181   2106             ; toggle addr/data mode
+0182   2106             ;
+0183   2106 3A 39 3F    addkey  ld     a,(MODE)
+0184   2109 EE 80               xor    80h         ;toggle mode
+0185   210B 32 39 3F            ld     (MODE),a
+0186   210E C9                  ret
+0187   210F             ;
+0188   210F             ; handle plus key
+0189   210F             ;
+0190   210F 2A 12 3F    inckey  ld     hl,(ADDR)
+0191   2112 23                  inc    hl
+0192   2113 22 12 3F            ld     (ADDR),hl   ;increment the address
+0193   2116 C9                  ret
+0194   2117             ;
+0195   2117             ; handle minus key
+0196   2117             ;
+0197   2117 2A 12 3F    deckey  ld     hl,(ADDR)
+0198   211A 2B                  dec    hl
+0199   211B 22 12 3F            ld     (ADDR),hl
+0200   211E C9                  ret
+0201   211F             ;
+0202   211F             ; put a space in the buffer
+0203   211F             ;
+0204   211F 3E 20       spcbuf  ld     a,' '
+0205   2121 77          inbuf   ld     (hl),a
+0206   2122 23                  inc    hl
+0207   2123 C9                  ret
+0208   2124             ;
+0209   2124             ; send CR,LF to serial port
+0210   2124             ;
+0211   2124             txcrlf
+0212   2124 3E 0D           ld  a,CR
+0213   2126 0E 17           ld  c,TXDATA
+0214   2128 F7              rst  30h
+0215   2129 3E 0A           ld  a,LF
+0216   212B 0E 17           ld  c,TXDATA
+0217   212D F7              rst  30h
+0218   212E C9              ret
+0219   212F             ;sign on message
+0220   212F 20 53 43 4D signon  .db    " SCMON V",00H
+0220   2133 4F 4E 20 56 
+0220   2137 00 
+0221   2138             
+0222   2138             ;------------
+0223   2138             ;LCD routines
+0224   2138             ;------------
+0225   2138             ;basic functions
+0226   2138             ;LCDinit        initialise LCD*
+0227   2138             ;LCDclear       clear display*
+0228   2138             ;LCDhome        set cursor to top left*
+0229   2138             ;LCDsetCursor   set cursor to col,row
+0230   2138             ;LCDwrite       write a byte to the display*
+0231   2138             ;LCDprint       print a string on the display*
+0232   2138             ;LCDcursor      cursor on*
+0233   2138             ;LCDnoCursor    cursor off*
+0234   2138             ;LCDblink       blink cursor*
+0235   2138             ;LCDnoBlink     don't blink the cursor*
+0236   2138             ;LCDdisplay     turn on the display*
+0237   2138             ;LCDnoDisplay   turn off the display*
+0238   2138             ;LCDcreateChar  make a bitmapped character
+0239   2138             
+0240   2138             LCDdisplay
+0241   2138 3E 0C               ld   a,0ch       ;turn on the display
+0242   213A 18 1A               jr   cmd
+0243   213C             LCDnoDisplay             ;turn off the display
+0244   213C 3E 08               ld   a,08h
+0245   213E 18 16               jr   cmd
+0246   2140             LCDblink                 ;blink the cursor
+0247   2140 3E 0F               ld   a,0fh
+0248   2142 18 12               jr   cmd
+0249   2144             LCDnoBLink               ;don't blink the cursor
+0250   2144 3E 0E               ld   a,0eh
+0251   2146 18 0E               jr   cmd
+0252   2148             LCDnoCursor              ;turn off the cursor
+0253   2148 3E 0C               ld   a,0ch
+0254   214A 18 0A               jr   cmd
+0255   214C             LCDcursor                ;turn on the cursor
+0256   214C 3E 0E               ld   a,0eh
+0257   214E 18 06               jr   cmd
+0258   2150             LCDclear                 ;clear the LCD
+0259   2150 3E 01               ld   a,01h
+0260   2152 18 02               jr   cmd
+0261   2154             LCDhome                  ;set the cursor to the top left position
+0262   2154 3E 02               ld   a,02h
+0263   2156 CD E3 21    cmd     call writecmd
+0264   2159 06 01               ld   b,1
+0265   215B CD 2E 22            call delae
+0266   215E C9                  ret
+0267   215F             ;
+0268   215F             ; set cursor column,row
+0269   215F             ;
+0270   215F             ;map sequential display address to ddram address
+0271   215F             ;
+0272   215F             ;rows 0 to 3  (4)
+0273   215F             ;columns 0 to 19 (20)
+0274   215F             ;LCDsetCursor
+0275   215F             ;rowtbl   .db  00h,
+0276   215F             
+0277   215F             ;
+0278   215F             ; print a string on the LCD
+0279   215F             ;
+0280   215F             LCDprint 
+0281   215F 06 10               ld    b,16
+0282   2161 7E          LCDpr1  ld    a,(hl)
+0283   2162 FE 00               cp    00h         ;zero terminator, we are done.
+0284   2164 28 06               jr    z,LCDpr2 
+0285   2166 CD 08 22            call  writedata
+0286   2169 23                  inc   hl
+0287   216A 10 F5               djnz  LCDpr1
+0288   216C C9          LCDpr2  ret
+0289   216D             ;
+0290   216D             ; write a character
+0291   216D             ;
+0292   216D             LCDwrite
+0293   216D CD 08 22            call   writedata
+0294   2170 C9                  ret
+0295   2171             ;
+0296   2171             ; backlight on
+0297   2171             ;
+0298   2171             LCDblight
+0299   2171 AF                  xor   a
+0300   2172 CB F7               set    BLIGHT,a
+0301   2174 32 07 20            ld     (backlight),a
+0302   2177 D3 83               out    (IO3),a
+0303   2179 C9                  ret
+0304   217A             ;
+0305   217A             ; backlight off
+0306   217A             ;
+0307   217A             LCDnoBlight
+0308   217A AF                  xor    a
+0309   217B 32 07 20            ld     (backlight),a
+0310   217E D3 83               out    (IO3),a
+0311   2180 C9                  ret
+0312   2181             ;-------------------
+0313   2181             ; initialise the LCD
+0314   2181             ;-------------------
+0315   2181             ; initialise the LCD for a 4 bit interface
+0316   2181             ; this initialisation is based on 
+0317   2181             ; https://web.alfredstate.edu/faculty/weimandn/index.html
+0318   2181             ; refer to the "Initialization by instruction - 4-bit data interface" found here
+0319   2181             
+0320   2181             LCDinit
+0321   2181 AF                 xor   a
+0322   2182 D3 83              out   (IO3),a        ;make E low
+0323   2184 06 64              LD    b,100
+0324   2186 CD 2E 22           call  delae          ;initial 100ms power on delay
+0325   2189             ;
+0326   2189             ;special case of function set - lower four bits are not written
+0327   2189             ;
+0328   2189 06 05              ld    b,5            ;>4.1ms delay
+0329   218B CD D2 21           call  sfnset
+0330   218E             ;
+0331   218E             ;special case of function set - lower four bits are not written
+0332   218E             ;
+0333   218E 06 01              ld    b,1            ;> 100us delay
+0334   2190 CD D2 21           call  sfnset
+0335   2193             ;
+0336   2193             ;special case of function set - lower four bits are not written
+0337   2193             ;
+0338   2193 06 01              ld    b,1            ;> 100us delay
+0339   2195 CD D2 21           call  sfnset
+0340   2198             ;
+0341   2198             ; initial Function Set to change interface
+0342   2198             ;
+0343   2198 06 01              ld    b,1             ;>100us delay
+0344   219A 3E 02              ld    a,02h           ;DL=0  4-bit data
+0345   219C CD D4 21           call  sfnseta         ;change interface to 4 bit
+0346   219F             ;
+0347   219F             ; now in four bit mode, write commands as two 4-bit nybbles
+0348   219F             ;
+0349   219F 3E 28              ld    a,28h           ;Function Set N=1 2 rows, F=0 5x7 dots
+0350   21A1 CD E3 21           call  writecmd
+0351   21A4 06 01              ld    b,1             ;>53us delay
+0352   21A6 CD 2E 22           call  delae
+0353   21A9             
+0354   21A9 3E 08              ld    a,08h           ;display switch D=0,C=0,B=0 
+0355   21AB CD E3 21           call  writecmd
+0356   21AE 06 01              ld    b,1
+0357   21B0 CD 2E 22           call  delae
+0358   21B3             
+0359   21B3 3E 01              ld    a,01h
+0360   21B5 CD E3 21           call  writecmd        ;clear display
+0361   21B8 06 03              ld    b,3
+0362   21BA CD 2E 22           call  delae
+0363   21BD             
+0364   21BD 3E 06              ld    a,06h           ;entry mode set I/D=1, S=1
+0365   21BF CD E3 21           call  writecmd
+0366   21C2 06 01              ld    b,1
+0367   21C4 CD 2E 22           call  delae
+0368   21C7             
+0369   21C7 3E 0C              ld    a,0ch           ;display switch D=1,C=0,B=0
+0370   21C9 CD E3 21           call  writecmd
+0371   21CC 06 01              ld    b,1
+0372   21CE CD 2E 22           call  delae
+0373   21D1 C9                 ret
+0374   21D2             ;
+0375   21D2             ; ;special case of function set - lower four bits are not written 
+0376   21D2             ;
+0377   21D2 3E 03       sfnset  ld    a,03h
+0378   21D4 CB EF       sfnseta set    ECLK,a
+0379   21D6 D3 83               out    (IO3),a        ;make E high 
+0380   21D8 CB AF               res    ECLK,a
+0381   21DA D3 83               out    (IO3),a        ;make E low
+0382   21DC AF                  xor    a
+0383   21DD D3 83               out    (IO3),a
+0384   21DF CD 2E 22            call   delae
+0385   21E2 C9                  ret
+0386   21E3             ;-------------------------------------------------
+0387   21E3             ;write the command register in two four bit writes
+0388   21E3             ;-------------------------------------------------
+0389   21E3             writecmd
+0390   21E3 F5                 push   af
+0391   21E4             ;
+0392   21E4             ;write the high nybble
+0393   21E4             ;
+0394   21E4 E6 F0              and    0f0h          ;strip the low nybble
+0395   21E6 CB 1F              rr     a
+0396   21E8 CB 1F              rr     a
+0397   21EA CB 1F              rr     a
+0398   21EC CB 1F              rr     a           ;shift into the low nyblle to write
+0399   21EE CB EF              set    ECLK,a      ;or     20h make E high
+0400   21F0 D3 83              out    (IO3),a
+0401   21F2 CB AF              res    ECLK,a      ;and    0dfh make E low
+0402   21F4 D3 83              out    (IO3),a
+0403   21F6 AF                 xor    a
+0404   21F7 D3 83              out    (IO3),a
+0405   21F9             ;
+0406   21F9             ;write the low nybble
+0407   21F9             ;
+0408   21F9 F1                 pop    af
+0409   21FA E6 0F              and    0fh         ;strip the high nybble
+0410   21FC CB EF              set    ECLK,a      ;or     20h make E high
+0411   21FE D3 83              out    (IO3),a
+0412   2200 CB AF              res    ECLK,a      ;and    0dfh make E low
+0413   2202 D3 83              out    (IO3),a
+0414   2204 AF                 xor    a
+0415   2205 D3 83              out    (IO3),a
+0416   2207 C9                 ret
+0417   2208             ;----------------------------------------------
+0418   2208             ;write the data register in two four bit writes
+0419   2208             ;----------------------------------------------
+0420   2208             writedata
+0421   2208 F5                 push   af
+0422   2209             ;
+0423   2209             ;write the high nybble
+0424   2209             ;
+0425   2209 E6 F0              and    0f0h       ;strip the low nybble
+0426   220B CB 1F              rr     a
+0427   220D CB 1F              rr     a
+0428   220F CB 1F              rr     a
+0429   2211 CB 1F              rr     a
+0430   2213 F6 30              or     30h        ;make E and RS high to select data register
+0431   2215 D3 83              out    (IO3),a    ;write the high nybble
+0432   2217 CB AF              res    ECLK,a     ;make E low
+0433   2219 D3 83              out    (IO3),a
+0434   221B E6 10              and    10h        ;make E low and keep RS high
+0435   221D D3 83              out    (IO3),a
+0436   221F             ;
+0437   221F             ;write the low nybble
+0438   221F             ;
+0439   221F F1                 pop    af
+0440   2220 E6 0F              and    0fh        ;strip the high nybble
+0441   2222 F6 30              or     30h        ;make E high and keep RS high
+0442   2224 D3 83              out    (IO3),a    ;write the low nybble
+0443   2226 CB AF              res    ECLK,a     ;make E low
+0444   2228 D3 83              out    (IO3),a
+0445   222A AF                 xor    a
+0446   222B D3 83              out    (IO3),a
+0447   222D C9                 ret
+0448   222E             ;--------------------------
+0449   222E             ; approx. 1mS Delay @ 4MHz
+0450   222E             ;--------------------------
+0451   222E C5          delae  push   bc           ;11t
+0452   222F 06 E9              ld    b,233         ;7t
+0453   2231 00          delae2 nop                 ;4t
+0454   2232 10 FD              djnz  delae2        ;nz=13t,z=8t
+0455   2234 C1                 pop   bc            ;10t
+0456   2235 10 F7              djnz  delae         ;nz=13t,z=8t
+0457   2237 C9                 ret                 ;10t
+0458   2238                    .end
+
+
+Label        Value      Label        Value      Label        Value
+------------------      ------------------      ------------------
+ADDR          3F12      ADRESS        3F3B      ASCHEX        0019      
+BOTRAM        2000      BUFFER        3E00      B300          0220      
+B1200         0080      B2400         003F      B4800         001B      
+B9600         000B      BAUD          3F21      BLKSRT        3F29      
+BLKEND        3F2B      BLKDST        3F2D      BEEP          0015      
+BITASC        0023      BYTASC        0025      BLIGHT        0006      
+CALMDE        3F17      COUNT         3F27      CLRBUF        0004      
+CONBYT        0006      CONVHI        0007      CONVLO        0008      
+CHKSUM        000E      CR            000D      DISPLY        0084      
+DATA          3F14      DISBUF        3F31      DALLAS        3F60      
+DISADD        0002      DISBYT        0003      DELONE        001E      
+ECLK          0005      ESC           001B      FUNTBL        3F15      
+FUNJMP        3F2F      IO0           0080      IO1           0081      
+IO2           0082      IO3           0083      IO7           0087      
+ISTACK        3C00      INDEXB        0011      INDEXW        0012      
+INTELH        0020      KEYBUF        0086      KEYFN         0010      
+KEYAD         0011      KEYINC        0012      KEYDEC        0013      
+KEYTIM        3F23      KEYDEL        3F3D      KEYIN         000B      
+KEYREL        000C      KBDTYP        0029      LF            000A      
+LCDPORT       2003      L1            2029      L3            202E      
+L2            2034      L9            204E      L10           2053      
+L5            2084      LCDdisplay    2138      LCDnoDisplay  213C      
+LCDblink      2140      LCDnoBLink    2144      LCDnoCursor   2148      
+LCDcursor     214C      LCDclear      2150      LCDhome       2154      
+LCDprint      215F      LCDpr1        2161      LCDpr2        216C      
+LCDwrite      216D      LCDblight     2171      LCDnoBlight   217A      
+LCDinit       2181      MODE          3F39      MAIN          0000      
+MENU          000D      MUL16         000F      MUSIC         0013      
+NYBASC        0026      ONTIM         3F37      OFTIM         3F38      
+ONESEC        001C      PCBTYP        0027      PRNTSZ        0028      
+RAMEND        3800      RAMSRT        2000      REGPNT        3F3F      
+RST08         3F51      RST10         3F53      RST18         3F55      
+RST20         3F57      RST28         3F59      RST38         3F5B      
+RST66         3F5D      RAMSUM        3F5F      RAND          0010      
+RXDATA        0018      RWATCH        001B      RLSTEP        001D      
+RSEL          0004      SCAN          0085      SPSAVE        3F10      
+SWREG0        3F19      SWREG1        3F1A      SWREG2        3F1B      
+SWREG3        3F1C      SWREG4        3F1D      SWREG5        3F1E      
+SWREG6        3F1F      SWREG7        3F20      SPTEMP        3F25      
+SYSERR        3F61      SCAND         0005      SKEYIN        0009      
+SKEYRL        000A      SKATE         0016      SCANKEY       001F      
+SPLIT         0021      SNDMSG        0022      SERINI        002C      
+SCBUG         002D      TOPRAM        3FFF      TMPPC         3F41      
+TMPAF         3F43      TMPBC         3F45      TMPDE         3F47      
+TMPHL         3F49      TMPIX         3F4B      TMPIY         3F4D      
+TMPSP         3F4F      TONE          0014      TXDATA        0017      
+UPDATE        002A      VARBLS        3F00      VARIDX        3F00      
+VERS          0001      VARRAM        002B      WWATCH        001A      
+WRDASC        0024      addkey        2106      backlight     2007      
+cols          0010      cmd           2156      deckey        2117      
+delae         222E      delae2        2231      funkey        2105      
+hexkey        20D6      hexky1        20DE      hexky2        20EC      
+inckey        210F      inbuf         2121      keytbl        2099      
+rows          0002      start         2008      spcbuf        211F      
+signon        212F      sfnset        21D2      sfnseta       21D4      
+test          2004      txcrlf        2124      var1          2005      
+var2          2006      writecmd      21E3      writedata     2208      
+
+tasm: Number of errors = 0
