@@ -1,0 +1,319 @@
+0001   0000             ;-----------------------
+0002   0000             ; Southern Cross SBC
+0003   0000             ; Compact Flash routines
+0004   0000             ;-----------------------
+0005   0000             ;
+0006   0000             ; Copyright (C) 2025 Craig RS Jones
+0007   0000             ;
+0008   0000             ; This program is free software: you can redistribute it and/or modify it under the 
+0009   0000             ; terms of the GNU General Public License as published by the Free Software Foundation,
+0010   0000             ; either version 3 of the License, or (at your option) any later version.
+0011   0000             ;
+0012   0000             ; This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+0013   0000             ; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+0014   0000             ; See the GNU General Public License for more details.
+0015   0000             ;
+0016   0000             ; You should have received a copy of the GNU General Public License along with this program. 
+0017   0000             ; If not, see <https://www.gnu.org/licenses/>.
+0018   0000             ;
+0019   0000             ;
+0020   0000             
+0021   0000             ;LBA28 temporary registers
+0022   0000             LBA0    .DS 1   ;(LBA) 7..0
+0023   0001             LBA1    .DS 1   ;(LBA) 15..8
+0024   0002             LBA2    .DS 1   ;(LBA) 23..16
+0025   0003             LBA3    .DS 1   ;(LBA) 27..24 (bits 3..0)
+0026   0004             
+0027   0004             CFPORT  .ds   1            ;CF register file port
+0028   0005             CFDRV   .ds   1            ;primary or secondary drive
+0029   0006             
+0030   0006             ; Compact Flash Card task file
+0031   0006             CFBASE  .EQU    10H       ;task file base address
+0032   0006             CFDATA  .EQU    CFBASE+0  ; byte data register
+0033   0006             CFEROR  .EQU    CFBASE+1  ;(read) error register
+0034   0006             CFFEAT  .EQU    CFBASE+1  ;(write) feature register
+0035   0006             CFSCNT  .EQU    CFBASE+2  ;sector count
+0036   0006             CFLBA0  .EQU    CFBASE+3  ;(LBA) 7..0
+0037   0006             CFLBA1  .EQU    CFBASE+4  ;(LBA) 15..8
+0038   0006             CFLBA2  .EQU    CFBASE+5  ;(LBA) 23..16
+0039   0006             CFLBA3  .EQU    CFBASE+6  ;(LBA) select card/27..24 (LBA bits 3..0)
+0040   0006             CFSTAT  .EQU    CFBASE+7  ;(read) status
+0041   0006             CFCMD   .EQU    CFBASE+7  ;(write) command
+0042   0006              
+0043   0006             ; CF card commands
+0044   0006             CMDSRD  .EQU    20H      ;read sector
+0045   0006             CMDSWR  .EQU    30H      ;write sector
+0046   0006             CMDSF   .EQU    0EFH     ;set feature
+0047   0006             CMDID   .EQU    0ECH     ;identify card
+0048   0006             CMDDD   .EQU    90H      ;drive diagnostic
+0049   0006             
+0050   0006             ; status register bits
+0051   0006             BITBSY  .EQU    7        ;card busy
+0052   0006             BITRDY  .EQU    6        ;card ready to accept commands
+0053   0006             BITWRF  .EQU    5        ;write fault
+0054   0006             BITDSC  .EQU    4        ;card ready to accept new command
+0055   0006             BITDRQ  .EQU    3        ;data request
+0056   0006             BITERC  .EQU    2        ;data error corrected
+0057   0006             ;
+0058   0006             BITERR  .EQU    0        ;command has an error
+0059   0006             ;-------------------------------------------
+0060   0006             ;initialise CF card
+0061   0006             ; CFDRV = drive number 00h=drive 0, 10h=drive 1
+0062   0006             ;
+0063   0006             ; returns
+0064   0006             ; a=ffh NZ drive initialised
+0065   0006             ; a=0 Z drive not ready
+0066   0006             ;-------------------------------------------
+0067   0006             CFINIT
+0068   0006 3A 05 00            LD    A,(CFDRV)
+0069   0009 E6 10               AND   10H
+0070   000B D3 16               OUT  (CFLBA3),A      ;set the drive
+0071   000D             
+0072   000D CD 2C 00            CALL  CFRDY
+0073   0010 28 19               JR    Z,CFINIT2    ;drive not ready
+0074   0012             
+0075   0012 3E 01               LD    A,01H       ;enable 8-bit transfers
+0076   0014 D3 11               OUT   (CFFEAT),A
+0077   0016 3E EF               LD    A,CMDSF
+0078   0018 D3 17               OUT   (CFCMD),A   ;set feature command
+0079   001A             
+0080   001A CD 44 00            CALL  CFBSY
+0081   001D             
+0082   001D 3E 82               LD    A,82H       ;disable write cache
+0083   001F D3 11               OUT   (CFFEAT),A
+0084   0021 3E EF               LD    A,CMDSF
+0085   0023 D3 17               OUT   (CFCMD),A   ;set feature command
+0086   0025             
+0087   0025 CD 44 00            CALL  CFBSY
+0088   0028             
+0089   0028 3E FF               LD    A,0FFH
+0090   002A B7                  OR    A           ;a=ffh NZ
+0091   002B             CFINIT2
+0092   002B C9                  RET
+0093   002C             ;---------------------------------------------
+0094   002C             ; wait until CF card is ready
+0095   002C             ; the ready bit is cleared at power up going high 
+0096   002C             ; when the CF card is ready to accept commands
+0097   002C             ;
+0098   002C             ; returns a= cfstat, NZ drive is ready
+0099   002C             ;         a= 0, Z drive not ready
+0100   002C             ;---------------------------------------------
+0101   002C             CFRDY
+0102   002C 21 F4 01            LD    HL,500        ;maximum wait time 500ms
+0103   002F             CFRDY1
+0104   002F 06 01               LD    B,1
+0105   0031 CD FF 00            CALL  PWRDLY        ;delay 1ms
+0106   0034 DB 17               IN    A,(CFSTAT)    ;read card status
+0107   0036             ;
+0108   0036             ;test busy bit, no other bit in the status register is valid if
+0109   0036             ;the busy bit is high.
+0110   0036 CB 7F               BIT   BITBSY,A      ;busy?
+0111   0038 20 04               JR    NZ,CFRDY2     ;busy is high
+0112   003A             ;
+0113   003A             ;test ready bit, ready bit is low at power up
+0114   003A             ;and goes high when the drive is ready for a command
+0115   003A CB 77               BIT   BITRDY,A      ;ready?
+0116   003C 20 05               JR    NZ,CFRDY3     ;ready is high
+0117   003E 2B          CFRDY2  DEC   HL
+0118   003F 7C                  LD    A,H
+0119   0040 B5                  OR    L             ;timer finished?
+0120   0041 20 EC               JR    NZ,CFRDY1
+0121   0043 C9          CFRDY3  RET
+0122   0044             ;-------------------------------
+0123   0044             ; wait until CF card is not busy
+0124   0044             ; return a=cfstat Z CF drive not busy
+0125   0044             ;-------------------------------
+0126   0044             CFBSY
+0127   0044 DB 17               IN    A,(CFSTAT)    ;read card status
+0128   0046 CB 7F               BIT   BITBSY,A      ;ready?
+0129   0048 C2 44 00            JP    NZ,CFBSY
+0130   004B C9                  RET
+0131   004C             ;-------------------------------------------
+0132   004C             ; identify drive
+0133   004C             ;
+0134   004C             ; CFDRV = C/D/H (LBA3) register
+0135   004C             ;     set drive B4 = 0  drive 0
+0136   004C             ;               B4 = 1  drive 1
+0137   004C             ; (HL) = where to put 256 bytes of data
+0138   004C             ;
+0139   004C             ;-------------------------------------------
+0140   004C             CFINFO
+0141   004C 3A 05 00            LD    A,(CFDRV)
+0142   004F E6 10               AND   10H
+0143   0051 D3 16               OUT  (CFLBA3),A
+0144   0053             
+0145   0053 CD 44 00            CALL  CFBSY
+0146   0056             
+0147   0056             ;issue identify drive command
+0148   0056 3E EC               LD   A,CMDID
+0149   0058 D3 17               OUT  (CFCMD),A
+0150   005A             
+0151   005A             ; read data into buffer
+0152   005A             CINFO1
+0153   005A CD 44 00            CALL  CFBSY
+0154   005D DB 17               IN    A,(CFSTAT)
+0155   005F CB 5F               BIT   BITDRQ,A
+0156   0061 C8                  RET   Z
+0157   0062 DB 10               IN    A,(CFDATA)
+0158   0064 77                  LD    (HL),A
+0159   0065 23                  INC   HL
+0160   0066 18 F2               JR    CINFO1
+0161   0068             ;-------------------------------------------
+0162   0068             ; drive diagnostic
+0163   0068             ;
+0164   0068             ; returns  A
+0165   0068             ; 01h = no error detected
+0166   0068             ; 02h = formatter device error
+0167   0068             ; 03h = sector buffer error
+0168   0068             ; 04h = ecc circuitry error
+0169   0068             ; 05h = controlling microprocessor error
+0170   0068             ; 8xh = slave failed
+0171   0068             ;
+0172   0068             ;-------------------------------------------
+0173   0068             CFDIAG
+0174   0068 CD 44 00            CALL  CFBSY
+0175   006B AF                  XOR   A             ;command has no valid parameters
+0176   006C D3 16               OUT  (CFLBA3),A
+0177   006E             
+0178   006E             ; issue the drive diagnostic command
+0179   006E 3E 90               LD   A,CMDDD
+0180   0070 D3 17               OUT  (CFCMD),A
+0181   0072             ;
+0182   0072 CD 44 00            CALL  CFBSY
+0183   0075 3E 11               LD   A,CFEROR       ;get diagnostic codes
+0184   0077 C9                  RET
+0185   0078             ;-------------
+0186   0078             ;increment LBA
+0187   0078             ;-------------
+0188   0078             ; increment the 28 bit LBA 
+0189   0078             ;
+0190   0078 AF          INCLBA  XOR   A                ;clear carry
+0191   0079 3A 00 00            LD    A,(LBA0)         ;get the least significaNT LBA
+0192   007C 3C                  INC   A                ;increment and
+0193   007D 32 00 00            LD    (LBA0),A         ;save
+0194   0080             ;
+0195   0080 3A 01 00            LD    A,(LBA1)         ;propogate the carry...
+0196   0083 CE 00               ADC   A,00H
+0197   0085 32 01 00            LD    (LBA1),A
+0198   0088             ;
+0199   0088 3A 02 00            LD    A,(LBA2)
+0200   008B CE 00               ADC   A,00H
+0201   008D 32 02 00            LD    (LBA2),A
+0202   0090             ;
+0203   0090 3A 03 00            LD    A,(LBA3)
+0204   0093 CE 00               ADC   A,00H
+0205   0095 E6 0F               AND   0FH              ;ensure it doesn't overrun
+0206   0097 32 03 00            LD    (LBA3),A
+0207   009A C9                  RET
+0208   009B             ;-------------------------------------------
+0209   009B             ; READ
+0210   009B             ; Entry - 
+0211   009B             ;         (HL) = Memory Buffer Address
+0212   009B             ;   LBA3..LBA0 = Logical Block Address
+0213   009B             ;        CFDRV = primary or secondary drive
+0214   009B             ;-------------------------------------------
+0215   009B             READ
+0216   009B 3A 00 00            LD    A,(LBA0)
+0217   009E D3 13               OUT   (CFLBA0),A
+0218   00A0 3A 01 00            LD    A,(LBA1)
+0219   00A3 D3 14               OUT   (CFLBA1),A
+0220   00A5 3A 02 00            LD    A,(LBA2)
+0221   00A8 D3 15               OUT   (CFLBA2),A
+0222   00AA 3A 03 00            LD    A,(LBA3)    ;get the high order LBA
+0223   00AD 47                  LD    B,A
+0224   00AE 3A 05 00            LD    A,(CFDRV)   ;get the drive
+0225   00B1 B0                  OR    B
+0226   00B2 F6 E0               OR    0E0H        ;B7=1 B6=1 LBA B5=1 B4= DRIVE HS3-HS0=0
+0227   00B4 D3 16               OUT   (CFLBA3),A
+0228   00B6 3E 01               LD    A,1            ;number of sectors to read
+0229   00B8 D3 12               OUT   (CFSCNT),A
+0230   00BA             
+0231   00BA             ; issue the read command
+0232   00BA 3E 20               LD    A,CMDSRD
+0233   00BC D3 17               OUT   (CFCMD),A
+0234   00BE             
+0235   00BE             ;read the data from the sector into memory
+0236   00BE             READ1
+0237   00BE DB 17               IN    A,(CFSTAT)     ;wait until the 
+0238   00C0 CB 7F               BIT   BITBSY,A       ;CF card gets the data... 
+0239   00C2 20 FA               JR    NZ,READ1       ;CF card is still busy
+0240   00C4             
+0241   00C4             ; read in the 512 byte sector data 
+0242   00C4 CB 5F               BIT   BITDRQ,A       ;does the CF card have a data byte?
+0243   00C6 C8                  RET   Z              ;return if done
+0244   00C7 DB 10               IN    A,(CFDATA)     ;read from card,
+0245   00C9 77                  LD    (HL),A         ;write to memory,
+0246   00CA 23                  INC   HL             ;and inc the ptr
+0247   00CB 18 F1               JR    READ1          ;ready for the next byte
+0248   00CD             ;-------------------------------------------
+0249   00CD             ; Write Sector
+0250   00CD             ; Entry - (HL) = Sector Buffer Address
+0251   00CD             ;   LBA3..LBA0 = Logical Block Address
+0252   00CD             ;        CFDRV = primary or secondary drive
+0253   00CD             ;-------------------------------------------
+0254   00CD             WRITE
+0255   00CD 3A 00 00            LD    A,(LBA0)
+0256   00D0 D3 13               OUT   (CFLBA0),A
+0257   00D2 3A 01 00            LD    A,(LBA1)
+0258   00D5 D3 14               OUT   (CFLBA1),A
+0259   00D7 3A 02 00            LD    A,(LBA2)
+0260   00DA D3 15               OUT   (CFLBA2),A
+0261   00DC 3A 03 00            LD    A,(LBA3)    ;get the high order LBA
+0262   00DF 47                  LD    B,A
+0263   00E0 3A 05 00            LD    A,(CFDRV)   ;get the drive
+0264   00E3 B0                  OR    B
+0265   00E4 F6 E0               OR    0E0H        ;B7=1 B6=1 LBA B5=1 B4= DRIVE HS3-HS0=0
+0266   00E6 D3 16               OUT   (CFLBA3),A
+0267   00E8 3E 01               LD    A,1            ;number of sectors to write
+0268   00EA D3 12               OUT   (CFSCNT),A
+0269   00EC             
+0270   00EC             ; issue the write command
+0271   00EC 3E 30               LD    A,CMDSWR
+0272   00EE D3 17               OUT   (CFCMD),A
+0273   00F0             
+0274   00F0             ;write the data from memory to the sector
+0275   00F0             WRITE1
+0276   00F0 DB 17               IN    A,(CFSTAT)     ;wait until the 
+0277   00F2 CB 7F               BIT   BITBSY,A       ;CF card is ready for the data...
+0278   00F4 20 FA               JR    NZ,WRITE1      ;CF card is busy
+0279   00F6             
+0280   00F6             ;write the 512 byte sector data
+0281   00F6 CB 5F               BIT   BITDRQ,A       ;does CF card want a data byte?
+0282   00F8 C8                  RET   Z              ;return if done
+0283   00F9 7E                  LD    A,(HL)         ;read from memory,
+0284   00FA D3 10               OUT   (CFDATA),A     ;write to card,
+0285   00FC 23                  INC   HL             ;and inc the ptr
+0286   00FD 18 F1               JR    WRITE1         ;ready for the next byte
+0287   00FF             ;
+0288   00FF             ;power up delay
+0289   00FF C5          PWRDLY  PUSH  BC       ;11T
+0290   0100 06 E9               LD    B,233    ;7T
+0291   0102 00          PWRDLY1 NOP            ;4T
+0292   0103 10 FD               DJNZ  PWRDLY1   ;NZ=13T,Z=8T
+0293   0105 C1                  POP   BC       ;10T
+0294   0106 10 F7               DJNZ  PWRDLY  ;NZ=13T,Z=8T
+0295   0108 C9                  RET            ;10T
+0296   0109                     .END
+
+
+
+Label        Value      Label        Value      Label        Value
+------------------      ------------------      ------------------
+BITBSY        0007      BITRDY        0006      BITWRF        0005      
+BITDSC        0004      BITDRQ        0003      BITERC        0002      
+BITERR        0000      CFPORT        0004      CFDRV         0005      
+CFBASE        0010      CFDATA        0010      CFEROR        0011      
+CFFEAT        0011      CFSCNT        0012      CFLBA0        0013      
+CFLBA1        0014      CFLBA2        0015      CFLBA3        0016      
+CFSTAT        0017      CFCMD         0017      CMDSRD        0020      
+CMDSWR        0030      CMDSF         00EF      CMDID         00EC      
+CMDDD         0090      CFINIT        0006      CFINIT2       002B      
+CFRDY         002C      CFRDY1        002F      CFRDY2        003E      
+CFRDY3        0043      CFBSY         0044      CFINFO        004C      
+CINFO1        005A      CFDIAG        0068      INCLBA        0078      
+LBA0          0000      LBA1          0001      LBA2          0002      
+LBA3          0003      PWRDLY        00FF      PWRDLY1       0102      
+READ          009B      READ1         00BE      WRITE         00CD      
+WRITE1        00F0      
+
+tasm: Number of errors = 0
